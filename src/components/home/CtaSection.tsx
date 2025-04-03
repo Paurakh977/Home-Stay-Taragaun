@@ -14,12 +14,16 @@ const CtaSection = () => {
               Special discounts available for early bookings!
             </p>
             <div className="flex flex-wrap gap-4">
-              <Button size="lg" className="bg-white text-primary hover:bg-white/90">
+              <button 
+                className="h-11 px-8 rounded-md inline-flex items-center justify-center text-sm font-medium bg-[#1e40af] text-white hover:bg-[#1e3a8a] transition-colors duration-300"
+              >
                 Book Now
-              </Button>
-              <Button size="lg" variant="outline" className="text-white border-white hover:bg-white/10">
+              </button>
+              <button 
+                className="h-11 px-8 rounded-md inline-flex items-center justify-center text-sm font-medium bg-white text-gray-800 hover:bg-gray-100 transition-colors duration-300"
+              >
                 Contact Us
-              </Button>
+              </button>
             </div>
           </div>
           <div className="hidden lg:block lg:w-2/5">
