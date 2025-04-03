@@ -120,3 +120,46 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes smooth-entrance {
+  0% { 
+    transform: translateX(100px);
+    opacity: 0;
+  }
+  100% { 
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes vibrate {
+  0% { transform: translateX(0) translateY(0); }
+  20% { transform: translateX(-2px) translateY(-1px); }
+  40% { transform: translateX(2px) translateY(1px); }
+  60% { transform: translateX(-2px) translateY(0); }
+  80% { transform: translateX(2px) translateY(-1px); }
+  100% { transform: translateX(0) translateY(0); }
+}
+
+@keyframes slideUp {
+  0% { 
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  100% { 
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-entrance {
+  animation: smooth-entrance 3s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.animate-vibrate {
+  animation: vibrate 0.6s ease-in-out;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.5s ease-out forwards;
+}

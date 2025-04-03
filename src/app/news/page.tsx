@@ -7,7 +7,7 @@ export default function News() {
           <h2 className="text-2xl font-semibold mb-2">New Homestay Location Opening Soon</h2>
           <p className="text-gray-500 mb-4">Posted on April 15, 2023</p>
           <p className="text-gray-700">
-            We're excited to announce that we'll be opening a new homestay location in Pokhara next month! 
+            We&apos;re excited to announce that we&apos;ll be opening a new homestay location in Pokhara next month! 
             This beautiful property offers stunning views of the Annapurna range and is just a short walk from Phewa Lake.
           </p>
         </div>

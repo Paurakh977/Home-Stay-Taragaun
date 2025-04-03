@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
@@ -8,7 +8,25 @@ import { Button } from "@/components/ui/button";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isVibrating, setIsVibrating] = useState(false);
+  const [hasEntered, setHasEntered] = useState(false);
   const pathname = usePathname();
+
+  useEffect(() => {
+    // Start vibration after entrance animation completes
+    const entranceTimer = setTimeout(() => {
+      setHasEntered(true);
+      
+      const interval = setInterval(() => {
+        setIsVibrating(true);
+        setTimeout(() => setIsVibrating(false), 600);
+      }, 3000);
+      
+      return () => clearInterval(interval);
+    }, 3500); // Wait until entrance animation completes
+    
+    return () => clearTimeout(entranceTimer);
+  }, []);
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -85,10 +103,32 @@ const Navbar = () => {
                 }`}></span>
               </div>
             </Link>
+            
+            {/* Register Home Stay Button */}
+            <Link href="/register" className="ml-6">
+              <button 
+                className={`bg-primary text-white px-4 py-2 rounded-md text-sm font-medium transition-all hover:bg-primary/90 whitespace-nowrap shadow-md hover:shadow-lg ${
+                  !hasEntered ? 'animate-entrance' : isVibrating ? 'animate-vibrate' : ''
+                }`}
+              >
+                Register Home Stay
+              </button>
+            </Link>
           </div>
           
           {/* Mobile menu button */}
-          <div className="md:hidden flex items-center">
+          <div className="md:hidden flex items-center space-x-4">
+            {/* Register Home Stay Button (Mobile) */}
+            <Link href="/register">
+              <button 
+                className={`bg-primary text-white px-3 py-1.5 rounded-md text-xs font-medium transition-all hover:bg-primary/90 whitespace-nowrap shadow-sm hover:shadow-md ${
+                  !hasEntered ? 'animate-entrance' : isVibrating ? 'animate-vibrate' : ''
+                }`}
+              >
+                Register
+              </button>
+            </Link>
+            
             <Button
               variant="ghost"
               size="icon"
@@ -150,6 +190,23 @@ const Navbar = () => {
             >
               Contact Us
             </Link>
+            
+            {/* Register Home Stay Button in Mobile Menu */}
+            <div className="mt-4 px-3">
+              <Link 
+                href="/register" 
+                className="block"
+                onClick={toggleMenu}
+              >
+                <button 
+                  className={`w-full bg-primary text-white py-2 px-4 rounded-md text-base font-medium transition-all hover:bg-primary/90 shadow-sm hover:shadow-md ${
+                    !hasEntered ? 'animate-entrance' : isVibrating ? 'animate-vibrate' : ''
+                  }`}
+                >
+                  Register Home Stay
+                </button>
+              </Link>
+            </div>
           </div>
         </div>
       )}

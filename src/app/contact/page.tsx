@@ -10,7 +10,7 @@ export default function Contact() {
               <h2 className="text-2xl font-semibold mb-6 text-primary">Get in Touch</h2>
               <p className="text-gray-700 mb-6">
                 Have questions about our homestays or want to make a reservation? 
-                Fill out the form and we'll get back to you as soon as possible.
+                Fill out the form and we&apos;ll get back to you as soon as possible.
               </p>
               
               <div className="space-y-4 mb-6">
