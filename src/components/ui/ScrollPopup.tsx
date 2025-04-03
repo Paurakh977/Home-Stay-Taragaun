@@ -9,29 +9,25 @@ export default function ScrollPopup() {
   const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
-    // Always start with popup not visible and not dismissed
-    setIsDismissed(false);
-    setIsVisible(false);
+    // Skip if already dismissed
+    if (isDismissed) return;
 
-    // Add a small delay before starting to check for scrolling
-    // This ensures the component is fully mounted
-    const timeoutId = setTimeout(() => {
-      const handleScroll = () => {
-        // Show popup when user has scrolled down a bit (200px)
-        if (window.scrollY > 200 && !isDismissed) {
-          setIsVisible(true);
-        }
-      };
+    // Simple scroll handler - only show if not dismissed
+    function handleScroll() {
+      if (window.scrollY > 100 && !isDismissed && !isVisible) {
+        setIsVisible(true);
+      }
+    }
 
-      // Check once in case user has already scrolled
-      handleScroll();
-      
-      window.addEventListener("scroll", handleScroll);
-      return () => window.removeEventListener("scroll", handleScroll);
-    }, 500);
+    // Register scroll listener
+    window.addEventListener("scroll", handleScroll);
+    
+    // Check if already scrolled on load
+    handleScroll();
 
-    return () => clearTimeout(timeoutId);
-  }, [isDismissed]); // Add isDismissed to dependency array
+    // Cleanup
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [isVisible, isDismissed]);
 
   const handleDismiss = () => {
     setIsVisible(false);
@@ -70,6 +66,7 @@ export default function ScrollPopup() {
           <Link 
             href="/register"
             className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary/90 focus:outline-none"
+            onClick={handleDismiss}
           >
             Register Now
           </Link>
