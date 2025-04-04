@@ -107,7 +107,7 @@ const Navbar = () => {
             {/* Register Home Stay Button */}
             <Link href="/register" className="ml-6">
               <button 
-                className={`bg-primary text-white px-4 py-2 rounded-md text-sm font-medium transition-all hover:bg-primary/90 whitespace-nowrap shadow-md hover:shadow-lg ${
+                className={`bg-primary text-white px-4 py-2 rounded-md text-sm font-medium transition-all hover:bg-primary/90 whitespace-nowrap shadow-md hover:shadow-lg cursor-pointer ${
                   !hasEntered ? 'animate-entrance' : isVibrating ? 'animate-vibrate' : ''
                 }`}
               >
@@ -117,11 +117,11 @@ const Navbar = () => {
           </div>
           
           {/* Mobile menu button */}
-          <div className="md:hidden flex items-center space-x-4">
+          <div className="md:hidden flex items-center space-x-2">
             {/* Register Home Stay Button (Mobile) */}
             <Link href="/register">
               <button 
-                className={`bg-primary text-white px-3 py-1.5 rounded-md text-xs font-medium transition-all hover:bg-primary/90 whitespace-nowrap shadow-sm hover:shadow-md ${
+                className={`bg-primary text-white px-2 py-1 rounded-md text-xs font-medium transition-all hover:bg-primary/90 whitespace-nowrap shadow-sm hover:shadow-md cursor-pointer ${
                   !hasEntered ? 'animate-entrance' : isVibrating ? 'animate-vibrate' : ''
                 }`}
               >
@@ -134,9 +134,9 @@ const Navbar = () => {
               size="icon"
               aria-label="Toggle menu"
               onClick={toggleMenu}
-              className="text-gray-900"
+              className="text-gray-900 ml-1"
             >
-              {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
           </div>
         </div>
@@ -199,7 +199,7 @@ const Navbar = () => {
                 onClick={toggleMenu}
               >
                 <button 
-                  className={`w-full bg-primary text-white py-2 px-4 rounded-md text-base font-medium transition-all hover:bg-primary/90 shadow-sm hover:shadow-md ${
+                  className={`w-full bg-primary text-white py-2 px-4 rounded-md text-base font-medium transition-all hover:bg-primary/90 shadow-sm hover:shadow-md cursor-pointer ${
                     !hasEntered ? 'animate-entrance' : isVibrating ? 'animate-vibrate' : ''
                   }`}
                 >
