@@ -10,10 +10,12 @@ const formButtonVariants = cva(
         primary: "bg-primary text-white hover:bg-primary-600 shadow-md",
         secondary: "bg-gray-100 text-gray-900 hover:bg-gray-200",
         outline: "border border-gray-300 bg-transparent hover:bg-gray-50",
-        navigation: "bg-gray-100 text-gray-800 hover:bg-gray-200",
+        navigation: "bg-gray-200 text-gray-800 hover:bg-gray-300 shadow-sm",
         save: "bg-green-600 text-white hover:bg-green-700",
         dismiss: "bg-gray-500 text-white hover:bg-gray-600",
         danger: "bg-red-500 text-white hover:bg-red-600",
+        blush: "bg-[#7AAFFF] text-white hover:bg-[#6AA0F0] active:bg-[#5A90E0] rounded-md font-medium cursor-pointer",
+        submit: "bg-[#7AAFFF] text-white rounded-md cursor-pointer",
       },
       size: {
         default: "h-10 py-2 px-4",
