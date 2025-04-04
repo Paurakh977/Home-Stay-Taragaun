@@ -23,6 +23,8 @@ interface AddressFormData {
   district: string;
   municipality: string;
   ward: string;
+  city: string;
+  tole: string;
 }
 
 type AddressDetailsProps = {
@@ -363,6 +365,38 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
               </svg>
             </div>
           </div>
+        </div>
+
+        {/* City Input */}
+        <div>
+          <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+            City/शहर
+          </label>
+          <input
+            type="text"
+            id="city"
+            name="city"
+            value={formData.city || ""}
+            onChange={(e) => updateFormData({ city: e.target.value })}
+            className="appearance-none block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+            required
+          />
+        </div>
+
+        {/* Tole Input */}
+        <div>
+          <label htmlFor="tole" className="block text-sm font-medium text-gray-700 mb-1">
+            Tole of your homestay/टोल
+          </label>
+          <input
+            type="text"
+            id="tole"
+            name="tole"
+            value={formData.tole || ""}
+            onChange={(e) => updateFormData({ tole: e.target.value })}
+            className="appearance-none block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+            required
+          />
         </div>
       </div>
     </div>

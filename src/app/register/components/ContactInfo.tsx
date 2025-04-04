@@ -7,6 +7,10 @@ type Contact = {
   name: string;
   mobile: string;
   facebook: string;
+  youtube: string;
+  instagram: string;
+  tiktok: string;
+  twitter: string;
   email: string;
 };
 
@@ -25,7 +29,7 @@ const ContactInfo: React.FC<ContactInfoProps> = ({ formData, updateFormData }) =
     updateFormData({
       contacts: [
         ...(formData.contacts || []),
-        { name: "", mobile: "+977", facebook: "", email: "" }
+        { name: "", mobile: "+977", facebook: "", youtube: "", instagram: "", tiktok: "", twitter: "", email: "" }
       ]
     });
   };
@@ -55,7 +59,7 @@ const ContactInfo: React.FC<ContactInfoProps> = ({ formData, updateFormData }) =
   React.useEffect(() => {
     if (!formData.contacts || formData.contacts.length === 0) {
       updateFormData({
-        contacts: [{ name: "", mobile: "+977", facebook: "", email: "" }]
+        contacts: [{ name: "", mobile: "+977", facebook: "", youtube: "", instagram: "", tiktok: "", twitter: "", email: "" }]
       });
     }
   }, [formData.contacts, updateFormData]);
@@ -121,19 +125,84 @@ const ContactInfo: React.FC<ContactInfoProps> = ({ formData, updateFormData }) =
             />
           </div>
           
-          {/* Facebook Page */}
-          <div>
-            <label htmlFor={`contact-facebook-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
-              Facebook Page / फेसबुक पेज
-            </label>
-            <input
-              type="text"
-              id={`contact-facebook-${index}`}
-              value={contact.facebook}
-              onChange={(e) => handleContactChange(index, "facebook", e.target.value)}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
-              placeholder="https://facebook.com/your-page"
-            />
+          {/* Social Media Section */}
+          <div className="border-t border-gray-200 pt-3 mt-3">
+            <h5 className="text-sm font-medium text-gray-700 mb-3">Social Media / सामाजिक संजाल</h5>
+            
+            {/* Facebook Page */}
+            <div className="mb-3">
+              <label htmlFor={`contact-facebook-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
+                Facebook Page / फेसबुक पेज
+              </label>
+              <input
+                type="text"
+                id={`contact-facebook-${index}`}
+                value={contact.facebook}
+                onChange={(e) => handleContactChange(index, "facebook", e.target.value)}
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                placeholder="https://facebook.com/your-page"
+              />
+            </div>
+            
+            {/* YouTube Channel */}
+            <div className="mb-3">
+              <label htmlFor={`contact-youtube-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
+                YouTube Channel / युट्युब च्यानल
+              </label>
+              <input
+                type="text"
+                id={`contact-youtube-${index}`}
+                value={contact.youtube}
+                onChange={(e) => handleContactChange(index, "youtube", e.target.value)}
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                placeholder="https://youtube.com/@channel"
+              />
+            </div>
+            
+            {/* Instagram */}
+            <div className="mb-3">
+              <label htmlFor={`contact-instagram-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
+                Instagram / इन्स्टाग्राम
+              </label>
+              <input
+                type="text"
+                id={`contact-instagram-${index}`}
+                value={contact.instagram}
+                onChange={(e) => handleContactChange(index, "instagram", e.target.value)}
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                placeholder="https://instagram.com/username"
+              />
+            </div>
+            
+            {/* TikTok */}
+            <div className="mb-3">
+              <label htmlFor={`contact-tiktok-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
+                TikTok / टिकटक
+              </label>
+              <input
+                type="text"
+                id={`contact-tiktok-${index}`}
+                value={contact.tiktok}
+                onChange={(e) => handleContactChange(index, "tiktok", e.target.value)}
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                placeholder="https://tiktok.com/@username"
+              />
+            </div>
+            
+            {/* Twitter */}
+            <div className="mb-3">
+              <label htmlFor={`contact-twitter-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
+                Twitter / ट्विटर
+              </label>
+              <input
+                type="text"
+                id={`contact-twitter-${index}`}
+                value={contact.twitter}
+                onChange={(e) => handleContactChange(index, "twitter", e.target.value)}
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                placeholder="https://twitter.com/username"
+              />
+            </div>
           </div>
           
           {/* Email */}

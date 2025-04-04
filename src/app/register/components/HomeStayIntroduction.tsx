@@ -2,7 +2,6 @@ import React from "react";
 
 interface HomeStayIntroductionData {
   homeStayName: string;
-  address: string;
   villageName: string;
   homeCount: number;
   roomCount: number;
@@ -27,6 +26,46 @@ const HomeStayIntroduction: React.FC<HomeStayIntroductionProps> = ({ formData, u
     updateFormData({ [name]: name.includes("Count") ? parseInt(value) : value });
   };
 
+  // Initialize default values for form data if undefined
+  React.useEffect(() => {
+    const defaultValues: Partial<HomeStayIntroductionData> = {};
+    let needsUpdate = false;
+
+    if (formData.homeStayName === undefined) {
+      defaultValues.homeStayName = '';
+      needsUpdate = true;
+    }
+    
+    if (formData.villageName === undefined) {
+      defaultValues.villageName = '';
+      needsUpdate = true;
+    }
+    
+    if (formData.homeStayType === undefined) {
+      defaultValues.homeStayType = '';
+      needsUpdate = true;
+    }
+    
+    if (formData.homeCount === undefined) {
+      defaultValues.homeCount = 1;
+      needsUpdate = true;
+    }
+    
+    if (formData.roomCount === undefined) {
+      defaultValues.roomCount = 1;
+      needsUpdate = true;
+    }
+    
+    if (formData.bedCount === undefined) {
+      defaultValues.bedCount = 1;
+      needsUpdate = true;
+    }
+    
+    if (needsUpdate) {
+      updateFormData(defaultValues);
+    }
+  }, [formData, updateFormData]);
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-6">
@@ -39,7 +78,7 @@ const HomeStayIntroduction: React.FC<HomeStayIntroductionProps> = ({ formData, u
             type="text"
             id="homeStayName"
             name="homeStayName"
-            value={formData.homeStayName}
+            value={formData.homeStayName || ''}
             onChange={handleChange}
             className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
             required
@@ -84,22 +123,6 @@ const HomeStayIntroduction: React.FC<HomeStayIntroductionProps> = ({ formData, u
           </div>
         </div>
 
-        {/* Address */}
-        <div>
-          <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
-            Address/ठेगाना
-          </label>
-          <input
-            type="text"
-            id="address"
-            name="address"
-            value={formData.address}
-            onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
-            required
-          />
-        </div>
-
         {/* Village Name */}
         <div>
           <label htmlFor="villageName" className="block text-sm font-medium text-gray-700 mb-1">
@@ -109,7 +132,7 @@ const HomeStayIntroduction: React.FC<HomeStayIntroductionProps> = ({ formData, u
             type="text"
             id="villageName"
             name="villageName"
-            value={formData.villageName}
+            value={formData.villageName || ''}
             onChange={handleChange}
             className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
             required
@@ -128,7 +151,7 @@ const HomeStayIntroduction: React.FC<HomeStayIntroductionProps> = ({ formData, u
                 <select
                   id="homeCount"
                   name="homeCount"
-                  value={formData.homeCount}
+                  value={formData.homeCount || 1}
                   onChange={handleChange}
                   className="appearance-none block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
                   required
@@ -156,7 +179,7 @@ const HomeStayIntroduction: React.FC<HomeStayIntroductionProps> = ({ formData, u
                 <select
                   id="roomCount"
                   name="roomCount"
-                  value={formData.roomCount}
+                  value={formData.roomCount || 1}
                   onChange={handleChange}
                   className="appearance-none block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
                   required
@@ -184,7 +207,7 @@ const HomeStayIntroduction: React.FC<HomeStayIntroductionProps> = ({ formData, u
                 <select
                   id="bedCount"
                   name="bedCount"
-                  value={formData.bedCount}
+                  value={formData.bedCount || 1}
                   onChange={handleChange}
                   className="appearance-none block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
                   required

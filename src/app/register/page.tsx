@@ -17,7 +17,6 @@ import ContactInfo from "./components/ContactInfo";
 type FormData = {
   // Page 1
   homeStayName: string;
-  address: string;
   villageName: string;
   homeCount: number;
   roomCount: number;
@@ -38,6 +37,8 @@ type FormData = {
   district: string;
   municipality: string;
   ward: string;
+  city: string;
+  tole: string;
 
   // Page 5 - Homestay Features
   localAttractions: string[];
@@ -50,6 +51,10 @@ type FormData = {
     mobile: string;
     facebook: string;
     email: string;
+    youtube: string;
+    instagram: string;
+    tiktok: string;
+    twitter: string;
   }[];
 };
 
@@ -57,7 +62,6 @@ export default function RegisterPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<FormData>({
     homeStayName: "",
-    address: "",
     villageName: "",
     homeCount: 1,
     roomCount: 1,
@@ -68,10 +72,21 @@ export default function RegisterPage() {
     district: "",
     municipality: "",
     ward: "",
+    city: "",
+    tole: "",
     localAttractions: [],
     tourismServices: [],
     infrastructure: [],
-    contacts: [{ name: "", mobile: "+977", facebook: "", email: "" }]
+    contacts: [{ 
+      name: "", 
+      mobile: "+977", 
+      facebook: "", 
+      email: "",
+      youtube: "",
+      instagram: "",
+      tiktok: "",
+      twitter: ""
+    }]
   });
 
   // Load form data from localStorage on initial render
@@ -285,19 +300,44 @@ export default function RegisterPage() {
         <div className="px-6 py-4 bg-gray-50 border-t flex justify-between">
           <FormButton
             variant="navigation"
+            size="default"
             onClick={handlePrevious}
             disabled={currentStep === 1}
           >
             ← Previous
           </FormButton>
           
-          <FormButton
-            variant="navigation"
-            onClick={handleNext}
-            disabled={currentStep === 6 && formData.contacts && formData.contacts.some(c => !c.name || !c.mobile)}
-          >
-            {currentStep === 6 ? 'Submit' : 'Next →'}
-          </FormButton>
+          {currentStep === 6 ? (
+            <button
+              type="button"
+              onClick={handleNext}
+              disabled={formData.contacts && formData.contacts.some(c => !c.name || !c.mobile)}
+              style={{
+                backgroundColor: '#1877F2',
+                color: 'white',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                border: 'none',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                height: '40px',
+                minWidth: '80px'
+              }}
+              onMouseOver={(e) => {e.currentTarget.style.backgroundColor = '#166FE5'}}
+              onMouseOut={(e) => {e.currentTarget.style.backgroundColor = '#1877F2'}}
+            >
+              Submit
+            </button>
+          ) : (
+            <FormButton
+              variant="navigation"
+              size="default"
+              onClick={handleNext}
+            >
+              Next →
+            </FormButton>
+          )}
         </div>
       </div>
     </div>
