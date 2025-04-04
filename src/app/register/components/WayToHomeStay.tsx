@@ -1,6 +1,20 @@
 import React from "react";
 
-const WayToHomeStay: React.FC = () => {
+interface WayToHomeStayData {
+  directions?: string;
+}
+
+type WayToHomeStayProps = {
+  formData: WayToHomeStayData;
+  updateFormData: (data: Partial<WayToHomeStayData>) => void;
+};
+
+const WayToHomeStay: React.FC<WayToHomeStayProps> = ({ formData, updateFormData }) => {
+  // Handle text direction changes
+  const handleDirectionsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    updateFormData({ directions: e.target.value });
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -22,19 +36,21 @@ const WayToHomeStay: React.FC = () => {
         {/* Optional text directions */}
         <div className="mt-6">
           <label htmlFor="directions" className="block text-sm font-medium text-gray-700 mb-1">
-            Written Directions (Optional)/लिखित निर्देशन (वैकल्पिक)
+            Written Directions <span className="text-sm font-normal text-gray-500">(Optional)</span> / लिखित निर्देशन <span className="text-sm font-normal text-gray-500">(वैकल्पिक)</span>
           </label>
           <textarea
             id="directions"
             name="directions"
             rows={4}
+            value={formData.directions || ''}
+            onChange={handleDirectionsChange}
             className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
             placeholder="Provide written directions to your homestay..."
           />
         </div>
 
-        <p className="text-sm text-gray-500 mb-4">
-          Provide information about how to reach your homestay. Include available transportation and key landmarks that will help guests find your location.
+        <p className="text-sm text-gray-500 mt-2">
+          Provide information about how to reach your homestay. Include available transportation and key landmarks that will help guests find your location. This field is optional and can be filled in later.
         </p>
       </div>
     </div>

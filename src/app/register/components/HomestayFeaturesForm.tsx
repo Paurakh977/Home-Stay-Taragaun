@@ -84,7 +84,9 @@ const HomestayFeaturesForm: React.FC<HomestayFeaturesFormProps> = ({ formData, u
       <div className="space-y-4">
         <h3 className="text-md font-medium text-gray-800">
           1. Local Tourism Attractions/Products / स्थानिय पर्यटकीय आकर्षण/उत्पादनहरु
+          <span className="text-red-500 ml-1">*</span>
         </h3>
+        <p className="text-sm text-gray-600">At least one attraction is required.</p>
         <div className="flex items-center space-x-2">
           <input
             type="text"
@@ -112,13 +114,14 @@ const HomestayFeaturesForm: React.FC<HomestayFeaturesFormProps> = ({ formData, u
                 type="button"
                 onClick={() => handleRemoveAttraction(index)}
                 className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
+                disabled={attractions.length === 1}
               >
                 ✕
               </button>
             </div>
           ))}
           {attractions.length === 0 && (
-            <p className="text-sm text-gray-500 italic">No attractions added yet. Please add at least one.</p>
+            <p className="text-sm text-red-500 italic">No attractions added yet. Please add at least one.</p>
           )}
         </div>
       </div>
@@ -127,7 +130,9 @@ const HomestayFeaturesForm: React.FC<HomestayFeaturesFormProps> = ({ formData, u
       <div className="space-y-4">
         <h3 className="text-md font-medium text-gray-800">
           2. Available Tourism Services and Facilities / उपलब्ध पर्यटकीय सेवा सुविधाहरु
+          <span className="text-red-500 ml-1">*</span>
         </h3>
+        <p className="text-sm text-gray-600">At least one service is required.</p>
         <div className="flex items-center space-x-2">
           <input
             type="text"
@@ -155,13 +160,14 @@ const HomestayFeaturesForm: React.FC<HomestayFeaturesFormProps> = ({ formData, u
                 type="button"
                 onClick={() => handleRemoveService(index)}
                 className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
+                disabled={services.length === 1}
               >
                 ✕
               </button>
             </div>
           ))}
           {services.length === 0 && (
-            <p className="text-sm text-gray-500 italic">No services added yet. Please add at least one.</p>
+            <p className="text-sm text-red-500 italic">No services added yet. Please add at least one.</p>
           )}
         </div>
       </div>
@@ -170,7 +176,9 @@ const HomestayFeaturesForm: React.FC<HomestayFeaturesFormProps> = ({ formData, u
       <div className="space-y-4">
         <h3 className="text-md font-medium text-gray-800">
           3. Infrastructure Available in the Homestay Village / होमस्टे गाउँमा भएका पूर्वाधारहरु
+          <span className="text-red-500 ml-1">*</span>
         </h3>
+        <p className="text-sm text-gray-600">At least one infrastructure item is required.</p>
         <div className="flex items-center space-x-2">
           <input
             type="text"
@@ -198,13 +206,14 @@ const HomestayFeaturesForm: React.FC<HomestayFeaturesFormProps> = ({ formData, u
                 type="button"
                 onClick={() => handleRemoveInfrastructure(index)}
                 className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
+                disabled={infrastructures.length === 1}
               >
                 ✕
               </button>
             </div>
           ))}
           {infrastructures.length === 0 && (
-            <p className="text-sm text-gray-500 italic">No infrastructure added yet. Please add at least one.</p>
+            <p className="text-sm text-red-500 italic">No infrastructure added yet. Please add at least one.</p>
           )}
         </div>
       </div>

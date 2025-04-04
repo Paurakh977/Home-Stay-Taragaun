@@ -23,7 +23,8 @@ type FormData = {
   bedCount: number;
   homeStayType: string;
   
-  // Page 2 (empty for now)
+  // Page 2 (WayToHomeStay)
+  directions?: string; // Optional written directions
   
   // Page 3
   officials: {
@@ -49,17 +50,19 @@ type FormData = {
   contacts: {
     name: string;
     mobile: string;
-    facebook: string;
-    email: string;
-    youtube: string;
-    instagram: string;
-    tiktok: string;
-    twitter: string;
+    facebook?: string;
+    email?: string;
+    youtube?: string;
+    instagram?: string;
+    tiktok?: string;
+    twitter?: string;
   }[];
 };
 
 export default function RegisterPage() {
   const [currentStep, setCurrentStep] = useState(1);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [showValidationErrors, setShowValidationErrors] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     homeStayName: "",
     villageName: "",
@@ -67,6 +70,7 @@ export default function RegisterPage() {
     roomCount: 1,
     bedCount: 1,
     homeStayType: "community", // Default to community
+    directions: "", // Initialize directions as empty string
     officials: [{ name: "", role: "", contactNo: "+977" }],
     province: "",
     district: "",
@@ -141,22 +145,114 @@ export default function RegisterPage() {
     }
   };
   
+  // Validate form data before submission
+  const validateForm = () => {
+    const errors: string[] = [];
+    
+    // Helper to validate phone numbers
+    const isValidPhoneNumber = (phoneNumber: string): boolean => {
+      const phoneRegex = /^\+977\d{10}$/;
+      return phoneRegex.test(phoneNumber);
+    };
+    
+    // Check home stay introduction (step 1)
+    if (!formData.homeStayName) errors.push("Home Stay Name is required");
+    if (!formData.villageName) errors.push("Village Name is required");
+    if (formData.homeCount < 1) errors.push("Home Count must be at least 1");
+    if (formData.roomCount < 1) errors.push("Room Count must be at least 1");
+    if (formData.bedCount < 1) errors.push("Bed Count must be at least 1");
+    
+    // Committee Officials (step 3)
+    const hasCompleteOfficial = formData.officials.some(
+      official => official.name && official.role && official.contactNo && isValidPhoneNumber(official.contactNo)
+    );
+    if (!hasCompleteOfficial) {
+      errors.push("At least one official with complete and valid information is required");
+    }
+    
+    // Check if any official has an invalid phone number format
+    const invalidOfficialPhones = formData.officials.some(
+      official => official.contactNo && official.contactNo !== "+977" && !isValidPhoneNumber(official.contactNo)
+    );
+    if (invalidOfficialPhones) {
+      errors.push("One or more officials have invalid phone numbers (must be +977 followed by 10 digits)");
+    }
+    
+    // Address Details (step 4)
+    if (!formData.province) errors.push("Province is required");
+    if (!formData.district) errors.push("District is required");
+    if (!formData.municipality) errors.push("Municipality is required");
+    if (!formData.ward) errors.push("Ward is required");
+    if (!formData.city) errors.push("City is required");
+    if (!formData.tole) errors.push("Tole is required");
+    
+    // Homestay Features (step 5)
+    if (!formData.localAttractions?.length) errors.push("At least one Local Attraction is required");
+    if (!formData.tourismServices?.length) errors.push("At least one Tourism Service is required");
+    if (!formData.infrastructure?.length) errors.push("At least one Infrastructure item is required");
+    
+    // Contact Information (step 6)
+    const hasCompleteContact = formData.contacts?.some(
+      contact => contact.name && contact.mobile && isValidPhoneNumber(contact.mobile)
+    );
+    if (!hasCompleteContact) {
+      errors.push("At least one contact with name and valid mobile number is required");
+    }
+    
+    // Check if any contact has an invalid phone number format
+    const invalidContactPhones = formData.contacts?.some(
+      contact => contact.mobile && contact.mobile !== "+977" && !isValidPhoneNumber(contact.mobile)
+    );
+    if (invalidContactPhones) {
+      errors.push("One or more contacts have invalid phone numbers (must be +977 followed by 10 digits)");
+    }
+    
+    setValidationErrors(errors);
+    return errors.length === 0;
+  };
+
   // Handle next step
   const handleNext = () => {
     if (currentStep < 6) {
       setCurrentStep(currentStep + 1);
+      setShowValidationErrors(false);
     } else {
-      // Form is complete - submit data
-      alert("Form submitted successfully!");
-      
-      // You would typically send the data to your server here
-      console.log("Form submitted:", formData);
-      
-      // Clear form data from localStorage
-      localStorage.removeItem("homeStayRegistrationForm");
-      
-      // Redirect to homepage or confirmation page
-      window.location.href = "/";
+      // Validate all form data before submission
+      if (validateForm()) {
+        // Form is complete - submit data
+        console.log("Form submitted:", formData);
+        
+        // Clear form data from localStorage
+        localStorage.removeItem("homeStayRegistrationForm");
+        
+        // Create and show minimalistic success popup
+        const popup = document.createElement('div');
+        popup.className = 'fixed top-4 right-4 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded shadow-md z-50 animate-slideUp';
+        popup.innerHTML = `
+          <div class="flex items-center">
+            <div class="py-1"><svg class="h-6 w-6 text-green-500 mr-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg></div>
+            <div>
+              <p class="font-bold">Success</p>
+              <p class="text-sm">Home stay registered successfully. Please check your email.</p>
+            </div>
+          </div>
+        `;
+        
+        document.body.appendChild(popup);
+        
+        // Redirect to homepage after a brief delay to show the popup
+        setTimeout(() => {
+          window.location.href = "/";
+        }, 3500);
+      } else {
+        // Show validation errors
+        setShowValidationErrors(true);
+        
+        // Scroll to the top to show errors
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     }
   };
   
@@ -178,7 +274,7 @@ export default function RegisterPage() {
       case 1:
         return <HomeStayIntroduction formData={formData} updateFormData={updateFormData} />;
       case 2:
-        return <WayToHomeStay />;
+        return <WayToHomeStay formData={formData} updateFormData={updateFormData} />;
       case 3:
         return <CommitteeOfficials formData={formData} updateFormData={updateFormData} />;
       case 4:
@@ -257,6 +353,18 @@ export default function RegisterPage() {
           </div>
         </div>
         
+        {/* Validation Errors */}
+        {showValidationErrors && validationErrors.length > 0 && (
+          <div className="px-6 py-4 bg-red-50 border-b border-red-200">
+            <h3 className="text-red-700 font-medium mb-2">Please fix the following errors before submitting:</h3>
+            <ul className="list-disc list-inside text-red-600 text-sm">
+              {validationErrors.map((error, index) => (
+                <li key={index}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        
         {/* Progress indicator */}
         <div className="px-6 py-4 border-b">
           <div className="flex justify-between">
@@ -311,7 +419,6 @@ export default function RegisterPage() {
             <button
               type="button"
               onClick={handleNext}
-              disabled={formData.contacts && formData.contacts.some(c => !c.name || !c.mobile)}
               style={{
                 backgroundColor: '#1877F2',
                 color: 'white',

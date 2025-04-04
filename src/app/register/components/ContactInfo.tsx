@@ -6,12 +6,12 @@ import React from "react";
 type Contact = {
   name: string;
   mobile: string;
-  facebook: string;
-  youtube: string;
-  instagram: string;
-  tiktok: string;
-  twitter: string;
-  email: string;
+  facebook?: string;
+  youtube?: string;
+  instagram?: string;
+  tiktok?: string;
+  twitter?: string;
+  email?: string;
 };
 
 interface ContactFormData {
@@ -69,6 +69,7 @@ const ContactInfo: React.FC<ContactInfoProps> = ({ formData, updateFormData }) =
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-md font-medium text-gray-800">
           Contact Information / सम्पर्क जानकारी
+          <span className="text-red-500 ml-1">*</span>
         </h3>
         <button
           type="button"
@@ -79,10 +80,17 @@ const ContactInfo: React.FC<ContactInfoProps> = ({ formData, updateFormData }) =
         </button>
       </div>
 
+      <p className="text-sm text-gray-600 mb-4">
+        Name and mobile number are required. Social media links are optional.
+      </p>
+
       {(formData.contacts || []).map((contact, index) => (
         <div key={index} className="p-4 border border-gray-200 rounded-md space-y-4">
           <div className="flex justify-between items-center border-b pb-2 mb-2">
-            <h4 className="font-medium">Contact #{index + 1}</h4>
+            <h4 className="font-medium">
+              Contact #{index + 1}
+              {index === 0 && <span className="text-red-500 ml-1">*</span>}
+            </h4>
             {(formData.contacts || []).length > 1 && (
               <button
                 type="button"
@@ -98,36 +106,68 @@ const ContactInfo: React.FC<ContactInfoProps> = ({ formData, updateFormData }) =
           <div>
             <label htmlFor={`contact-name-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
               Contact Person Name / सम्पर्क व्यक्तिको नाम
+              <span className="text-red-500 ml-1">*</span>
             </label>
             <input
               type="text"
               id={`contact-name-${index}`}
               value={contact.name}
               onChange={(e) => handleContactChange(index, "name", e.target.value)}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+              className={`block w-full px-3 py-2 border ${
+                !contact.name ? 'border-red-300' : 'border-gray-300'
+              } rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary`}
               required
             />
+            {!contact.name && 
+              <p className="mt-1 text-xs text-red-500">This field is required</p>
+            }
           </div>
           
           {/* Mobile Number */}
           <div>
             <label htmlFor={`contact-mobile-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
               Mobile No. / मोबाइल नं.
+              <span className="text-red-500 ml-1">*</span>
             </label>
             <input
               type="tel"
               id={`contact-mobile-${index}`}
               value={contact.mobile}
-              onChange={(e) => handleContactChange(index, "mobile", e.target.value)}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+              onChange={(e) => {
+                // Format: keep +977 prefix and limit to 10 digits after it
+                let value = e.target.value;
+                if (!value.startsWith('+977')) {
+                  value = '+977';
+                } else {
+                  // Extract digits after +977
+                  const digits = value.replace(/^\+977/, '').replace(/\D/g, '');
+                  // Limit to 10 digits after +977
+                  value = `+977${digits.substring(0, 10)}`;
+                }
+                handleContactChange(index, "mobile", value);
+              }}
+              className={`block w-full px-3 py-2 border ${
+                !contact.mobile || (contact.mobile !== "+977" && !/^\+977\d{10}$/.test(contact.mobile)) 
+                  ? 'border-red-300' 
+                  : 'border-gray-300'
+              } rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary`}
               required
               placeholder="+977 98XXXXXXXX"
             />
+            {!contact.mobile && 
+              <p className="mt-1 text-xs text-red-500">This field is required</p>
+            }
+            {contact.mobile && contact.mobile !== "+977" && !/^\+977\d{10}$/.test(contact.mobile) && 
+              <p className="mt-1 text-xs text-red-500">Please enter a valid Nepali phone number (+977 followed by 10 digits)</p>
+            }
+            <p className="mt-1 text-xs text-gray-500">Format: +977 followed by 10 digits (e.g. +9779812345678)</p>
           </div>
           
           {/* Social Media Section */}
           <div className="border-t border-gray-200 pt-3 mt-3">
-            <h5 className="text-sm font-medium text-gray-700 mb-3">Social Media / सामाजिक संजाल</h5>
+            <h5 className="text-sm font-medium text-gray-700 mb-3">
+              Social Media / सामाजिक संजाल <span className="text-sm font-normal text-gray-500">(Optional)</span>
+            </h5>
             
             {/* Facebook Page */}
             <div className="mb-3">

@@ -73,6 +73,7 @@ const HomeStayIntroduction: React.FC<HomeStayIntroductionProps> = ({ formData, u
         <div>
           <label htmlFor="homeStayName" className="block text-sm font-medium text-gray-700 mb-1">
             Home Stay name/होमस्टेको नाम
+            <span className="text-red-500 ml-1">*</span>
           </label>
           <input
             type="text"
@@ -80,15 +81,21 @@ const HomeStayIntroduction: React.FC<HomeStayIntroductionProps> = ({ formData, u
             name="homeStayName"
             value={formData.homeStayName || ''}
             onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+            className={`mt-1 block w-full px-3 py-2 bg-white border ${
+              !formData.homeStayName ? 'border-red-300' : 'border-gray-300'
+            } rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary`}
             required
           />
+          {!formData.homeStayName && 
+            <p className="mt-1 text-xs text-red-500">This field is required</p>
+          }
         </div>
 
         {/* Homestay Type */}
         <div>
           <label htmlFor="homeStayType" className="block text-sm font-medium text-gray-700 mb-1">
             Homestay Type/होमस्टेको प्रकार
+            <span className="text-red-500 ml-1">*</span>
           </label>
           <div className="mt-1 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex items-center">
@@ -121,12 +128,16 @@ const HomeStayIntroduction: React.FC<HomeStayIntroductionProps> = ({ formData, u
               </label>
             </div>
           </div>
+          {!formData.homeStayType && 
+            <p className="mt-1 text-xs text-red-500">Please select a homestay type</p>
+          }
         </div>
 
         {/* Village Name */}
         <div>
           <label htmlFor="villageName" className="block text-sm font-medium text-gray-700 mb-1">
             Home stays&apos; Village Name/होमस्टे गाउँको नाम
+            <span className="text-red-500 ml-1">*</span>
           </label>
           <input
             type="text"
@@ -134,9 +145,14 @@ const HomeStayIntroduction: React.FC<HomeStayIntroductionProps> = ({ formData, u
             name="villageName"
             value={formData.villageName || ''}
             onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+            className={`mt-1 block w-full px-3 py-2 bg-white border ${
+              !formData.villageName ? 'border-red-300' : 'border-gray-300'
+            } rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary`}
             required
           />
+          {!formData.villageName && 
+            <p className="mt-1 text-xs text-red-500">This field is required</p>
+          }
         </div>
 
         {/* Number dropdowns */}
