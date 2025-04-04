@@ -133,6 +133,24 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
     }
   }, [formData.province, formData.district, isLoading, addressData.provinceDistrictsMap]);
 
+  // Add additional debugging for municipalities
+  useEffect(() => {
+    if (formData.district && addressData.districtMunicipalitiesMap && addressData.municipalityTranslations) {
+      console.log("District selected:", formData.district);
+      const districtMunicipalities = addressData.districtMunicipalitiesMap[formData.district] || [];
+      console.log("Municipalities for district:", districtMunicipalities.length);
+      
+      // Check for missing translations
+      const missingTranslations = districtMunicipalities.filter(
+        municipality => !addressData.municipalityTranslations[municipality.trim()]
+      );
+      
+      if (missingTranslations.length > 0) {
+        console.log("Municipalities missing translations:", missingTranslations);
+      }
+    }
+  }, [formData.district, addressData.districtMunicipalitiesMap, addressData.municipalityTranslations]);
+
   // Update municipalities when district changes
   useEffect(() => {
     if (isLoading || !addressData.districtMunicipalitiesMap || isUpdatingRef.current) return;
@@ -299,11 +317,15 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
               disabled={!formData.district}
             >
               <option value="">Select Municipality / नगरपालिका छनोट गर्नुहोस्</option>
-              {municipalities.map((municipality) => (
-                <option key={municipality} value={municipality}>
-                  {addressData.municipalityTranslations[municipality] || municipality} / {municipality}
-                </option>
-              ))}
+              {municipalities.map((municipality) => {
+                // Trim municipality name to handle whitespace issues
+                const trimmedMunicipality = municipality.trim();
+                return (
+                  <option key={municipality} value={municipality}>
+                    {addressData.municipalityTranslations[trimmedMunicipality] || trimmedMunicipality} / {municipality}
+                  </option>
+                );
+              })}
             </select>
             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
               <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
