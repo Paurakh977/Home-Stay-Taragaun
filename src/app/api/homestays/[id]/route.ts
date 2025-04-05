@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
-import { HomestaySingle, Official, Contact } from "@/lib/models";
+import HomestaySingle from "@/lib/models/HomestaySingle";
+import Official from "@/lib/models/Official";
+import Contact from "@/lib/models/Contact";
+import Location from "@/lib/models/Location";
 import mongoose from "mongoose";
+import path from "path";
+import fs from "fs";
 
 // Get a specific homestay by ID
 export async function GET(
@@ -69,14 +74,30 @@ export async function PUT(
       roomCount: body.roomCount,
       bedCount: body.bedCount,
       homeStayType: body.homeStayType,
-      directions: body.directions,
+      directions: body.directions || "",
       address: {
-        province: body.province,
-        district: body.district,
-        municipality: body.municipality,
-        ward: body.ward,
+        province: {
+          en: provinceTranslations[body.province] || body.province,
+          ne: body.province
+        },
+        district: {
+          en: findBestTranslation(body.district, 'district'),
+          ne: body.district
+        },
+        municipality: {
+          en: findBestTranslation(body.municipality, 'municipality'),
+          ne: body.municipality
+        },
+        ward: {
+          en: translateWard(body.ward),
+          ne: body.ward
+        },
         city: body.city,
-        tole: body.tole
+        tole: body.tole,
+        formattedAddress: {
+          en: `${body.tole}, ${body.city}, ${findBestTranslation(body.municipality, 'municipality')}, ${findBestTranslation(body.district, 'district')}, ${provinceTranslations[body.province] || body.province}`,
+          ne: `${body.tole}, ${body.city}, ${body.municipality}, ${body.district}, ${body.province}`
+        }
       },
       features: {
         localAttractions: body.localAttractions,
@@ -91,6 +112,56 @@ export async function PUT(
       { $set: homestayUpdateData },
       { new: true }
     ).select("-password");
+    
+    // Update location data in Location collection
+    if (body.province || body.district || body.municipality || body.ward || body.city || body.tole) {
+      // Get English translations
+      const provinceEn = provinceTranslations[body.province] || body.province;
+      const districtEn = findBestTranslation(body.district, 'district');
+      const municipalityEn = findBestTranslation(body.municipality, 'municipality');
+      const wardEn = translateWard(body.ward);
+      
+      // Create formatted addresses in both languages
+      const formattedAddressNe = `${body.tole}, ${body.city}, ${body.municipality}, ${body.district}, ${body.province}`;
+      const formattedAddressEn = `${body.tole}, ${body.city}, ${municipalityEn}, ${districtEn}, ${provinceEn}`;
+      
+      const locationUpdateData = {
+        province: {
+          en: provinceEn,
+          ne: body.province
+        },
+        district: {
+          en: districtEn,
+          ne: body.district
+        },
+        municipality: {
+          en: municipalityEn,
+          ne: body.municipality
+        },
+        ward: {
+          en: wardEn,
+          ne: body.ward
+        },
+        city: body.city,
+        tole: body.tole,
+        formattedAddress: {
+          en: formattedAddressEn,
+          ne: formattedAddressNe
+        },
+        // Add empty location field to avoid validation errors
+        location: {
+          type: 'Point',
+          coordinates: null
+        }
+      };
+      
+      // Find and update the location or create if it doesn't exist
+      await Location.findOneAndUpdate(
+        { homestayId: id },
+        { $set: locationUpdateData },
+        { upsert: true, new: true }
+      );
+    }
 
     // Handle officials update if provided
     if (body.officials && Array.isArray(body.officials)) {
@@ -198,7 +269,8 @@ export async function DELETE(
     await Promise.all([
       HomestaySingle.deleteOne({ homestayId: id }),
       Official.deleteMany({ homestayId: id }),
-      Contact.deleteMany({ homestayId: id })
+      Contact.deleteMany({ homestayId: id }),
+      Location.deleteOne({ homestayId: id })
     ]);
 
     return NextResponse.json({
@@ -212,4 +284,87 @@ export async function DELETE(
       { status: 500 }
     );
   }
-} 
+}
+
+// Import translation maps
+const provinceTranslations: Record<string, string> = {
+  "कोशी": "Koshi",
+  "मधेश": "Madhesh",
+  "वागमती": "Bagmati",
+  "गण्डकी": "Gandaki",
+  "लुम्बिनी": "Lumbini",
+  "कर्णाली": "Karnali",
+  "सुदुर पश्चिम": "Sudurpashchim"
+};
+
+// Helper function to find the best English translation
+const findBestTranslation = (nepaliValue: string, type: 'district' | 'municipality'): string => {
+  try {
+    if (!nepaliValue) return '';
+    
+    // Read translations from JSON files in the public directory using filesystem
+    let translationsMap: Record<string, string> = {};
+    
+    try {
+      const publicPath = path.join(process.cwd(), 'public', 'address');
+      
+      if (type === 'district') {
+        const filePath = path.join(publicPath, 'all-districts.json');
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        translationsMap = JSON.parse(fileContent);
+      } else if (type === 'municipality') {
+        const filePath = path.join(publicPath, 'all-municipalities.json');
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        translationsMap = JSON.parse(fileContent);
+      }
+    } catch (fileError) {
+      console.warn(`Could not read translation file for ${type}:`, fileError);
+      // If files can't be loaded, return the original value
+      return nepaliValue;
+    }
+    
+    // Clean and normalize the value
+    const cleanValue = nepaliValue.trim().replace(/\s+/g, ' ');
+    
+    // Try direct lookup
+    if (translationsMap[cleanValue]) {
+      return translationsMap[cleanValue];
+    } 
+    // Then try with a space
+    else if (translationsMap[cleanValue + ' ']) {
+      return translationsMap[cleanValue + ' '];
+    }
+    // Find similar match
+    else {
+      // Look for keys that contain this value or vice versa
+      const possibleKey = Object.keys(translationsMap)
+        .find(key => key.includes(cleanValue) || cleanValue.includes(key));
+      
+      if (possibleKey) {
+        return translationsMap[possibleKey];
+      }
+    }
+    
+    // If no translation found, return the original value
+    return nepaliValue;
+  } catch (error) {
+    console.error(`Error finding translation for ${type}:`, error);
+    return nepaliValue;
+  }
+};
+
+// Convert Nepali numeric ward to English
+const translateWard = (ward: string): string => {
+  const wardMap: Record<string, string> = {
+    '१': '1', '२': '2', '३': '3', '४': '4', '५': '5',
+    '६': '6', '७': '7', '८': '8', '९': '9', '०': '0'
+  };
+  
+  let englishWard = '';
+  for (let i = 0; i < ward.length; i++) {
+    const char = ward[i];
+    englishWard += wardMap[char] || char;
+  }
+  
+  return englishWard;
+}; 

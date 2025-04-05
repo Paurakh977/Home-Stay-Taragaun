@@ -1,5 +1,11 @@
 import mongoose, { Schema } from 'mongoose';
 
+// Define a simple schema for bilingual fields without requiring them to be string type
+const bilingualField = {
+  en: { type: String, required: true },
+  ne: { type: String, required: true }
+};
+
 // Define the homestay schema
 const homestaySchema = new Schema(
   {
@@ -24,16 +30,17 @@ const homestaySchema = new Schema(
     homeStayType: { type: String, required: true, enum: ['community', 'private'] },
     
     // Directions
-    directions: { type: String, required: true },
+    directions: { type: String, default: "" },
     
-    // Address (embedded document)
+    // Address (embedded document with bilingual support)
     address: {
-      province: { type: String, required: true },
-      district: { type: String, required: true },
-      municipality: { type: String, required: true },
-      ward: { type: String, required: true },
+      province: bilingualField,
+      district: bilingualField,
+      municipality: bilingualField,
+      ward: bilingualField,
       city: { type: String, required: true },
-      tole: { type: String, required: true }
+      tole: { type: String, required: true },
+      formattedAddress: bilingualField
     },
     
     // Features (embedded document)
@@ -64,7 +71,8 @@ const homestaySchema = new Schema(
   },
   {
     timestamps: true, // Adds createdAt and updatedAt
-    collection: 'Homestays Collection' // Use existing collection name
+    collection: 'Homestays Collection', // Use existing collection name
+    strict: false // Allow additional fields for flexibility
   }
 );
 
@@ -72,13 +80,28 @@ const homestaySchema = new Schema(
 homestaySchema.index({
   homeStayName: "text",
   villageName: "text",
-  "address.province": "text",
-  "address.district": "text",
-  "address.municipality": "text",
+  "address.province.en": "text",
+  "address.province.ne": "text",
+  "address.district.en": "text",
+  "address.district.ne": "text",
+  "address.municipality.en": "text",
+  "address.municipality.ne": "text",
   "address.city": "text",
 });
 
-// Check if model exists before creating to prevent overwrite during development
+// Clear existing model if in development to avoid schema conflicts
+try {
+  if (process.env.NODE_ENV !== 'production') {
+    // Delete the model if it exists to allow schema changes during development
+    if (mongoose.models.HomestaySingle) {
+      delete mongoose.models.HomestaySingle;
+    }
+  }
+} catch (error) {
+  console.warn('Failed to delete existing model:', error);
+}
+
+// Create model (or return existing)
 const HomestaySingle = mongoose.models.HomestaySingle || mongoose.model('HomestaySingle', homestaySchema);
 
 export default HomestaySingle; 

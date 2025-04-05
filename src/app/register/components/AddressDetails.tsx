@@ -77,6 +77,15 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
           fetch('/address/all-municipalities.json').then(res => res.json())
         ]);
 
+        console.log('Municipality translations loaded:', Object.keys(municipalityTranslations).length);
+        
+        // Log a sample of the translations to check format
+        const sampleKeys = Object.keys(municipalityTranslations).slice(0, 3);
+        console.log('Sample municipality translations:', sampleKeys.map(key => ({
+          nepali: key,
+          english: municipalityTranslations[key]
+        })));
+
         setAddressData({
           allProvinces: provinces,
           provinceDistrictsMap: provinceDistricts,
@@ -232,6 +241,78 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
     return englishWard;
   };
 
+  // Add this debugging effect
+  useEffect(() => {
+    // Log debug info when municipalities change
+    if (municipalities.length > 0 && addressData.municipalityTranslations) {
+      // Check for whitespace issues
+      const muniWithSpaces = municipalities.filter(m => m !== m.trim());
+      if (muniWithSpaces.length > 0) {
+        console.log('Municipalities with whitespace issues:', muniWithSpaces);
+      }
+      
+      // Check for missing translations
+      const missing = municipalities.filter(m => !addressData.municipalityTranslations[m.trim()]);
+      if (missing.length > 0) {
+        console.log(`Missing translations (${missing.length}/${municipalities.length}):`, missing.slice(0, 5));
+        
+        // Try different approaches to find the translations
+        missing.slice(0, 3).forEach(m => {
+          const trimmed = m.trim();
+          console.log(`Looking for "${trimmed}":`);
+          
+          // Check with trailing space
+          if (addressData.municipalityTranslations[trimmed + ' ']) {
+            console.log(`  Found with trailing space: "${addressData.municipalityTranslations[trimmed + ' ']}"`);
+          }
+          
+          // Check with different whitespace
+          const withoutExtraSpaces = trimmed.replace(/\s+/g, ' ');
+          if (addressData.municipalityTranslations[withoutExtraSpaces]) {
+            console.log(`  Found with normalized spaces: "${addressData.municipalityTranslations[withoutExtraSpaces]}"`);
+          }
+          
+          // Find similar keys
+          const similarKeys = Object.keys(addressData.municipalityTranslations)
+            .filter(key => key.includes(trimmed) || trimmed.includes(key))
+            .slice(0, 3);
+            
+          if (similarKeys.length > 0) {
+            console.log('  Similar keys found:', similarKeys);
+          }
+        });
+      }
+    }
+  }, [municipalities, addressData.municipalityTranslations]);
+
+  // Add this helper function before the component return
+  const findBestTranslationMatch = (municipality: string, translations: Record<string, string>): string => {
+    // Clean and normalize the municipality name
+    const cleanMunicipality = municipality.trim().replace(/\s+/g, ' ');
+    
+    // First try direct lookup
+    if (translations[cleanMunicipality]) {
+      return translations[cleanMunicipality];
+    } 
+    // Then try with a space
+    else if (translations[cleanMunicipality + ' ']) {
+      return translations[cleanMunicipality + ' '];
+    }
+    // Then try to find it in a different way - searching for a partial match
+    else {
+      // Look for keys that contain this municipality or vice versa
+      const possibleKey = Object.keys(translations)
+        .find(key => key.includes(cleanMunicipality) || cleanMunicipality.includes(key));
+      
+      if (possibleKey) {
+        return translations[possibleKey];
+      }
+      
+      // If all else fails, return the original name
+      return cleanMunicipality;
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center p-8">
@@ -320,11 +401,12 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
             >
               <option value="">Select Municipality / नगरपालिका छनोट गर्नुहोस्</option>
               {municipalities.map((municipality) => {
-                // Trim municipality name to handle whitespace issues
-                const trimmedMunicipality = municipality.trim();
+                // Get the best English translation match
+                const englishName = findBestTranslationMatch(municipality, addressData.municipalityTranslations);
+                
                 return (
                   <option key={municipality} value={municipality}>
-                    {addressData.municipalityTranslations[trimmedMunicipality] || trimmedMunicipality} / {municipality}
+                    {englishName} / {municipality}
                   </option>
                 );
               })}

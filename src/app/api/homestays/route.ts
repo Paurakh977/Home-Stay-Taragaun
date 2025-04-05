@@ -1,8 +1,96 @@
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
-import { HomestaySingle, Official, Contact } from "@/lib/models";
+import HomestaySingle from "@/lib/models/HomestaySingle";
+import Official from "@/lib/models/Official";
+import Contact from "@/lib/models/Contact";
+import Location from "@/lib/models/Location";
 import { generateHomestayId, generateSecurePassword, hashPassword } from "@/lib/utils";
 import mongoose from "mongoose";
+import fs from 'fs';
+import path from 'path';
+
+// Import translation maps
+const provinceTranslations: Record<string, string> = {
+  "कोशी": "Koshi",
+  "मधेश": "Madhesh",
+  "वागमती": "Bagmati",
+  "गण्डकी": "Gandaki",
+  "लुम्बिनी": "Lumbini",
+  "कर्णाली": "Karnali",
+  "सुदुर पश्चिम": "Sudurpashchim"
+};
+
+// Helper function to find the best English translation
+const findBestTranslation = (nepaliValue: string, type: 'district' | 'municipality'): string => {
+  try {
+    if (!nepaliValue) return '';
+    
+    // Read translations from JSON files in the public directory using filesystem
+    let translationsMap: Record<string, string> = {};
+    
+    try {
+      const publicPath = path.join(process.cwd(), 'public', 'address');
+      
+      if (type === 'district') {
+        const filePath = path.join(publicPath, 'all-districts.json');
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        translationsMap = JSON.parse(fileContent);
+      } else if (type === 'municipality') {
+        const filePath = path.join(publicPath, 'all-municipalities.json');
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        translationsMap = JSON.parse(fileContent);
+      }
+    } catch (fileError) {
+      console.warn(`Could not read translation file for ${type}:`, fileError);
+      // If files can't be loaded, return the original value
+      return nepaliValue;
+    }
+    
+    // Clean and normalize the value
+    const cleanValue = nepaliValue.trim().replace(/\s+/g, ' ');
+    
+    // Try direct lookup
+    if (translationsMap[cleanValue]) {
+      return translationsMap[cleanValue];
+    } 
+    // Then try with a space
+    else if (translationsMap[cleanValue + ' ']) {
+      return translationsMap[cleanValue + ' '];
+    }
+    // Find similar match
+    else {
+      // Look for keys that contain this value or vice versa
+      const possibleKey = Object.keys(translationsMap)
+        .find(key => key.includes(cleanValue) || cleanValue.includes(key));
+      
+      if (possibleKey) {
+        return translationsMap[possibleKey];
+      }
+    }
+    
+    // If no translation found, return the original value
+    return nepaliValue;
+  } catch (error) {
+    console.error(`Error finding translation for ${type}:`, error);
+    return nepaliValue;
+  }
+};
+
+// Convert Nepali numeric ward to English
+const translateWard = (ward: string): string => {
+  const wardMap: Record<string, string> = {
+    '१': '1', '२': '2', '३': '3', '४': '4', '५': '5',
+    '६': '6', '७': '7', '८': '8', '९': '9', '०': '0'
+  };
+  
+  let englishWard = '';
+  for (let i = 0; i < ward.length; i++) {
+    const char = ward[i];
+    englishWard += wardMap[char] || char;
+  }
+  
+  return englishWard;
+};
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,11 +103,32 @@ export async function GET(req: NextRequest) {
     const province = searchParams.get("province");
     const district = searchParams.get("district");
     const query = searchParams.get("q");
+    const lang = searchParams.get("lang") || "ne"; // Default to Nepali
     
     // Build filter
     const filter: any = {};
-    if (province) filter["address.province"] = province;
-    if (district) filter["address.district"] = district;
+    if (province) {
+      // Handle both old and new schema
+      if (province.includes('.')) {
+        // Direct path query (e.g., "address.province.ne")
+        filter[province] = province;
+      } else {
+        // Assume new schema with bilingual fields
+        filter[`address.province.${lang}`] = province;
+      }
+    }
+    
+    if (district) {
+      // Handle both old and new schema
+      if (district.includes('.')) {
+        // Direct path query
+        filter[district] = district;
+      } else {
+        // Assume new schema with bilingual fields
+        filter[`address.district.${lang}`] = district;
+      }
+    }
+    
     if (query) {
       filter.$text = { $search: query };
     }
@@ -31,17 +140,60 @@ export async function GET(req: NextRequest) {
     const skip = (page - 1) * limit;
     
     // Execute query with the new schema
-    const homestays = await HomestaySingle.find(filter)
+    const homestaysData = await HomestaySingle.find(filter)
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 })
-      .select("homestayId homeStayName villageName address.province address.district homeStayType averageRating");
+      .select("homestayId homeStayName villageName address homeStayType averageRating")
+      .lean();
+    
+    // Format the response to handle bilingual address fields
+    const formattedHomestays = homestaysData.map(homestay => {
+      // Use type assertion to handle the document safely
+      const rawHomestay = homestay as any;
+      
+      // Check if we have the new bilingual format
+      const hasBilingualAddress = 
+        rawHomestay.address && 
+        rawHomestay.address.province && 
+        typeof rawHomestay.address.province === 'object' &&
+        'en' in rawHomestay.address.province;
+      
+      // Format address based on schema and language preference
+      if (hasBilingualAddress) {
+        return {
+          ...rawHomestay,
+          address: {
+            province: lang === 'en' ? rawHomestay.address.province.en : rawHomestay.address.province.ne,
+            district: lang === 'en' ? rawHomestay.address.district.en : rawHomestay.address.district.ne,
+            municipality: lang === 'en' ? rawHomestay.address.municipality.en : rawHomestay.address.municipality.ne,
+            ward: lang === 'en' ? rawHomestay.address.ward.en : rawHomestay.address.ward.ne,
+            city: rawHomestay.address.city,
+            tole: rawHomestay.address.tole,
+            formattedAddress: lang === 'en' 
+              ? rawHomestay.address.formattedAddress.en 
+              : rawHomestay.address.formattedAddress.ne,
+            // Include full translations for clients that need them
+            translations: {
+              province: rawHomestay.address.province,
+              district: rawHomestay.address.district,
+              municipality: rawHomestay.address.municipality,
+              ward: rawHomestay.address.ward,
+              formattedAddress: rawHomestay.address.formattedAddress
+            }
+          }
+        };
+      } else {
+        // Return original format for backward compatibility
+        return rawHomestay;
+      }
+    });
     
     // Get total count for pagination
     const totalCount = await HomestaySingle.countDocuments(filter);
     
     return NextResponse.json({
-      data: homestays,
+      data: formattedHomestays,
       pagination: {
         page,
         limit,
@@ -73,7 +225,17 @@ export async function POST(req: NextRequest) {
     
     console.log(`Processing registration for: ${body.homeStayName}, ID: ${homestayId}`);
     
-    // Format data for HomestaySingle model
+    // Get English translations for the address fields
+    const provinceEn = provinceTranslations[body.province] || body.province;
+    const districtEn = findBestTranslation(body.district, 'district');
+    const municipalityEn = findBestTranslation(body.municipality, 'municipality');
+    const wardEn = translateWard(body.ward);
+    
+    // Create formatted addresses in both languages
+    const formattedAddressNe = `${body.tole}, ${body.city}, ${body.municipality}, ${body.district}, ${body.province}`;
+    const formattedAddressEn = `${body.tole}, ${body.city}, ${municipalityEn}, ${districtEn}, ${provinceEn}`;
+    
+    // Format data for HomestaySingle model with bilingual address
     const homestayData = {
       homestayId,
       password: hashedPassword,
@@ -83,14 +245,30 @@ export async function POST(req: NextRequest) {
       roomCount: body.roomCount,
       bedCount: body.bedCount,
       homeStayType: body.homeStayType,
-      directions: body.directions,
+      directions: body.directions || "",
       address: {
-        province: body.province,
-        district: body.district,
-        municipality: body.municipality,
-        ward: body.ward,
+        province: {
+          en: provinceEn,
+          ne: body.province
+        },
+        district: {
+          en: districtEn,
+          ne: body.district
+        },
+        municipality: {
+          en: municipalityEn,
+          ne: body.municipality
+        },
+        ward: {
+          en: wardEn,
+          ne: body.ward
+        },
         city: body.city,
-        tole: body.tole
+        tole: body.tole,
+        formattedAddress: {
+          en: formattedAddressEn,
+          ne: formattedAddressNe
+        }
       },
       features: {
         localAttractions: body.localAttractions,
@@ -105,6 +283,39 @@ export async function POST(req: NextRequest) {
     // Create homestay record - No transaction
     const createdHomestay = await HomestaySingle.create(homestayData);
     console.log(`Created homestay record with ID: ${createdHomestay._id}`);
+    
+    // Also save location data to the Location collection with both English and Nepali
+    const locationData = await Location.create({
+      homestayId,
+      province: {
+        en: provinceEn,
+        ne: body.province
+      },
+      district: {
+        en: districtEn,
+        ne: body.district
+      },
+      municipality: {
+        en: municipalityEn,
+        ne: body.municipality
+      },
+      ward: {
+        en: wardEn,
+        ne: body.ward
+      },
+      city: body.city,
+      tole: body.tole,
+      formattedAddress: {
+        en: formattedAddressEn,
+        ne: formattedAddressNe
+      },
+      // Add empty location field to avoid validation errors
+      location: {
+        type: 'Point',
+        coordinates: null
+      }
+    });
+    console.log(`Location data saved with ID: ${locationData._id} for homestay: ${homestayId}`);
     
     // Process officials - collect promises for parallel execution
     const officialPromises = body.officials
