@@ -2,17 +2,42 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Menu, X, LogOut, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+interface UserInfo {
+  homestayId: string;
+  homeStayName: string;
+}
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isVibrating, setIsVibrating] = useState(false);
   const [hasEntered, setHasEntered] = useState(false);
+  const [user, setUser] = useState<UserInfo | null>(null);
   const pathname = usePathname();
+  const router = useRouter();
 
+  // Check authentication status when component mounts and pathname changes
   useEffect(() => {
+    const checkAuth = () => {
+      const userJson = localStorage.getItem("user");
+      if (userJson) {
+        try {
+          const userData = JSON.parse(userJson);
+          setUser(userData);
+        } catch (err) {
+          console.error("Error parsing user data:", err);
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+    };
+
+    checkAuth();
+
     // Start vibration after entrance animation completes
     const entranceTimer = setTimeout(() => {
       setHasEntered(true);
@@ -26,7 +51,7 @@ const Navbar = () => {
     }, 3500); // Wait until entrance animation completes
     
     return () => clearTimeout(entranceTimer);
-  }, []);
+  }, [pathname]); // Re-check auth when pathname changes
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -34,6 +59,37 @@ const Navbar = () => {
 
   const isActive = (path: string) => {
     return pathname === path;
+  };
+
+  const handleDashboardClick = () => {
+    if (!user) {
+      router.push("/login");
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      // Clear user from localStorage
+      localStorage.removeItem("user");
+
+      // Call logout API to clear the cookie
+      await fetch("/api/auth/logout", {
+        method: "POST",
+      });
+
+      // Update state
+      setUser(null);
+
+      // Close menu if open
+      if (isMenuOpen) {
+        setIsMenuOpen(false);
+      }
+
+      // Redirect to home page
+      router.push("/");
+    } catch (err) {
+      console.error("Error during logout:", err);
+    }
   };
 
   return (
@@ -45,7 +101,7 @@ const Navbar = () => {
               <div className="h-10 w-10 bg-primary rounded-full flex items-center justify-center text-white font-bold text-lg">
                 HH
               </div>
-              <span className="ml-2 text-xl font-bold text-gray-900">Hamro Home Stay</span>
+              <span className="ml-2 text-xl font-bold text-gray-900 truncate max-w-[140px] sm:max-w-none">Hamro Home Stay</span>
             </Link>
           </div>
           
@@ -104,8 +160,24 @@ const Navbar = () => {
               </div>
             </Link>
             
+            {/* Dashboard Link */}
+            <Link 
+              href={user ? "/dashboard" : "/login"}
+              onClick={handleDashboardClick}
+              className={`group font-medium px-3 py-5 transition-all duration-300 ease-in-out ${
+                pathname.startsWith('/dashboard') ? 'text-primary' : 'text-gray-700'
+              }`}
+            >
+              <div className="relative">
+                <span className="group-hover:text-primary">Dashboard</span>
+                <span className={`absolute bottom-0 left-0 w-full h-[2px] bg-primary transform transition-transform duration-300 ease-in-out ${
+                  pathname.startsWith('/dashboard') ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
+                }`}></span>
+              </div>
+            </Link>
+            
             {/* Register Home Stay Button */}
-            <Link href="/register" className="ml-6">
+            <Link href="/register" className="ml-3">
               <button 
                 className={`bg-primary text-white px-4 py-2 rounded-md text-sm font-medium transition-all hover:bg-primary/90 whitespace-nowrap shadow-md hover:shadow-lg cursor-pointer ${
                   !hasEntered ? 'animate-entrance' : isVibrating ? 'animate-vibrate' : ''
@@ -114,27 +186,65 @@ const Navbar = () => {
                 Register Home Stay
               </button>
             </Link>
+            
+            {/* Login/Logout Button */}
+            {user ? (
+              <button
+                onClick={handleLogout}
+                className="flex items-center text-gray-700 hover:text-red-600 text-sm font-medium transition-colors"
+              >
+                <LogOut className="h-4 w-4 mr-1" />
+                Logout
+              </button>
+            ) : (
+              <Link href="/login">
+                <span className="flex items-center text-primary hover:text-primary-dark text-sm font-medium transition-colors cursor-pointer">
+                  <LogIn className="h-4 w-4 mr-1" />
+                  Login
+                </span>
+              </Link>
+            )}
           </div>
           
           {/* Mobile menu button */}
-          <div className="md:hidden flex items-center space-x-2">
-            {/* Register Home Stay Button (Mobile) */}
-            <Link href="/register">
-              <button 
-                className={`bg-primary text-white px-2 py-1 rounded-md text-xs font-medium transition-all hover:bg-primary/90 whitespace-nowrap shadow-sm hover:shadow-md cursor-pointer ${
-                  !hasEntered ? 'animate-entrance' : isVibrating ? 'animate-vibrate' : ''
-                }`}
-              >
-                Register
-              </button>
-            </Link>
+          <div className="md:hidden flex items-center">
+            <div className="flex space-x-1 mr-1">
+              {/* Login/Logout Button (Mobile) */}
+              {user ? (
+                <button
+                  onClick={handleLogout}
+                  className="text-red-600 px-2 py-1 rounded-md text-xs font-medium hover:bg-red-50 whitespace-nowrap"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              ) : (
+                <Link href="/login">
+                  <button
+                    className="text-primary px-2 py-1 rounded-md text-xs font-medium hover:bg-primary/10 whitespace-nowrap"
+                  >
+                    <LogIn className="h-4 w-4" />
+                  </button>
+                </Link>
+              )}
+              
+              {/* Register Home Stay Button (Mobile) */}
+              <Link href="/register">
+                <button 
+                  className={`bg-primary text-white px-2 py-1 rounded-md text-xs font-medium transition-all hover:bg-primary/90 whitespace-nowrap shadow-sm hover:shadow-md cursor-pointer ${
+                    !hasEntered ? 'animate-entrance' : isVibrating ? 'animate-vibrate' : ''
+                  }`}
+                >
+                  Register
+                </button>
+              </Link>
+            </div>
             
             <Button
               variant="ghost"
               size="icon"
               aria-label="Toggle menu"
               onClick={toggleMenu}
-              className="text-gray-900 ml-1"
+              className="text-gray-900"
             >
               {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
@@ -144,7 +254,7 @@ const Navbar = () => {
       
       {/* Mobile menu */}
       {isMenuOpen && (
-        <div className="md:hidden bg-white">
+        <div className="md:hidden bg-white absolute top-16 left-0 right-0 shadow-lg z-50">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
             <Link 
               href="/" 
@@ -191,6 +301,24 @@ const Navbar = () => {
               Contact Us
             </Link>
             
+            {/* Dashboard Link in Mobile Menu */}
+            <Link 
+              href={user ? "/dashboard" : "/login"}
+              className={`block px-3 py-2 rounded-md text-base font-medium transition-all duration-200 ${
+                pathname.startsWith('/dashboard') 
+                  ? 'text-primary border-l-4 border-primary bg-orange-50 pl-2' 
+                  : 'text-gray-700 hover:bg-orange-50 hover:text-primary'
+              }`}
+              onClick={() => {
+                toggleMenu();
+                if (!user) {
+                  router.push("/login");
+                }
+              }}
+            >
+              Dashboard
+            </Link>
+            
             {/* Register Home Stay Button in Mobile Menu */}
             <div className="mt-4 px-3">
               <Link 
@@ -206,6 +334,30 @@ const Navbar = () => {
                   Register Home Stay
                 </button>
               </Link>
+            </div>
+            
+            {/* Login/Logout Button in Mobile Menu */}
+            <div className="mt-2 px-3">
+              {user ? (
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center w-full justify-center py-2 px-4 border border-red-300 text-red-600 rounded-md text-base font-medium hover:bg-red-50"
+                >
+                  <LogOut className="h-5 w-5 mr-2" />
+                  Logout
+                </button>
+              ) : (
+                <Link
+                  href="/login"
+                  className="block"
+                  onClick={toggleMenu}
+                >
+                  <button className="flex items-center w-full justify-center py-2 px-4 border border-primary text-primary rounded-md text-base font-medium hover:bg-primary/10">
+                    <LogIn className="h-5 w-5 mr-2" />
+                    Login
+                  </button>
+                </Link>
+              )}
             </div>
           </div>
         </div>

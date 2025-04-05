@@ -396,13 +396,22 @@ export default function RegisterPage() {
           </div>
           
           <div className="pt-4">
-            <Link href="/">
-              <button 
-                className="mt-4 px-6 py-2 bg-primary text-white rounded-md hover:bg-primary-dark transition-colors"
-              >
-                Return to Home Page
-              </button>
-            </Link>
+            <div className="flex justify-center space-x-4">
+              <Link href="/">
+                <button 
+                  className="mt-4 px-6 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
+                >
+                  Return to Home Page
+                </button>
+              </Link>
+              <Link href="/login">
+                <button 
+                  className="mt-4 px-6 py-2 bg-primary text-white rounded-md hover:bg-primary-dark transition-colors"
+                >
+                  Login Now
+                </button>
+              </Link>
+            </div>
           </div>
         </div>
       );

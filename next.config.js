@@ -15,12 +15,6 @@ const nextConfig = {
     MONGODB_URI: process.env.MONGODB_URI,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
   },
-  // Increase body size limit for file uploads
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb', // Increase the body parser limit
-    },
-  },
 };
 
-module.exports = nextConfig;
+module.exports = nextConfig; 
