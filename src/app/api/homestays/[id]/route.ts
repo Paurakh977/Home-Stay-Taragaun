@@ -8,14 +8,97 @@ import mongoose from "mongoose";
 import path from "path";
 import fs from "fs";
 
+// Import translation maps
+const provinceTranslations: Record<string, string> = {
+  "कोशी": "Koshi",
+  "मधेश": "Madhesh",
+  "वागमती": "Bagmati",
+  "गण्डकी": "Gandaki",
+  "लुम्बिनी": "Lumbini",
+  "कर्णाली": "Karnali",
+  "सुदुर पश्चिम": "Sudurpashchim"
+};
+
+// Helper function to find the best English translation
+const findBestTranslation = (nepaliValue: string, type: 'district' | 'municipality'): string => {
+  try {
+    if (!nepaliValue) return '';
+    
+    // Read translations from JSON files in the public directory using filesystem
+    let translationsMap: Record<string, string> = {};
+    
+    try {
+      const publicPath = path.join(process.cwd(), 'public', 'address');
+      
+      if (type === 'district') {
+        const filePath = path.join(publicPath, 'all-districts.json');
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        translationsMap = JSON.parse(fileContent);
+      } else if (type === 'municipality') {
+        const filePath = path.join(publicPath, 'all-municipalities.json');
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        translationsMap = JSON.parse(fileContent);
+      }
+    } catch (fileError) {
+      console.warn(`Could not read translation file for ${type}:`, fileError);
+      // If files can't be loaded, return the original value
+      return nepaliValue;
+    }
+    
+    // Clean and normalize the value
+    const cleanValue = nepaliValue.trim().replace(/\s+/g, ' ');
+    
+    // Try direct lookup
+    if (translationsMap[cleanValue]) {
+      return translationsMap[cleanValue];
+    } 
+    // Then try with a space
+    else if (translationsMap[cleanValue + ' ']) {
+      return translationsMap[cleanValue + ' '];
+    }
+    // Find similar match
+    else {
+      // Look for keys that contain this value or vice versa
+      const possibleKey = Object.keys(translationsMap)
+        .find(key => key.includes(cleanValue) || cleanValue.includes(key));
+      
+      if (possibleKey) {
+        return translationsMap[possibleKey];
+      }
+    }
+    
+    // If no translation found, return the original value
+    return nepaliValue;
+  } catch (error) {
+    console.error(`Error finding translation for ${type}:`, error);
+    return nepaliValue;
+  }
+};
+
+// Convert Nepali numeric ward to English
+const translateWard = (ward: string): string => {
+  const wardMap: Record<string, string> = {
+    '१': '1', '२': '2', '३': '3', '४': '4', '५': '5',
+    '६': '6', '७': '7', '८': '8', '९': '9', '०': '0'
+  };
+  
+  let englishWard = '';
+  for (let i = 0; i < ward.length; i++) {
+    const char = ward[i];
+    englishWard += wardMap[char] || char;
+  }
+  
+  return englishWard;
+};
+
 // Get a specific homestay by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
     await dbConnect();
-    const { id } = params;
+    const { id } = context.params;
 
     // Find homestay by homestayId
     const homestay = await HomestaySingle.findOne({ homestayId: id }).select("-password");
@@ -50,11 +133,11 @@ export async function GET(
 // Update a homestay
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
     await dbConnect();
-    const { id } = params;
+    const { id } = context.params;
     const body = await request.json();
 
     // Find homestay to update
@@ -250,13 +333,13 @@ export async function PUT(
 // Delete a homestay
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
     await dbConnect();
-    const { id } = params;
+    const { id } = context.params;
 
-    // Find homestay to delete
+    // Find homestay
     const homestay = await HomestaySingle.findOne({ homestayId: id });
     if (!homestay) {
       return NextResponse.json(
@@ -265,17 +348,21 @@ export async function DELETE(
       );
     }
 
-    // Delete the homestay and related data
-    await Promise.all([
-      HomestaySingle.deleteOne({ homestayId: id }),
-      Official.deleteMany({ homestayId: id }),
-      Contact.deleteMany({ homestayId: id }),
-      Location.deleteOne({ homestayId: id })
-    ]);
+    // Delete related officials
+    await Official.deleteMany({ homestayId: id });
+    
+    // Delete related contacts
+    await Contact.deleteMany({ homestayId: id });
+    
+    // Delete related location
+    await Location.deleteMany({ homestayId: id });
+    
+    // Delete homestay
+    await HomestaySingle.deleteOne({ homestayId: id });
 
     return NextResponse.json({
       success: true,
-      message: "Homestay deleted successfully"
+      message: "Homestay and all related data deleted successfully"
     });
   } catch (error) {
     console.error("Error deleting homestay:", error);
@@ -284,87 +371,4 @@ export async function DELETE(
       { status: 500 }
     );
   }
-}
-
-// Import translation maps
-const provinceTranslations: Record<string, string> = {
-  "कोशी": "Koshi",
-  "मधेश": "Madhesh",
-  "वागमती": "Bagmati",
-  "गण्डकी": "Gandaki",
-  "लुम्बिनी": "Lumbini",
-  "कर्णाली": "Karnali",
-  "सुदुर पश्चिम": "Sudurpashchim"
-};
-
-// Helper function to find the best English translation
-const findBestTranslation = (nepaliValue: string, type: 'district' | 'municipality'): string => {
-  try {
-    if (!nepaliValue) return '';
-    
-    // Read translations from JSON files in the public directory using filesystem
-    let translationsMap: Record<string, string> = {};
-    
-    try {
-      const publicPath = path.join(process.cwd(), 'public', 'address');
-      
-      if (type === 'district') {
-        const filePath = path.join(publicPath, 'all-districts.json');
-        const fileContent = fs.readFileSync(filePath, 'utf8');
-        translationsMap = JSON.parse(fileContent);
-      } else if (type === 'municipality') {
-        const filePath = path.join(publicPath, 'all-municipalities.json');
-        const fileContent = fs.readFileSync(filePath, 'utf8');
-        translationsMap = JSON.parse(fileContent);
-      }
-    } catch (fileError) {
-      console.warn(`Could not read translation file for ${type}:`, fileError);
-      // If files can't be loaded, return the original value
-      return nepaliValue;
-    }
-    
-    // Clean and normalize the value
-    const cleanValue = nepaliValue.trim().replace(/\s+/g, ' ');
-    
-    // Try direct lookup
-    if (translationsMap[cleanValue]) {
-      return translationsMap[cleanValue];
-    } 
-    // Then try with a space
-    else if (translationsMap[cleanValue + ' ']) {
-      return translationsMap[cleanValue + ' '];
-    }
-    // Find similar match
-    else {
-      // Look for keys that contain this value or vice versa
-      const possibleKey = Object.keys(translationsMap)
-        .find(key => key.includes(cleanValue) || cleanValue.includes(key));
-      
-      if (possibleKey) {
-        return translationsMap[possibleKey];
-      }
-    }
-    
-    // If no translation found, return the original value
-    return nepaliValue;
-  } catch (error) {
-    console.error(`Error finding translation for ${type}:`, error);
-    return nepaliValue;
-  }
-};
-
-// Convert Nepali numeric ward to English
-const translateWard = (ward: string): string => {
-  const wardMap: Record<string, string> = {
-    '१': '1', '२': '2', '३': '3', '४': '4', '५': '5',
-    '६': '6', '७': '7', '८': '8', '९': '9', '०': '0'
-  };
-  
-  let englishWard = '';
-  for (let i = 0; i < ward.length; i++) {
-    const char = ward[i];
-    englishWard += wardMap[char] || char;
-  }
-  
-  return englishWard;
-}; 
+} 
