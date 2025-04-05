@@ -30,25 +30,7 @@ const locationSchema = new Schema(
     // Formatted address with bilingual support
     formattedAddress: bilingualField,
     
-    // These fields are added to satisfy MongoDB validation but are not required
-    location: {
-      type: { type: String, default: 'Point', required: false },
-      coordinates: { 
-        type: [Number],
-        required: false,
-        default: null,
-        validate: {
-          validator: function(v: any) {
-            // Either null or an array with exactly 2 numbers
-            return v === null || (Array.isArray(v) && v.length === 2 && 
-              !isNaN(parseFloat(v[0])) && !isNaN(parseFloat(v[1])));
-          },
-          message: "Coordinates must be null or [longitude, latitude]"
-        }
-      }
-    },
-    
-    // Flag to indicate if coordinates have been verified
+    // Flag to indicate verification status (can be used for admin approval)
     isVerified: {
       type: Boolean,
       default: false
@@ -56,16 +38,13 @@ const locationSchema = new Schema(
   },
   {
     timestamps: true, 
-    collection: 'HomestayLocations', // Changed collection name to start fresh
+    collection: 'HomestayLocations',
     strict: false // Allow additional fields for flexibility
   }
 );
 
 // Create index on homestayId for fast lookups
 locationSchema.index({ homestayId: 1 });
-
-// Add 2dsphere index for geospatial queries if coordinates are present
-locationSchema.index({ location: '2dsphere' });
 
 // Clear existing model if in development to avoid schema conflicts
 try {

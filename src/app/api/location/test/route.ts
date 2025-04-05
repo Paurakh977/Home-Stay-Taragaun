@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import dbConnect from "@/lib/dbConnect";
+import dbConnect from "@/lib/mongodb";
 import { HomestaySingle, Location } from "@/lib/models";
 import mongoose from "mongoose";
 
@@ -30,7 +30,6 @@ export async function GET(req: NextRequest) {
         ne: "मिलनचोक, भैरहवा, १२, सिद्धार्थनगर नगरपालिका, रुपन्देही, लुम्बिनी", 
         en: "Milan Chowk, Bhairahawa, 12, Siddharthanagar Municipality, Rupandehi, Lumbini" 
       },
-      coordinates: [83.46112060546875, 27.5111198425293],
       isVerified: true
     };
     

@@ -284,107 +284,154 @@ export async function POST(req: NextRequest) {
     const createdHomestay = await HomestaySingle.create(homestayData);
     console.log(`Created homestay record with ID: ${createdHomestay._id}`);
     
-    // Also save location data to the Location collection with both English and Nepali
-    const locationData = await Location.create({
-      homestayId,
-      province: {
-        en: provinceEn,
-        ne: body.province
-      },
-      district: {
-        en: districtEn,
-        ne: body.district
-      },
-      municipality: {
-        en: municipalityEn,
-        ne: body.municipality
-      },
-      ward: {
-        en: wardEn,
-        ne: body.ward
-      },
-      city: body.city,
-      tole: body.tole,
-      formattedAddress: {
-        en: formattedAddressEn,
-        ne: formattedAddressNe
-      },
-      // Add empty location field to avoid validation errors
-      location: {
-        type: 'Point',
-        coordinates: null
+    // Save location data to Location Collection
+    try {
+      const locationData = {
+        homestayId,
+        province: {
+          ne: body.province,
+          en: provinceEn
+        },
+        district: {
+          ne: body.district,
+          en: districtEn
+        },
+        municipality: {
+          ne: body.municipality,
+          en: municipalityEn
+        },
+        ward: {
+          ne: body.ward,
+          en: wardEn
+        },
+        city: body.city || '',
+        tole: body.tole || '',
+        formattedAddress: {
+          ne: `${body.tole || ''}, ${body.city || ''}, ${body.ward}, ${body.municipality}, ${body.district}, ${body.province}`,
+          en: `${body.tole || ''}, ${body.city || ''}, ${wardEn}, ${municipalityEn}, ${districtEn}, ${provinceEn}`
+        },
+        isVerified: false
+      };
+
+      // Insert to Location collection
+      const savedLocation = await Location.create(locationData);
+      
+      console.log(`Location data saved with ID: ${savedLocation._id} for homestay: ${homestayId}`);
+      
+      // Process officials - collect promises for parallel execution
+      const officialPromises = body.officials
+        .filter((officialData: any) => officialData.name && officialData.role && officialData.contactNo)
+        .map(async (officialData: any) => {
+          const official = await Official.create({
+            homestayId,
+            name: officialData.name,
+            role: officialData.role,
+            contactNo: officialData.contactNo
+          });
+          
+          return official._id;
+        });
+      
+      // Process contacts - collect promises for parallel execution
+      const contactPromises = body.contacts
+        .filter((contactData: any) => contactData.name && contactData.mobile)
+        .map(async (contactData: any) => {
+          const contact = await Contact.create({
+            homestayId,
+            name: contactData.name,
+            mobile: contactData.mobile,
+            email: contactData.email || "",
+            facebook: contactData.facebook || "",
+            youtube: contactData.youtube || "",
+            instagram: contactData.instagram || "",
+            tiktok: contactData.tiktok || "",
+            twitter: contactData.twitter || ""
+          });
+          
+          return contact._id;
+        });
+      
+      // Wait for all officials and contacts to be created
+      const [officialIds, contactIds] = await Promise.all([
+        Promise.all(officialPromises),
+        Promise.all(contactPromises)
+      ]);
+      
+      console.log(`Created ${officialIds.length} officials and ${contactIds.length} contacts`);
+      
+      // Update homestay with official and contact IDs
+      if (officialIds.length > 0 || contactIds.length > 0) {
+        await HomestaySingle.findByIdAndUpdate(
+          createdHomestay._id,
+          { 
+            $set: { 
+              officialIds, 
+              contactIds 
+            } 
+          }
+        );
       }
-    });
-    console.log(`Location data saved with ID: ${locationData._id} for homestay: ${homestayId}`);
-    
-    // Process officials - collect promises for parallel execution
-    const officialPromises = body.officials
-      .filter((officialData: any) => officialData.name && officialData.role && officialData.contactNo)
-      .map(async (officialData: any) => {
-        const official = await Official.create({
-          homestayId,
-          name: officialData.name,
-          role: officialData.role,
-          contactNo: officialData.contactNo
-        });
-        
-        return official._id;
-      });
-    
-    // Process contacts - collect promises for parallel execution
-    const contactPromises = body.contacts
-      .filter((contactData: any) => contactData.name && contactData.mobile)
-      .map(async (contactData: any) => {
-        const contact = await Contact.create({
-          homestayId,
-          name: contactData.name,
-          mobile: contactData.mobile,
-          email: contactData.email || "",
-          facebook: contactData.facebook || "",
-          youtube: contactData.youtube || "",
-          instagram: contactData.instagram || "",
-          tiktok: contactData.tiktok || "",
-          twitter: contactData.twitter || ""
-        });
-        
-        return contact._id;
-      });
-    
-    // Wait for all officials and contacts to be created
-    const [officialIds, contactIds] = await Promise.all([
-      Promise.all(officialPromises),
-      Promise.all(contactPromises)
-    ]);
-    
-    console.log(`Created ${officialIds.length} officials and ${contactIds.length} contacts`);
-    
-    // Update homestay with official and contact IDs
-    if (officialIds.length > 0 || contactIds.length > 0) {
-      await HomestaySingle.findByIdAndUpdate(
-        createdHomestay._id,
-        { 
-          $set: { 
-            officialIds, 
-            contactIds 
-          } 
+      
+      console.log(`Registration completed successfully for ${homestayId}`);
+      
+      // Return the response with credentials (plain text password for display to user)
+      return NextResponse.json({
+        success: true,
+        message: "Homestay registered successfully",
+        homestayId,
+        password, // Sending plain password for display to user ONCE
+        homestay: {
+          ...createdHomestay.toObject(),
+          password: undefined // Remove hashed password from response
         }
+      }, { status: 201 });
+      
+    } catch (error: any) {
+      console.error("Error saving location data:", error);
+      
+      // Handle validation errors
+      if (error.name === "ValidationError") {
+        const errors = Object.entries(error.errors).reduce(
+          (acc: any, [field, fieldError]: [string, any]) => {
+            acc[field] = fieldError.message;
+            return acc;
+          },
+          {}
+        );
+        
+        return NextResponse.json(
+          { error: "Validation Error", errors },
+          { status: 400 }
+        );
+      }
+      
+      // Handle duplicate homestayId
+      if (error.code === 11000) {
+        return NextResponse.json(
+          { error: "A homestay with this ID already exists. Please try again." },
+          { status: 409 }
+        );
+      }
+      
+      // Handle MongoDB connection issues
+      if (error.name === "MongooseError" || error.name === "MongoServerError") {
+        return NextResponse.json(
+          { 
+            error: "Database Connection Error", 
+            message: "Could not connect to the database. Please try again later."
+          },
+          { status: 503 }  // Service Unavailable
+        );
+      }
+      
+      return NextResponse.json(
+        { 
+          error: "Internal Server Error", 
+          message: error.message || "An unexpected error occurred" 
+        },
+        { status: 500 }
       );
     }
-    
-    console.log(`Registration completed successfully for ${homestayId}`);
-    
-    // Return the response with credentials (plain text password for display to user)
-    return NextResponse.json({
-      success: true,
-      message: "Homestay registered successfully",
-      homestayId,
-      password, // Sending plain password for display to user ONCE
-      homestay: {
-        ...createdHomestay.toObject(),
-        password: undefined // Remove hashed password from response
-      }
-    }, { status: 201 });
-    
   } catch (error: any) {
     console.error("Error creating homestay:", error);
     

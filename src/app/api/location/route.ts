@@ -19,10 +19,6 @@ interface LocationDocument {
   city: string;
   tole: string;
   formattedAddress: string | BilingualField;
-  location: {
-    type: string;
-    coordinates: number[] | null;
-  };
   isVerified?: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -95,14 +91,8 @@ export async function GET(request: NextRequest) {
           formattedAddress: formattedAddressBilingual
         },
         
-        // Include coordinates if available
-        coordinates: location.location.coordinates && location.location.coordinates[0] !== null
-          ? {
-              longitude: location.location.coordinates[0],
-              latitude: location.location.coordinates[1],
-              isVerified: !!location.isVerified
-            }
-          : null
+        // Add verification status
+        isVerified: !!location.isVerified
       };
     } else {
       // Old format - backward compatibility
@@ -115,15 +105,7 @@ export async function GET(request: NextRequest) {
         city: location.city,
         tole: location.tole,
         formattedAddress: location.formattedAddress as string,
-        
-        // Include coordinates if available
-        coordinates: location.location.coordinates && location.location.coordinates[0] !== null
-          ? {
-              longitude: location.location.coordinates[0],
-              latitude: location.location.coordinates[1],
-              isVerified: !!location.isVerified
-            }
-          : null
+        isVerified: !!location.isVerified
       };
     }
     
