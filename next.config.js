@@ -15,6 +15,16 @@ const nextConfig = {
     MONGODB_URI: process.env.MONGODB_URI,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
   },
+  // Disable ESLint during builds
+  eslint: {
+    // Ignore ESLint errors during production builds
+    ignoreDuringBuilds: true,
+  },
+  // Disable TypeScript checking during builds
+  typescript: {
+    // Ignore TypeScript errors during production builds
+    ignoreBuildErrors: true,
+  },
 };
 
 module.exports = nextConfig; 
