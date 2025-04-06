@@ -15,12 +15,6 @@ const nextConfig = {
     MONGODB_URI: process.env.MONGODB_URI,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
   },
-  // Increase body size limit for file uploads
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb', // Increase the body parser limit
-    },
-  },
   // Disable ESLint during builds
   eslint: {
     // Ignore ESLint errors during production builds
@@ -30,6 +24,12 @@ const nextConfig = {
   typescript: {
     // Ignore TypeScript errors during production builds
     ignoreBuildErrors: true,
+  },
+  // Configure experimental features
+  experimental: {
+    // Set the maximum request body size for API routes (10MB)
+    serverComponentsExternalPackages: [],
+    largePageDataBytes: 10 * 1024 * 1024, // 10MB
   },
 };
 

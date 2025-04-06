@@ -14,6 +14,11 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_for_developmen
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
+  // If it's an API route, just pass through (API body limits are handled by config)
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next();
+  }
+  
   // Check if the path is protected
   const isProtectedPath = PROTECTED_PATHS.some(path => 
     pathname === path || pathname.startsWith(`${path}/`)
@@ -63,5 +68,6 @@ export const config = {
      * - sitemap.xml (SEO file)
      */
     '/((?!_next/static|_next/image|images|favicon.ico|robots.txt|sitemap.xml).*)',
+    '/api/:path*'
   ],
 }; 

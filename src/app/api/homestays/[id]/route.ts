@@ -98,10 +98,13 @@ export async function GET(
 ) {
   try {
     await dbConnect();
-    const id = params.id;
-
+    
+    // Extract ID from URL directly to avoid the params.id issue
+    const pathname = request.nextUrl.pathname;
+    const homestayId = pathname.split('/').pop() || '';
+    
     // Find homestay by homestayId
-    const homestay = await HomestaySingle.findOne({ homestayId: id }).select("-password");
+    const homestay = await HomestaySingle.findOne({ homestayId }).select("-password");
 
     if (!homestay) {
       return NextResponse.json(
@@ -112,8 +115,8 @@ export async function GET(
 
     // Fetch related officials and contacts
     const [officials, contacts] = await Promise.all([
-      Official.find({ homestayId: id }),
-      Contact.find({ homestayId: id })
+      Official.find({ homestayId }),
+      Contact.find({ homestayId })
     ]);
 
     return NextResponse.json({
@@ -137,11 +140,15 @@ export async function PUT(
 ) {
   try {
     await dbConnect();
-    const id = params.id;
+    
+    // Extract ID from URL directly
+    const pathname = request.nextUrl.pathname;
+    const homestayId = pathname.split('/').pop() || '';
+    
     const body = await request.json();
 
     // Find homestay to update
-    const existingHomestay = await HomestaySingle.findOne({ homestayId: id });
+    const existingHomestay = await HomestaySingle.findOne({ homestayId });
     if (!existingHomestay) {
       return NextResponse.json(
         { error: "Homestay not found" },
@@ -323,7 +330,7 @@ export async function PUT(
     if (body.address || body.province || body.district || body.municipality || 
         body.ward || body.city || body.tole) {
       // Find existing location
-      const existingLocation = await Location.findOne({ homestayId: id });
+      const existingLocation = await Location.findOne({ homestayId: homestayId });
       
       if (existingLocation) {
         const locationUpdateData: any = {};
@@ -378,7 +385,7 @@ export async function PUT(
         
         // Update the location document
         await Location.updateOne(
-          { homestayId: id },
+          { homestayId: homestayId },
           { $set: locationUpdateData }
         );
       }
@@ -387,14 +394,14 @@ export async function PUT(
     // Handle officials update if provided
     if (body.officials && Array.isArray(body.officials)) {
       // Delete existing officials and create new ones
-      await Official.deleteMany({ homestayId: id });
+      await Official.deleteMany({ homestayId: homestayId });
       
       // Create new officials
       const officialPromises = body.officials
         .filter((o: any) => o.name && o.role && o.contactNo)
         .map((officialData: any) => {
           return Official.create({
-            homestayId: id,
+            homestayId: homestayId,
             name: officialData.name,
             role: officialData.role,
             contactNo: officialData.contactNo
@@ -407,14 +414,14 @@ export async function PUT(
     // Handle contacts update if provided
     if (body.contacts && Array.isArray(body.contacts)) {
       // Delete existing contacts and create new ones
-      await Contact.deleteMany({ homestayId: id });
+      await Contact.deleteMany({ homestayId: homestayId });
       
       // Create new contacts
       const contactPromises = body.contacts
         .filter((c: any) => c.name && c.mobile)
         .map((contactData: any) => {
           return Contact.create({
-            homestayId: id,
+            homestayId: homestayId,
             name: contactData.name,
             mobile: contactData.mobile,
             email: contactData.email || "",
@@ -431,8 +438,8 @@ export async function PUT(
 
     // Fetch the updated officials and contacts
     const [officials, contacts] = await Promise.all([
-      Official.find({ homestayId: id }),
-      Contact.find({ homestayId: id })
+      Official.find({ homestayId: homestayId }),
+      Contact.find({ homestayId: homestayId })
     ]);
 
     return NextResponse.json({
@@ -475,10 +482,13 @@ export async function DELETE(
 ) {
   try {
     await dbConnect();
-    const id = params.id;
-
+    
+    // Extract ID from URL directly
+    const pathname = request.nextUrl.pathname;
+    const homestayId = pathname.split('/').pop() || '';
+    
     // Find homestay
-    const homestay = await HomestaySingle.findOne({ homestayId: id });
+    const homestay = await HomestaySingle.findOne({ homestayId });
     if (!homestay) {
       return NextResponse.json(
         { error: "Homestay not found" },
@@ -487,16 +497,16 @@ export async function DELETE(
     }
 
     // Delete related officials
-    await Official.deleteMany({ homestayId: id });
+    await Official.deleteMany({ homestayId: homestayId });
     
     // Delete related contacts
-    await Contact.deleteMany({ homestayId: id });
+    await Contact.deleteMany({ homestayId: homestayId });
     
     // Delete related location
-    await Location.deleteMany({ homestayId: id });
+    await Location.deleteMany({ homestayId: homestayId });
     
     // Delete homestay
-    await HomestaySingle.deleteOne({ homestayId: id });
+    await HomestaySingle.deleteOne({ homestayId: homestayId });
 
     return NextResponse.json({
       success: true,
