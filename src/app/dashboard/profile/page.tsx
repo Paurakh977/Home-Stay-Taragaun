@@ -2,20 +2,45 @@
 
 import { useState, useEffect, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import { User, Upload, MapPin, Home, Phone, Mail, Edit } from "lucide-react";
+import { User, Upload, MapPin, Home, Phone, Mail, Edit, Loader2, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface UserInfo {
   homestayId: string;
   homeStayName: string;
 }
 
+interface ContactInfo {
+  _id: string;
+  name: string;
+  mobile: string;
+  email: string;
+  facebook?: string;
+  youtube?: string;
+  instagram?: string;
+  tiktok?: string;
+  twitter?: string;
+}
+
 interface ProfileData {
   homestayId: string;
   homeStayName: string;
-  location: string;
-  email: string;
-  phone: string;
-  bio: string;
+  villageName: string;
+  homeCount: number;
+  roomCount: number;
+  bedCount: number;
+  homeStayType: string;
+  status: string;
+  address: {
+    province: { en: string; ne: string };
+    district: { en: string; ne: string };
+    municipality: { en: string; ne: string };
+    ward: { en: string; ne: string };
+    city: string;
+    tole: string;
+    formattedAddress: { en: string; ne: string };
+  };
+  contacts: ContactInfo[];
   image: string | null;
 }
 
@@ -24,36 +49,23 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
-  const [profileData, setProfileData] = useState<ProfileData>({
-    homestayId: "",
-    homeStayName: "",
-    location: "Pokhara, Nepal",
-    email: "contact@homestay.com",
-    phone: "+977 9812345678",
-    bio: "Welcome to our beautiful homestay! We offer authentic Nepali hospitality and stunning mountain views.",
-    image: null
-  });
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [editedData, setEditedData] = useState<Partial<ProfileData>>({});
   
   const router = useRouter();
   
-  // Load user data from localStorage
+  // Load user data and fetch profile information
   useEffect(() => {
     const userJson = localStorage.getItem("user");
     if (userJson) {
       try {
         const userData = JSON.parse(userJson);
         setUser(userData);
-        setProfileData(prev => ({
-          ...prev,
-          homestayId: userData.homestayId,
-          homeStayName: userData.homeStayName
-        }));
         
-        // In a real app, we would fetch profile data from API
-        // For now, we'll simulate data loading
-        setLoading(false);
+        // Fetch the homestay data
+        fetchHomestayData(userData.homestayId);
       } catch (err) {
         console.error("Error parsing user data:", err);
         router.push("/login");
@@ -62,6 +74,49 @@ export default function ProfilePage() {
       router.push("/login");
     }
   }, [router]);
+  
+  // Fetch homestay data from API
+  const fetchHomestayData = async (homestayId: string) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/homestays/${homestayId}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch homestay data');
+      }
+      
+      const data = await response.json();
+      
+      // Transform data for our profile view
+      const formattedData: ProfileData = {
+        homestayId: data.homestay.homestayId,
+        homeStayName: data.homestay.homeStayName,
+        villageName: data.homestay.villageName,
+        homeCount: data.homestay.homeCount,
+        roomCount: data.homestay.roomCount,
+        bedCount: data.homestay.bedCount,
+        homeStayType: data.homestay.homeStayType,
+        status: data.homestay.status,
+        address: data.homestay.address,
+        contacts: data.contacts || [],
+        image: null // We'll set this from localStorage for now
+      };
+      
+      setProfileData(formattedData);
+      
+      // Load profile image from localStorage 
+      const savedImage = localStorage.getItem("profileImage");
+      if (savedImage) {
+        setProfileImage(savedImage);
+      }
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Error fetching homestay data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
   
   // Handle profile image upload
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
@@ -89,31 +144,93 @@ export default function ProfilePage() {
     setEditedData({ ...editedData, [name]: value });
   };
   
-  // Save profile changes
-  const saveChanges = () => {
-    setProfileData({ ...profileData, ...editedData });
+  // Handle contact info change
+  const handleContactChange = (e: ChangeEvent<HTMLInputElement>, index: number) => {
+    const { name, value } = e.target;
     
-    // In a real app, we would send this data to the server
-    // For now, just simulate saving
-    setTimeout(() => {
-      setIsEditing(false);
+    if (!profileData) return;
+    
+    const updatedContacts = [...profileData.contacts];
+    updatedContacts[index] = {
+      ...updatedContacts[index],
+      [name]: value
+    };
+    
+    setEditedData({
+      ...editedData,
+      contacts: updatedContacts
+    });
+  };
+  
+  // Save profile changes
+  const saveChanges = async () => {
+    if (!profileData || !user) return;
+    
+    try {
+      setIsSaving(true);
       setError(null);
       
-      // Save profile image to localStorage for persistence in demo
+      // Prepare data for update
+      const updateData = {
+        homeStayName: editedData.homeStayName || profileData.homeStayName,
+        villageName: editedData.villageName || profileData.villageName,
+        homeCount: profileData.homeCount,
+        roomCount: profileData.roomCount,
+        bedCount: profileData.bedCount,
+        homeStayType: profileData.homeStayType,
+        contacts: editedData.contacts || profileData.contacts
+      };
+      
+      console.log("Sending update:", updateData);
+      
+      // Send update to API
+      const response = await fetch(`/api/homestays/${user.homestayId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+      
+      const responseData = await response.json();
+      
+      if (!response.ok) {
+        console.error("API error response:", responseData);
+        throw new Error(responseData.error || 'Failed to update profile');
+      }
+      
+      // Update local state with new data
+      setProfileData({
+        ...profileData,
+        ...editedData,
+      });
+      
+      // Save profile image to localStorage for persistence
       if (editedData.image) {
         localStorage.setItem("profileImage", editedData.image as string);
       }
-    }, 500);
+      
+      // Reset edited data
+      setEditedData({});
+      setIsEditing(false);
+      toast.success("Profile updated successfully!");
+      
+    } catch (err) {
+      console.error("Profile update error:", err);
+      setError(err instanceof Error ? err.message : 'Failed to update profile');
+      toast.error(err instanceof Error ? err.message : "Failed to update profile");
+    } finally {
+      setIsSaving(false);
+    }
   };
   
-  // Load profile image from localStorage (for demo persistence)
-  useEffect(() => {
-    const savedImage = localStorage.getItem("profileImage");
-    if (savedImage) {
-      setProfileImage(savedImage);
-      setProfileData(prev => ({ ...prev, image: savedImage }));
+  // Get primary contact (first one in the list)
+  const getPrimaryContact = () => {
+    if (!profileData || !profileData.contacts || profileData.contacts.length === 0) {
+      return { name: '', mobile: '', email: '' };
     }
-  }, []);
+    return profileData.contacts[0];
+  };
   
   if (loading) {
     return (
@@ -122,6 +239,21 @@ export default function ProfilePage() {
       </div>
     );
   }
+  
+  if (!profileData) {
+    return (
+      <div className="bg-red-50 border-l-4 border-red-500 p-4">
+        <div className="flex">
+          <div>
+            <p className="text-red-700 font-medium">Error</p>
+            <p className="text-sm text-red-700">{error || "Failed to load profile data"}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  const primaryContact = getPrimaryContact();
   
   return (
     <div>
@@ -171,6 +303,7 @@ export default function ProfilePage() {
                 accept="image/*" 
                 className="hidden" 
                 onChange={handleImageUpload}
+                disabled={!isEditing}
               />
             </label>
           </div>
@@ -193,16 +326,7 @@ export default function ProfilePage() {
                 </h2>
                 <p className="text-gray-600 flex items-center mt-1">
                   <MapPin className="h-4 w-4 mr-1" />
-                  {isEditing 
-                    ? <input 
-                        type="text" 
-                        name="location" 
-                        value={editedData.location || profileData.location} 
-                        onChange={handleInputChange}
-                        className="border-b border-gray-300 focus:border-primary outline-none bg-transparent text-sm"
-                      />
-                    : profileData.location
-                  }
+                  {profileData.address.formattedAddress.en}
                 </p>
               </div>
               
@@ -212,14 +336,26 @@ export default function ProfilePage() {
                     <button 
                       onClick={() => setIsEditing(false)} 
                       className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
+                      disabled={isSaving}
                     >
                       Cancel
                     </button>
                     <button 
                       onClick={saveChanges} 
-                      className="px-4 py-2 text-sm bg-primary text-white rounded-md hover:bg-primary-dark"
+                      className="px-4 py-2 text-sm bg-primary text-white rounded-md hover:bg-primary-dark flex items-center"
+                      disabled={isSaving}
                     >
-                      Save
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 mr-1" />
+                          Save
+                        </>
+                      )}
                     </button>
                   </div>
                 ) : (
@@ -244,47 +380,126 @@ export default function ProfilePage() {
               <div className="flex items-center text-sm text-gray-600">
                 <Phone className="h-4 w-4 mr-2 text-gray-400" />
                 <span className="font-medium mr-2">Phone:</span>
-                {isEditing 
+                {isEditing && profileData.contacts.length > 0
                   ? <input 
                       type="text" 
-                      name="phone" 
-                      value={editedData.phone || profileData.phone} 
-                      onChange={handleInputChange}
-                      className="border-b border-gray-300 focus:border-primary outline-none bg-transparent"
+                      name="mobile" 
+                      value={editedData.contacts?.[0]?.mobile || primaryContact.mobile} 
+                      onChange={(e) => handleContactChange(e, 0)}
+                      className="border-b border-gray-300 focus:border-primary outline-none bg-transparent text-sm"
                     />
-                  : profileData.phone
+                  : primaryContact.mobile
                 }
               </div>
               
               <div className="flex items-center text-sm text-gray-600">
                 <Mail className="h-4 w-4 mr-2 text-gray-400" />
                 <span className="font-medium mr-2">Email:</span>
-                {isEditing 
+                {isEditing && profileData.contacts.length > 0
                   ? <input 
                       type="email" 
                       name="email" 
-                      value={editedData.email || profileData.email} 
-                      onChange={handleInputChange}
-                      className="border-b border-gray-300 focus:border-primary outline-none bg-transparent"
+                      value={editedData.contacts?.[0]?.email || primaryContact.email} 
+                      onChange={(e) => handleContactChange(e, 0)}
+                      className="border-b border-gray-300 focus:border-primary outline-none bg-transparent text-sm"
                     />
-                  : profileData.email
+                  : primaryContact.email || "Not provided"
+                }
+              </div>
+              
+              <div className="flex items-center text-sm text-gray-600">
+                <MapPin className="h-4 w-4 mr-2 text-gray-400" />
+                <span className="font-medium mr-2">Village:</span>
+                {isEditing
+                  ? <input 
+                      type="text" 
+                      name="villageName" 
+                      value={editedData.villageName || profileData.villageName} 
+                      onChange={handleInputChange}
+                      className="border-b border-gray-300 focus:border-primary outline-none bg-transparent text-sm"
+                    />
+                  : profileData.villageName
                 }
               </div>
             </div>
             
-            <div className="mt-4">
-              <h3 className="text-md font-medium text-gray-900 mb-2">Bio</h3>
-              {isEditing ? (
-                <textarea 
-                  name="bio" 
-                  value={editedData.bio || profileData.bio} 
-                  onChange={handleInputChange}
-                  rows={4}
-                  className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                ></textarea>
-              ) : (
-                <p className="text-gray-600 whitespace-pre-wrap">{profileData.bio}</p>
-              )}
+            {/* Homestay Details */}
+            <div className="border-t border-gray-200 pt-4">
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Homestay Details</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="px-4 py-3 bg-gray-50 rounded-md">
+                  <p className="text-xs text-gray-500">Type</p>
+                  <p className="text-sm font-medium">
+                    {profileData.homeStayType === 'community' ? 'Community Homestay' : 'Private Homestay'}
+                  </p>
+                </div>
+                
+                <div className="px-4 py-3 bg-gray-50 rounded-md">
+                  <p className="text-xs text-gray-500">Homes</p>
+                  <p className="text-sm font-medium">{profileData.homeCount}</p>
+                </div>
+                
+                <div className="px-4 py-3 bg-gray-50 rounded-md">
+                  <p className="text-xs text-gray-500">Rooms</p>
+                  <p className="text-sm font-medium">{profileData.roomCount}</p>
+                </div>
+                
+                <div className="px-4 py-3 bg-gray-50 rounded-md">
+                  <p className="text-xs text-gray-500">Beds</p>
+                  <p className="text-sm font-medium">{profileData.bedCount}</p>
+                </div>
+                
+                <div className="px-4 py-3 bg-gray-50 rounded-md">
+                  <p className="text-xs text-gray-500">Status</p>
+                  <p className={`text-sm font-medium ${
+                    profileData.status === 'approved' 
+                      ? 'text-green-600' 
+                      : profileData.status === 'pending' 
+                        ? 'text-yellow-600' 
+                        : 'text-red-600'
+                  }`}>
+                    {profileData.status.charAt(0).toUpperCase() + profileData.status.slice(1)}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Address Information */}
+            <div className="border-t border-gray-200 pt-4">
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Address Information</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-start">
+                  <div className="min-w-32 text-sm font-medium text-gray-500">Province:</div>
+                  <div className="text-sm text-gray-900">{profileData.address.province.en} ({profileData.address.province.ne})</div>
+                </div>
+                
+                <div className="flex items-start">
+                  <div className="min-w-32 text-sm font-medium text-gray-500">District:</div>
+                  <div className="text-sm text-gray-900">{profileData.address.district.en} ({profileData.address.district.ne})</div>
+                </div>
+                
+                <div className="flex items-start">
+                  <div className="min-w-32 text-sm font-medium text-gray-500">Municipality:</div>
+                  <div className="text-sm text-gray-900">{profileData.address.municipality.en} ({profileData.address.municipality.ne})</div>
+                </div>
+                
+                <div className="flex items-start">
+                  <div className="min-w-32 text-sm font-medium text-gray-500">Ward:</div>
+                  <div className="text-sm text-gray-900">{profileData.address.ward.en} ({profileData.address.ward.ne})</div>
+                </div>
+                
+                <div className="flex items-start">
+                  <div className="min-w-32 text-sm font-medium text-gray-500">City:</div>
+                  <div className="text-sm text-gray-900">{profileData.address.city}</div>
+                </div>
+                
+                <div className="flex items-start">
+                  <div className="min-w-32 text-sm font-medium text-gray-500">Tole:</div>
+                  <div className="text-sm text-gray-900">{profileData.address.tole}</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

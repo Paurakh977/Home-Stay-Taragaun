@@ -149,101 +149,157 @@ export async function PUT(
       );
     }
 
-    // Update homestay basic info
-    const homestayUpdateData = {
-      homeStayName: body.homeStayName,
-      villageName: body.villageName,
-      homeCount: body.homeCount,
-      roomCount: body.roomCount,
-      bedCount: body.bedCount,
-      homeStayType: body.homeStayType,
-      directions: body.directions || "",
-      address: {
-        province: {
+    // Prepare update data - only include fields that are present in the request
+    const homestayUpdateData: any = {};
+    
+    // Basic fields
+    if (body.homeStayName) homestayUpdateData.homeStayName = body.homeStayName;
+    if (body.villageName) homestayUpdateData.villageName = body.villageName;
+    if (body.homeCount) homestayUpdateData.homeCount = body.homeCount;
+    if (body.roomCount) homestayUpdateData.roomCount = body.roomCount;
+    if (body.bedCount) homestayUpdateData.bedCount = body.bedCount;
+    if (body.homeStayType) homestayUpdateData.homeStayType = body.homeStayType;
+    if (body.directions !== undefined) homestayUpdateData.directions = body.directions || "";
+    
+    // Handle address updates only if address fields are provided
+    const hasAddressChanges = body.province || body.district || body.municipality || 
+                            body.ward || body.city || body.tole;
+    
+    if (hasAddressChanges) {
+      // Get the existing address to merge with updates
+      const currentAddress = existingHomestay.address || {};
+      
+      // Build updated address object
+      const updatedAddress: any = {
+        province: { ...currentAddress.province },
+        district: { ...currentAddress.district },
+        municipality: { ...currentAddress.municipality },
+        ward: { ...currentAddress.ward },
+        city: currentAddress.city,
+        tole: currentAddress.tole,
+        formattedAddress: { ...currentAddress.formattedAddress }
+      };
+      
+      // Update only the provided fields
+      if (body.province) {
+        updatedAddress.province = {
           en: provinceTranslations[body.province] || body.province,
           ne: body.province
-        },
-        district: {
+        };
+      }
+      
+      if (body.district) {
+        updatedAddress.district = {
           en: findBestTranslation(body.district, 'district'),
           ne: body.district
-        },
-        municipality: {
+        };
+      }
+      
+      if (body.municipality) {
+        updatedAddress.municipality = {
           en: findBestTranslation(body.municipality, 'municipality'),
           ne: body.municipality
-        },
-        ward: {
+        };
+      }
+      
+      if (body.ward) {
+        updatedAddress.ward = {
           en: translateWard(body.ward),
           ne: body.ward
-        },
-        city: body.city,
-        tole: body.tole,
-        formattedAddress: {
-          en: `${body.tole}, ${body.city}, ${findBestTranslation(body.municipality, 'municipality')}, ${findBestTranslation(body.district, 'district')}, ${provinceTranslations[body.province] || body.province}`,
-          ne: `${body.tole}, ${body.city}, ${body.municipality}, ${body.district}, ${body.province}`
-        }
-      },
-      features: {
-        localAttractions: body.localAttractions,
-        tourismServices: body.tourismServices,
-        infrastructure: body.infrastructure
+        };
       }
-    };
+      
+      if (body.city) updatedAddress.city = body.city;
+      if (body.tole) updatedAddress.tole = body.tole;
+      
+      // Only regenerate formatted address if one of the address components changed
+      if (body.province || body.district || body.municipality || body.city || body.tole) {
+        // Use current values for any missing fields
+        const tole = body.tole || updatedAddress.tole;
+        const city = body.city || updatedAddress.city;
+        const municipality = body.municipality || (updatedAddress.municipality?.ne || '');
+        const district = body.district || (updatedAddress.district?.ne || '');
+        const province = body.province || (updatedAddress.province?.ne || '');
+        
+        // Generate English versions for formatting
+        const municipalityEn = body.municipality ? 
+          findBestTranslation(body.municipality, 'municipality') : 
+          updatedAddress.municipality?.en || '';
+          
+        const districtEn = body.district ? 
+          findBestTranslation(body.district, 'district') : 
+          updatedAddress.district?.en || '';
+          
+        const provinceEn = body.province ? 
+          (provinceTranslations[body.province] || body.province) : 
+          updatedAddress.province?.en || '';
+        
+        updatedAddress.formattedAddress = {
+          en: `${tole}, ${city}, ${municipalityEn}, ${districtEn}, ${provinceEn}`,
+          ne: `${tole}, ${city}, ${municipality}, ${district}, ${province}`
+        };
+      }
+      
+      homestayUpdateData.address = updatedAddress;
+    }
+    
+    // Handle features updates if provided
+    if (body.localAttractions || body.tourismServices || body.infrastructure) {
+      const currentFeatures = existingHomestay.features || {};
+      
+      homestayUpdateData.features = {
+        localAttractions: body.localAttractions || currentFeatures.localAttractions || [],
+        tourismServices: body.tourismServices || currentFeatures.tourismServices || [],
+        infrastructure: body.infrastructure || currentFeatures.infrastructure || []
+      };
+    }
 
-    // Update homestay document
+    // Update homestay document with the partial data
     const updatedHomestay = await HomestaySingle.findByIdAndUpdate(
       existingHomestay._id,
       { $set: homestayUpdateData },
       { new: true }
     ).select("-password");
     
-    // Update location data in Location collection
-    if (body.province || body.district || body.municipality || body.ward || body.city || body.tole) {
-      // Get English translations
-      const provinceEn = provinceTranslations[body.province] || body.province;
-      const districtEn = findBestTranslation(body.district, 'district');
-      const municipalityEn = findBestTranslation(body.municipality, 'municipality');
-      const wardEn = translateWard(body.ward);
+    // Update location data in Location collection if address fields changed
+    if (hasAddressChanges) {
+      // Find existing location
+      const existingLocation = await Location.findOne({ homestayId: id });
       
-      // Create formatted addresses in both languages
-      const formattedAddressNe = `${body.tole}, ${body.city}, ${body.municipality}, ${body.district}, ${body.province}`;
-      const formattedAddressEn = `${body.tole}, ${body.city}, ${municipalityEn}, ${districtEn}, ${provinceEn}`;
-      
-      const locationUpdateData = {
-        province: {
-          en: provinceEn,
-          ne: body.province
-        },
-        district: {
-          en: districtEn,
-          ne: body.district
-        },
-        municipality: {
-          en: municipalityEn,
-          ne: body.municipality
-        },
-        ward: {
-          en: wardEn,
-          ne: body.ward
-        },
-        city: body.city,
-        tole: body.tole,
-        formattedAddress: {
-          en: formattedAddressEn,
-          ne: formattedAddressNe
-        },
-        // Add empty location field to avoid validation errors
-        location: {
-          type: 'Point',
-          coordinates: null
+      if (existingLocation) {
+        const locationUpdateData: any = {};
+        
+        // Only update the fields that were provided
+        if (body.province) {
+          locationUpdateData.province = homestayUpdateData.address.province;
         }
-      };
-      
-      // Find and update the location or create if it doesn't exist
-      await Location.findOneAndUpdate(
-        { homestayId: id },
-        { $set: locationUpdateData },
-        { upsert: true, new: true }
-      );
+        
+        if (body.district) {
+          locationUpdateData.district = homestayUpdateData.address.district;
+        }
+        
+        if (body.municipality) {
+          locationUpdateData.municipality = homestayUpdateData.address.municipality;
+        }
+        
+        if (body.ward) {
+          locationUpdateData.ward = homestayUpdateData.address.ward;
+        }
+        
+        if (body.city) locationUpdateData.city = body.city;
+        if (body.tole) locationUpdateData.tole = body.tole;
+        
+        // Update formattedAddress if it was regenerated
+        if (homestayUpdateData.address?.formattedAddress) {
+          locationUpdateData.formattedAddress = homestayUpdateData.address.formattedAddress;
+        }
+        
+        // Update the location document
+        await Location.updateOne(
+          { homestayId: id },
+          { $set: locationUpdateData }
+        );
+      }
     }
 
     // Handle officials update if provided

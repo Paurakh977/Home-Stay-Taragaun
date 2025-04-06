@@ -1,9 +1,9 @@
-import { ClassValue, clsx } from "clsx";
+import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import crypto from 'crypto';
 
 /**
- * Utility function to combine class names
+ * Combines class names with tailwind-merge to prevent conflicts
  */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

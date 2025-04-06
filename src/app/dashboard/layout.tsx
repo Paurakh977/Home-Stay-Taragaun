@@ -10,7 +10,7 @@ import {
   Settings,
   MessageSquare,
   Upload,
-  FileEdit,
+  PencilLine,
   MenuIcon,
   X,
   ChevronLeft,
@@ -183,7 +183,7 @@ export default function DashboardLayout({
             className={`flex items-center ${isCollapsed ? "justify-center" : ""} px-4 py-3 rounded-md transition-colors ${isActive("/update-info")}`}
             title={isCollapsed ? "Update Information" : ""}
           >
-            <FileEdit className="h-5 w-5 min-w-5" />
+            <PencilLine className="h-5 w-5 min-w-5" />
             {!isCollapsed && <span className="ml-3">Update Information</span>}
           </Link>
           <Link
@@ -274,7 +274,7 @@ export default function DashboardLayout({
                 className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("/update-info")}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                <FileEdit className="h-5 w-5 mr-3" />
+                <PencilLine className="h-5 w-5 mr-3" />
                 Update Information
               </Link>
               <Link
