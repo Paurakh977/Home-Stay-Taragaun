@@ -160,35 +160,35 @@ export default function DashboardPage() {
           <h2 className="text-lg font-medium text-gray-900">Recent Homestays</h2>
         </div>
         <div className="px-6 py-4">
-          {/* Error message */}
-          {error && (
-            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
-              <div className="flex">
-                <div>
-                  <p className="text-red-700 font-medium">Error</p>
-                  <p className="text-sm text-red-700">{error}</p>
-                </div>
+        {/* Error message */}
+        {error && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+            <div className="flex">
+              <div>
+                <p className="text-red-700 font-medium">Error</p>
+                <p className="text-sm text-red-700">{error}</p>
               </div>
             </div>
-          )}
-          
+          </div>
+        )}
+        
           {/* Loading state */}
-          {loading ? (
+        {loading ? (
             <div className="flex justify-center items-center h-40">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-            </div>
-          ) : homestays.length === 0 ? (
+          </div>
+        ) : homestays.length === 0 ? (
             <div className="text-center py-8">
               <Building2Icon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No homestays found</h3>
-              <p className="text-gray-600 mb-4">No homestays have been registered yet.</p>
-              <Link href="/register">
-                <button className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark transition">
-                  Register a Homestay
-                </button>
-              </Link>
-            </div>
-          ) : (
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No homestays found</h3>
+            <p className="text-gray-600 mb-4">No homestays have been registered yet.</p>
+            <Link href="/register">
+              <button className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark transition">
+                Register a Homestay
+              </button>
+            </Link>
+          </div>
+        ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
