@@ -476,6 +476,71 @@ export async function PUT(
   }
 }
 
+// Update portal information (PATCH method)
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await dbConnect();
+    
+    // Extract ID from URL directly
+    const pathname = request.nextUrl.pathname;
+    const homestayId = pathname.split('/').pop() || '';
+    
+    const body = await request.json();
+
+    // Find homestay to update
+    const existingHomestay = await HomestaySingle.findOne({ homestayId });
+    if (!existingHomestay) {
+      return NextResponse.json(
+        { error: "Homestay not found" },
+        { status: 404 }
+      );
+    }
+
+    // Prepare update data for portal fields only
+    const portalUpdateData: any = {};
+    
+    // Update description if provided
+    if (body.description !== undefined) {
+      portalUpdateData.description = body.description;
+    }
+    
+    // Update gallery images if provided
+    if (body.galleryImages !== undefined) {
+      portalUpdateData.galleryImages = body.galleryImages;
+    }
+    
+    // Only update if there are fields to update
+    if (Object.keys(portalUpdateData).length > 0) {
+      // Update the homestay
+      const updatedHomestay = await HomestaySingle.findOneAndUpdate(
+        { homestayId },
+        { $set: portalUpdateData },
+        { new: true }
+      ).select("-password");
+      
+      return NextResponse.json({
+        success: true,
+        message: "Portal information updated successfully",
+        homestay: updatedHomestay
+      });
+    } else {
+      return NextResponse.json(
+        { error: "No portal fields to update" },
+        { status: 400 }
+      );
+    }
+  } catch (error) {
+    console.error("Error updating portal information:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error", message: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}
+
 // Delete a homestay
 export async function DELETE(
   request: NextRequest,

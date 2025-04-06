@@ -212,12 +212,12 @@ export default function DashboardLayout({
             {!isCollapsed && <span className="ml-3">Chats</span>}
           </Link>
           <Link
-            href="/dashboard/uploads"
-            className={`flex items-center ${isCollapsed ? "justify-center" : ""} px-4 py-3 rounded-md transition-colors ${isActive("/uploads")}`}
-            title={isCollapsed ? "Uploads" : ""}
+            href="/dashboard/portal"
+            className={`flex items-center ${isCollapsed ? "justify-center" : ""} px-4 py-3 rounded-md transition-colors ${isActive("/portal")}`}
+            title={isCollapsed ? "Portal" : ""}
           >
             <Upload className="h-5 w-5 min-w-5" />
-            {!isCollapsed && <span className="ml-3">Uploads</span>}
+            {!isCollapsed && <span className="ml-3">Portal</span>}
           </Link>
           <Link
             href="/dashboard/update-info"
@@ -303,12 +303,12 @@ export default function DashboardLayout({
                 Chats
               </Link>
               <Link
-                href="/dashboard/uploads"
-                className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("/uploads")}`}
+                href="/dashboard/portal"
+                className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("/portal")}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 <Upload className="h-5 w-5 mr-3" />
-                Uploads
+                Portal
               </Link>
               <Link
                 href="/dashboard/update-info"

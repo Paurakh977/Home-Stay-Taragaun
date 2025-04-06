@@ -32,6 +32,12 @@ const homestaySchema = new Schema(
     // Profile image
     profileImage: { type: String, default: null },
     
+    // Gallery images for the portal
+    galleryImages: { type: [String], default: [] },
+    
+    // Description for the portal
+    description: { type: String, default: "" },
+    
     // Directions
     directions: { type: String, default: "" },
     
@@ -90,6 +96,7 @@ homestaySchema.index({
   "address.municipality.en": "text",
   "address.municipality.ne": "text",
   "address.city": "text",
+  description: "text" // Add description to text search
 });
 
 // Clear existing model if in development to avoid schema conflicts
