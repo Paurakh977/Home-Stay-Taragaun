@@ -43,8 +43,8 @@ const locationSchema = new Schema(
   }
 );
 
-// Create index on homestayId for fast lookups
-locationSchema.index({ homestayId: 1 });
+// Don't create additional index since it's already defined in the schema
+// locationSchema.index({ homestayId: 1 });
 
 // Clear existing model if in development to avoid schema conflicts
 try {

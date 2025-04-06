@@ -112,7 +112,7 @@ export default function UpdateInfoPage() {
       setContacts(data.contacts || []);
       setOfficials(data.officials || []);
       
-      // Initialize edited data with current data
+      // Update edited data with current values
       setEditedData({
         homeStayName: data.homestay.homeStayName,
         villageName: data.homestay.villageName,
@@ -121,10 +121,10 @@ export default function UpdateInfoPage() {
         bedCount: data.homestay.bedCount,
         homeStayType: data.homestay.homeStayType,
         directions: data.homestay.directions || "",
-        province: data.homestay.address.province.ne,
-        district: data.homestay.address.district.ne,
-        municipality: data.homestay.address.municipality.ne,
-        ward: data.homestay.address.ward.ne,
+        province: data.homestay.address.province,
+        district: data.homestay.address.district,
+        municipality: data.homestay.address.municipality,
+        ward: data.homestay.address.ward,
         city: data.homestay.address.city,
         tole: data.homestay.address.tole,
         localAttractions: data.homestay.features?.localAttractions || [],
@@ -189,20 +189,22 @@ export default function UpdateInfoPage() {
       
       // Address fields - only include if they're different
       const addressFieldsChanged = 
-        editedData.province !== homeStay.address.province.ne ||
-        editedData.district !== homeStay.address.district.ne ||
-        editedData.municipality !== homeStay.address.municipality.ne ||
-        editedData.ward !== homeStay.address.ward.ne ||
+        JSON.stringify(editedData.province) !== JSON.stringify(homeStay.address.province) ||
+        JSON.stringify(editedData.district) !== JSON.stringify(homeStay.address.district) ||
+        JSON.stringify(editedData.municipality) !== JSON.stringify(homeStay.address.municipality) ||
+        JSON.stringify(editedData.ward) !== JSON.stringify(homeStay.address.ward) ||
         editedData.city !== homeStay.address.city ||
         editedData.tole !== homeStay.address.tole;
       
       if (addressFieldsChanged) {
-        updateData.province = editedData.province;
-        updateData.district = editedData.district;
-        updateData.municipality = editedData.municipality;
-        updateData.ward = editedData.ward;
-        updateData.city = editedData.city;
-        updateData.tole = editedData.tole;
+        updateData.address = {
+          province: editedData.province,
+          district: editedData.district,
+          municipality: editedData.municipality,
+          ward: editedData.ward,
+          city: editedData.city,
+          tole: editedData.tole
+        };
       }
       
       // Features fields
@@ -255,10 +257,10 @@ export default function UpdateInfoPage() {
         bedCount: responseData.homestay.bedCount,
         homeStayType: responseData.homestay.homeStayType,
         directions: responseData.homestay.directions || "",
-        province: responseData.homestay.address.province.ne,
-        district: responseData.homestay.address.district.ne,
-        municipality: responseData.homestay.address.municipality.ne,
-        ward: responseData.homestay.address.ward.ne,
+        province: responseData.homestay.address.province,
+        district: responseData.homestay.address.district,
+        municipality: responseData.homestay.address.municipality,
+        ward: responseData.homestay.address.ward,
         city: responseData.homestay.address.city,
         tole: responseData.homestay.address.tole,
         localAttractions: responseData.homestay.features?.localAttractions || [],
@@ -314,25 +316,27 @@ export default function UpdateInfoPage() {
             <div className="flex space-x-3">
               <button 
                 onClick={() => setIsEditing(false)} 
-                className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
+                className="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
                 disabled={isSaving}
               >
                 Cancel
               </button>
               <button 
                 onClick={saveChanges} 
-                className="px-4 py-2 text-sm bg-primary text-white rounded-md hover:bg-primary-dark flex items-center"
+                className="px-3 py-2 text-sm bg-primary text-white rounded-md hover:bg-primary-dark flex items-center"
                 disabled={isSaving}
               >
                 {isSaving ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                    Saving...
+                    <span className="hidden sm:inline">Saving...</span>
+                    <span className="sm:hidden">...</span>
                   </>
                 ) : (
                   <>
                     <Save className="h-4 w-4 mr-1" />
-                    Save Changes
+                    <span className="hidden sm:inline">Save Changes</span>
+                    <span className="sm:hidden">Save</span>
                   </>
                 )}
               </button>
@@ -340,10 +344,12 @@ export default function UpdateInfoPage() {
           ) : (
             <button 
               onClick={() => setIsEditing(true)} 
-              className="px-4 py-2 text-sm bg-gray-100 rounded-md hover:bg-gray-200 flex items-center"
+              className="px-3 py-2 text-sm bg-gray-100 rounded-md hover:bg-gray-200 flex items-center"
+              aria-label="Edit Information"
             >
               <Edit className="h-4 w-4 mr-1" />
-              Edit Information
+              <span className="hidden sm:inline">Edit Information</span>
+              <span className="sm:hidden">Edit</span>
             </button>
           )}
         </div>

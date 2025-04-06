@@ -94,11 +94,11 @@ const translateWard = (ward: string): string => {
 // Get a specific homestay by ID
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
     await dbConnect();
-    const { id } = context.params;
+    const id = params.id;
 
     // Find homestay by homestayId
     const homestay = await HomestaySingle.findOne({ homestayId: id }).select("-password");
@@ -133,11 +133,11 @@ export async function GET(
 // Update a homestay
 export async function PUT(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
     await dbConnect();
-    const { id } = context.params;
+    const id = params.id;
     const body = await request.json();
 
     // Find homestay to update
@@ -161,11 +161,69 @@ export async function PUT(
     if (body.homeStayType) homestayUpdateData.homeStayType = body.homeStayType;
     if (body.directions !== undefined) homestayUpdateData.directions = body.directions || "";
     
-    // Handle address updates only if address fields are provided
-    const hasAddressChanges = body.province || body.district || body.municipality || 
-                            body.ward || body.city || body.tole;
-    
-    if (hasAddressChanges) {
+    // Handle address updates
+    // Check if address is provided as a complete object (new format)
+    if (body.address) {
+      // Get the existing address to merge with updates
+      const currentAddress = existingHomestay.address || {};
+      
+      // Build updated address object
+      const updatedAddress: any = {
+        province: { ...currentAddress.province },
+        district: { ...currentAddress.district },
+        municipality: { ...currentAddress.municipality },
+        ward: { ...currentAddress.ward },
+        city: currentAddress.city,
+        tole: currentAddress.tole,
+        formattedAddress: { ...currentAddress.formattedAddress }
+      };
+      
+      // Update from the address object
+      if (body.address.province) {
+        updatedAddress.province = body.address.province;
+      }
+      
+      if (body.address.district) {
+        updatedAddress.district = body.address.district;
+      }
+      
+      if (body.address.municipality) {
+        updatedAddress.municipality = body.address.municipality;
+      }
+      
+      if (body.address.ward) {
+        updatedAddress.ward = body.address.ward;
+      }
+      
+      if (body.address.city) updatedAddress.city = body.address.city;
+      if (body.address.tole) updatedAddress.tole = body.address.tole;
+      
+      // Only regenerate formatted address if one of the address components changed
+      if (body.address.province || body.address.district || body.address.municipality || 
+          body.address.city || body.address.tole) {
+        
+        // Use current values for any missing fields
+        const tole = body.address.tole || updatedAddress.tole;
+        const city = body.address.city || updatedAddress.city;
+        const municipalityEn = body.address.municipality?.en || updatedAddress.municipality?.en || '';
+        const districtEn = body.address.district?.en || updatedAddress.district?.en || '';
+        const provinceEn = body.address.province?.en || updatedAddress.province?.en || '';
+        
+        const municipalityNe = body.address.municipality?.ne || updatedAddress.municipality?.ne || '';
+        const districtNe = body.address.district?.ne || updatedAddress.district?.ne || '';
+        const provinceNe = body.address.province?.ne || updatedAddress.province?.ne || '';
+        
+        updatedAddress.formattedAddress = {
+          en: `${tole}, ${city}, ${municipalityEn}, ${districtEn}, ${provinceEn}`,
+          ne: `${tole}, ${city}, ${municipalityNe}, ${districtNe}, ${provinceNe}`
+        };
+      }
+      
+      homestayUpdateData.address = updatedAddress;
+    }
+    // Handle legacy format where address fields are provided individually
+    else if (body.province || body.district || body.municipality || 
+             body.ward || body.city || body.tole) {
       // Get the existing address to merge with updates
       const currentAddress = existingHomestay.address || {};
       
@@ -262,32 +320,56 @@ export async function PUT(
     ).select("-password");
     
     // Update location data in Location collection if address fields changed
-    if (hasAddressChanges) {
+    if (body.address || body.province || body.district || body.municipality || 
+        body.ward || body.city || body.tole) {
       // Find existing location
       const existingLocation = await Location.findOne({ homestayId: id });
       
       if (existingLocation) {
         const locationUpdateData: any = {};
         
-        // Only update the fields that were provided
-        if (body.province) {
-          locationUpdateData.province = homestayUpdateData.address.province;
+        // If address is provided as a complete object
+        if (body.address) {
+          if (body.address.province) locationUpdateData.province = body.address.province;
+          if (body.address.district) locationUpdateData.district = body.address.district;
+          if (body.address.municipality) locationUpdateData.municipality = body.address.municipality;
+          if (body.address.ward) locationUpdateData.ward = body.address.ward;
+          if (body.address.city) locationUpdateData.city = body.address.city;
+          if (body.address.tole) locationUpdateData.tole = body.address.tole;
         }
-        
-        if (body.district) {
-          locationUpdateData.district = homestayUpdateData.address.district;
+        // Handle legacy individual fields
+        else {
+          if (body.province) {
+            locationUpdateData.province = {
+              en: provinceTranslations[body.province] || body.province,
+              ne: body.province
+            };
+          }
+          
+          if (body.district) {
+            locationUpdateData.district = {
+              en: findBestTranslation(body.district, 'district'),
+              ne: body.district
+            };
+          }
+          
+          if (body.municipality) {
+            locationUpdateData.municipality = {
+              en: findBestTranslation(body.municipality, 'municipality'),
+              ne: body.municipality
+            };
+          }
+          
+          if (body.ward) {
+            locationUpdateData.ward = {
+              en: translateWard(body.ward),
+              ne: body.ward
+            };
+          }
+          
+          if (body.city) locationUpdateData.city = body.city;
+          if (body.tole) locationUpdateData.tole = body.tole;
         }
-        
-        if (body.municipality) {
-          locationUpdateData.municipality = homestayUpdateData.address.municipality;
-        }
-        
-        if (body.ward) {
-          locationUpdateData.ward = homestayUpdateData.address.ward;
-        }
-        
-        if (body.city) locationUpdateData.city = body.city;
-        if (body.tole) locationUpdateData.tole = body.tole;
         
         // Update formattedAddress if it was regenerated
         if (homestayUpdateData.address?.formattedAddress) {
@@ -389,11 +471,11 @@ export async function PUT(
 // Delete a homestay
 export async function DELETE(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
     await dbConnect();
-    const { id } = context.params;
+    const id = params.id;
 
     // Find homestay
     const homestay = await HomestaySingle.findOne({ homestayId: id });
