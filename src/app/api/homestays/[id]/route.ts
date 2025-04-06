@@ -167,6 +167,7 @@ export async function PUT(
     if (body.bedCount) homestayUpdateData.bedCount = body.bedCount;
     if (body.homeStayType) homestayUpdateData.homeStayType = body.homeStayType;
     if (body.directions !== undefined) homestayUpdateData.directions = body.directions || "";
+    if (body.profileImage !== undefined) homestayUpdateData.profileImage = body.profileImage;
     
     // Handle address updates
     // Check if address is provided as a complete object (new format)

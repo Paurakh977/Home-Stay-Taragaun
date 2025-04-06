@@ -41,7 +41,7 @@ interface ProfileData {
     formattedAddress: { en: string; ne: string };
   };
   contacts: ContactInfo[];
-  image: string | null;
+  profileImage: string | null;
 }
 
 export default function ProfilePage() {
@@ -99,16 +99,11 @@ export default function ProfilePage() {
         status: data.homestay.status,
         address: data.homestay.address,
         contacts: data.contacts || [],
-        image: null // We'll set this from localStorage for now
+        profileImage: data.homestay.profileImage || null
       };
       
       setProfileData(formattedData);
-      
-      // Load profile image from localStorage 
-      const savedImage = localStorage.getItem("profileImage");
-      if (savedImage) {
-        setProfileImage(savedImage);
-      }
+      setProfileImage(data.homestay.profileImage || null);
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -119,23 +114,62 @@ export default function ProfilePage() {
   };
   
   // Handle profile image upload
-  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !user) return;
     
     if (file.size > 5 * 1024 * 1024) {
       setError("Image size should be less than 5MB");
       return;
     }
     
+    // Show a temporary preview
     const reader = new FileReader();
     reader.onload = (event) => {
       if (event.target?.result) {
         setProfileImage(event.target.result as string);
-        setEditedData({ ...editedData, image: event.target.result as string });
       }
     };
     reader.readAsDataURL(file);
+    
+    try {
+      // Upload the image to the server
+      const formData = new FormData();
+      formData.append("file", file);
+      
+      const response = await fetch(`/api/homestays/${user.homestayId}/upload`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to upload image');
+      }
+      
+      const data = await response.json();
+      
+      // Update the profile data with the new image URL
+      if (profileData) {
+        setProfileData({
+          ...profileData,
+          profileImage: data.imageUrl
+        });
+        setProfileImage(data.imageUrl);
+      }
+      
+      toast.success("Profile image updated successfully!");
+      
+    } catch (err) {
+      console.error("Image upload error:", err);
+      setError(err instanceof Error ? err.message : 'Failed to upload image');
+      toast.error(err instanceof Error ? err.message : "Failed to upload image");
+      
+      // Revert to previous image if there was an error
+      if (profileData) {
+        setProfileImage(profileData.profileImage);
+      }
+    }
   };
   
   // Handle form input change
@@ -204,11 +238,6 @@ export default function ProfilePage() {
         ...profileData,
         ...editedData,
       });
-      
-      // Save profile image to localStorage for persistence
-      if (editedData.image) {
-        localStorage.setItem("profileImage", editedData.image as string);
-      }
       
       // Reset edited data
       setEditedData({});
@@ -283,7 +312,7 @@ export default function ProfilePage() {
             <div className="rounded-full h-24 w-24 md:h-32 md:w-32 bg-white p-1 shadow-md overflow-hidden">
               {profileImage ? (
                 <img 
-                  src={profileImage} 
+                  src={profileImage.startsWith('data:') ? profileImage : `${profileImage}?t=${new Date().getTime()}`} 
                   alt="Profile" 
                   className="rounded-full h-full w-full object-cover"
                 />
@@ -294,18 +323,19 @@ export default function ProfilePage() {
               )}
             </div>
             
-            {/* Image upload button */}
-            <label htmlFor="profile-image" className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full cursor-pointer shadow-md hover:bg-primary-dark">
-              <Upload className="h-4 w-4" />
-              <input 
-                id="profile-image" 
-                type="file" 
-                accept="image/*" 
-                className="hidden" 
-                onChange={handleImageUpload}
-                disabled={!isEditing}
-              />
-            </label>
+            {/* Only show image upload button when editing */}
+            {isEditing && (
+              <label htmlFor="profile-image" className="absolute bottom-0 right-0 p-2 rounded-full cursor-pointer shadow-md bg-primary text-white hover:bg-primary-dark">
+                <Upload className="h-4 w-4" />
+                <input 
+                  id="profile-image" 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={handleImageUpload}
+                />
+              </label>
+            )}
           </div>
           
           {/* Profile Info */}

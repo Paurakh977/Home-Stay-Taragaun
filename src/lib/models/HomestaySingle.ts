@@ -29,6 +29,9 @@ const homestaySchema = new Schema(
     bedCount: { type: Number, required: true, min: 1 },
     homeStayType: { type: String, required: true, enum: ['community', 'private'] },
     
+    // Profile image
+    profileImage: { type: String, default: null },
+    
     // Directions
     directions: { type: String, default: "" },
     

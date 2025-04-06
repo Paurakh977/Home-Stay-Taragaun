@@ -30,6 +30,7 @@ export default function DashboardLayout({
   const [user, setUser] = useState<UserInfo | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -40,6 +41,10 @@ export default function DashboardLayout({
       try {
         const userData = JSON.parse(userJson);
         setUser(userData);
+        
+        // Fetch the user's profile image
+        fetchProfileImage(userData.homestayId);
+        
       } catch (err) {
         console.error("Error parsing user data:", err);
         // If we can't parse the user data, clear it and redirect
@@ -57,6 +62,23 @@ export default function DashboardLayout({
       setIsCollapsed(savedCollapsedState === "true");
     }
   }, [router]);
+  
+  // Fetch user's profile image
+  const fetchProfileImage = async (homestayId: string) => {
+    try {
+      const response = await fetch(`/api/homestays/${homestayId}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch homestay data');
+      }
+      
+      const data = await response.json();
+      setProfileImage(data.homestay.profileImage);
+      
+    } catch (err) {
+      console.error('Error fetching profile image:', err);
+    }
+  };
 
   // Handle sidebar collapse toggle
   const toggleSidebar = () => {
@@ -85,6 +107,25 @@ export default function DashboardLayout({
 
   const isActive = (path: string) => {
     return pathname === `/dashboard${path}` ? "bg-primary/10 text-primary" : "text-gray-600 hover:bg-gray-100";
+  };
+
+  // Function to render profile image or default user icon
+  const renderProfileImage = (size: "small" | "medium") => {
+    const sizeClasses = size === "small" ? "h-6 w-6" : "h-10 w-10";
+    
+    if (profileImage) {
+      return (
+        <div className={`rounded-full overflow-hidden ${sizeClasses}`}>
+          <img 
+            src={`${profileImage}?t=${new Date().getTime()}`} 
+            alt="Profile" 
+            className="h-full w-full object-cover"
+          />
+        </div>
+      );
+    } else {
+      return <User className={`${sizeClasses} text-primary`} />;
+    }
   };
 
   return (
@@ -127,7 +168,7 @@ export default function DashboardLayout({
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center space-x-3">
               <div className="bg-primary/10 p-2 rounded-full">
-                <User className="h-6 w-6 text-primary" />
+                {renderProfileImage("small")}
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-900">{user.homeStayName}</p>
@@ -140,7 +181,7 @@ export default function DashboardLayout({
         {user && isCollapsed && (
           <div className="py-4 border-b border-gray-200 flex justify-center">
             <div className="bg-primary/10 p-2 rounded-full">
-              <User className="h-6 w-6 text-primary" />
+              {renderProfileImage("small")}
             </div>
           </div>
         )}
@@ -226,7 +267,7 @@ export default function DashboardLayout({
               <div className="px-6 py-4 border-b border-gray-200">
                 <div className="flex items-center space-x-3">
                   <div className="bg-primary/10 p-2 rounded-full">
-                    <User className="h-6 w-6 text-primary" />
+                    {renderProfileImage("small")}
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-900">{user.homeStayName}</p>
