@@ -353,15 +353,15 @@ export default function HomestayPortalPage() {
               <>
                 {galleryImages.map((imagePath, index) => {
                   const filename = imagePath.split('/').pop();
-                  if (!filename) return null; // Skip invalid paths
-                  const apiUrl = `/api/images/${filename}?t=${new Date().getTime()}`;
+                  if (!filename) return null;
+                  const apiUrl = `/api/images/${homestayId}/gallery/${filename}?t=${new Date().getTime()}`;
                   return (
                     <div
                       key={index}
                       className={`absolute inset-0 w-full h-full transition-opacity duration-1000 cursor-pointer ${
                         index === currentSlide ? "opacity-100" : "opacity-0"
                       }`}
-                      onClick={() => openFullscreenViewer(index)} // Use index to find the API url later
+                      onClick={() => openFullscreenViewer(index)}
                     >
                       <div className="absolute inset-0 bg-black/20 z-10"></div>
                       <img 
@@ -458,16 +458,9 @@ export default function HomestayPortalPage() {
                 <div className="w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden border-2 border-primary flex-shrink-0 bg-primary/10 flex items-center justify-center">
                   {homestay.profileImage ? (
                     () => { // Use a function to handle logic
-                      const filename = homestay.profileImage.split('/').pop();
-                      if (!filename) {
-                        console.warn(`[Public Page] Could not extract filename for profile: ${homestay.profileImage}`);
-                        return (
-                          <span className="text-2xl md:text-3xl font-bold text-primary">
-                            {profileInitials}
-                          </span>
-                        );
-                      }
-                      const apiUrl = `/api/images/${filename}?t=${new Date().getTime()}`;
+                      // Convert /uploads/[...] path to /api/images/[...] path
+                      const apiUrl = homestay.profileImage.replace('/uploads/', '/api/images/') + `?t=${new Date().getTime()}`;
+                      console.log(`[Public Page] Rendering profile image via API: ${apiUrl}`);
                       return (
                         <img 
                           src={apiUrl} 
@@ -680,13 +673,12 @@ export default function HomestayPortalPage() {
                   {galleryImages.map((imagePath, index) => {
                     const filename = imagePath.split('/').pop();
                     if (!filename) return null; // Filter out invalid paths
-                    const apiUrl = `/api/images/${filename}?t=${new Date().getTime()}`;
+                    const apiUrl = `/api/images/${homestayId}/gallery/${filename}?t=${new Date().getTime()}`;
                     return (
-                      // Return the JSX element directly
                       <div 
                         key={index}
                         className="relative aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity group"
-                        onClick={() => openFullscreenViewer(index)} // Use index
+                        onClick={() => openFullscreenViewer(index)}
                       >
                         <img 
                           src={apiUrl}
@@ -871,7 +863,7 @@ export default function HomestayPortalPage() {
           setShowFullImage(false); // Close viewer if path is invalid
           return null;
         }
-        const currentApiUrl = `/api/images/${currentFilename}?t=${new Date().getTime()}`;
+        const currentApiUrl = `/api/images/${homestayId}/gallery/${currentFilename}?t=${new Date().getTime()}`;
 
         return (
           <div 
@@ -911,7 +903,7 @@ export default function HomestayPortalPage() {
               {galleryImages.map((thumbPath, index) => {
                 const thumbFilename = thumbPath.split('/').pop();
                 if (!thumbFilename) return null;
-                const thumbApiUrl = `/api/images/${thumbFilename}?t=${new Date().getTime()}`;
+                const thumbApiUrl = `/api/images/${homestayId}/gallery/${thumbFilename}?t=${new Date().getTime()}`;
                 return (
                   <div 
                     key={index} 

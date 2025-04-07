@@ -383,9 +383,9 @@ export default function PortalPage() {
 
   // Main Slider Image (Uses validGalleryImages)
   const renderSliderImage = (imageSrc: string, index: number) => {
-    const filename = imageSrc.split('/').pop();
-    if (!filename) return null; // Skip if filename invalid
-    const apiUrl = `/api/images/${filename}?t=${new Date().getTime()}`;
+    // imageSrc will be like "/uploads/[homestayId]/gallery/[filename]"
+    // We need to convert it to "/api/images/[homestayId]/gallery/[filename]"
+    const apiUrl = imageSrc.replace('/uploads/', '/api/images/') + `?t=${new Date().getTime()}`;
     console.log(`[Portal Slider] Rendering image ${index} via API: ${apiUrl}`);
     return (
       <div
@@ -393,7 +393,7 @@ export default function PortalPage() {
         className={`absolute inset-0 w-full h-full transition-opacity duration-700 ease-in-out ${
           index === currentSlideIndex ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
-        onClick={() => openPreview(apiUrl)} // Open preview with API URL
+        onClick={() => openPreview(apiUrl)}
       >
         <img 
           src={apiUrl}
@@ -402,8 +402,7 @@ export default function PortalPage() {
           loading="lazy"
           onError={(e) => {
             console.warn(`[Portal Slider] Failed to load image via API: ${apiUrl}`);
-            // Optionally replace with a placeholder or hide
-            (e.target as HTMLImageElement).style.display = 'none'; 
+            (e.target as HTMLImageElement).style.display = 'none';
           }}
         />
       </div>
@@ -416,13 +415,11 @@ export default function PortalPage() {
     const activeClass = "border-primary scale-105 shadow-md";
     const inactiveClass = "border-transparent hover:border-primary/50 opacity-80 hover:opacity-100";
     
-    // Determine if this thumbnail corresponds to the current main slide
     const isActive = (type === 'gallery' && validGalleryImages[currentSlideIndex] === imageSrc);
 
     if (imageSrc && typeof imageSrc === 'string' && imageSrc.trim() !== '') {
-      const filename = imageSrc.split('/').pop();
-      if (!filename) return null; // Skip invalid paths
-      const apiUrl = `/api/images/${filename}?t=${new Date().getTime()}`;
+      // Convert /uploads/[...] path to /api/images/[...] path
+      const apiUrl = imageSrc.replace('/uploads/', '/api/images/') + `?t=${new Date().getTime()}`;
       console.log(`[Portal Thumb] Rendering ${type} thumb via API: ${apiUrl}`);
 
       return (
@@ -431,11 +428,9 @@ export default function PortalPage() {
           className={`${baseClasses} ${isActive ? activeClass : inactiveClass}`}
           onClick={() => {
             if (type === 'gallery' && index !== undefined) {
-                // Find the index within validGalleryImages to set the main slide
                 const validIndex = validGalleryImages.findIndex(img => img === imageSrc);
                 if (validIndex !== -1) setCurrentSlide(validIndex);
             } else {
-                // Clicking profile thumb could show it in preview?
                 openPreview(apiUrl);
             }
           }}
@@ -447,23 +442,21 @@ export default function PortalPage() {
             loading="lazy"
             onError={(e) => {
                 console.warn(`[Portal Thumb] Failed to load ${type} thumb via API: ${apiUrl}`);
-                 // Simple fallback: hide broken image
                 (e.target as HTMLImageElement).style.display = 'none';
-                // Consider adding initials here for profile if needed
-                 if (type === 'profile') {
+                if (type === 'profile') {
                     const initials = getInitials(homestay?.homeStayName || '');
                     const placeholder = document.createElement('div');
                     placeholder.className = 'w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 font-semibold text-xl';
                     placeholder.textContent = initials;
                     e.currentTarget.parentElement?.appendChild(placeholder);
-                 }
+                }
             }}
           />
           {/* Delete button for gallery thumbs */}
           {type === 'gallery' && (
             <button 
               onClick={(e) => {
-                e.stopPropagation(); // Prevent triggering the main onClick
+                e.stopPropagation();
                 removeGalleryImage(imageSrc);
               }}
               className="absolute top-1 right-1 p-1 bg-red-500/80 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
@@ -507,7 +500,7 @@ export default function PortalPage() {
   }
 
   if (!homestay) {
-  return (
+    return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary"></div>
       </div>
@@ -617,9 +610,9 @@ export default function PortalPage() {
                     </div>
                 </>
                   )}
-                </div>
+                        </div>
                       </div>
-
+                      
           {/* Moved Thumbnails Section (Manage Gallery) */}
           <div className="bg-white rounded-lg shadow-md p-4 border border-gray-100">
             <h3 className="text-md font-semibold text-gray-700 mb-3">Manage Gallery</h3>

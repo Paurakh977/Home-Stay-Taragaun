@@ -157,11 +157,10 @@ export async function GET(req: NextRequest) {
         // Get the homestay ID for folder name
         const homestayId = rawHomestay.homestayId;
         if (homestayId) {
-          // Based on the screenshot, the profile images are named like "dolpa637_profile.jpg"
-          // and stored directly in the uploads/[homestayId] folder
+          // Profile images are stored in uploads/[homestayId]/profile/profile.[ext]
           const possiblePaths = [
-            `/uploads/${homestayId}/${homestayId}_profile.jpg`,
-            `/uploads/${homestayId}/${homestayId}_profile.png`
+            `/uploads/${homestayId}/profile/profile.jpg`,
+            `/uploads/${homestayId}/profile/profile.png`
           ];
           
           // Use the first path format as default

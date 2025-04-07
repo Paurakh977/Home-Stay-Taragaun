@@ -294,28 +294,16 @@ export default function ProfilePage() {
           );
       }
       // It's an uploaded path, use the API route
-      // Extract filename from path like "/uploads/filename.jpg"
-      const filename = currentImage.split('/').pop(); 
-      if (!filename) {
-        // Fallback or error rendering if filename extraction fails
-        console.warn("[Profile] Could not extract filename from:", currentImage);
-         const initials = getInitials(currentName);
-         return (
-            <div className={`rounded-full ${sizeClasses} bg-gray-100 flex items-center justify-center text-gray-400 font-semibold ${initialsSizeClasses}`}>
-                {initials}
-            </div>
-         );
-      }
-      
-      const imageUrl = `/api/images/${filename}?t=${new Date().getTime()}`; // Use API route + cache busting
-      console.log("[Profile] Rendering profile image via API src:", imageUrl);
+      // Convert /uploads/[...] path to /api/images/[...] path
+      const apiUrl = currentImage.replace('/uploads/', '/api/images/') + `?t=${new Date().getTime()}`;
+      console.log("[Profile] Rendering profile image via API src:", apiUrl);
       return (
         <img 
-          src={imageUrl} 
+          src={apiUrl} 
           alt={currentName} 
           className={`rounded-full ${sizeClasses} object-cover`}
           onError={(e) => {
-            console.warn(`[Profile] Failed to load profile image via API: ${imageUrl}`);
+            console.warn(`[Profile] Failed to load profile image via API: ${apiUrl}`);
             // Fallback logic remains
             const target = e.currentTarget;
             const parent = target.parentElement;

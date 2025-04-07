@@ -45,22 +45,28 @@ export async function POST(
     // Get file extension
     const fileExtension = fileType.split('/')[1];
     
-    // Create filename with homestay ID to ensure uniqueness
-    const fileName = `${homestayId}_profile.${fileExtension}`;
+    // Create organized directory structure
+    const userDir = join(process.cwd(), "public", "uploads", homestayId);
+    const profileDir = join(userDir, "profile");
     
-    // Create uploads directory if it doesn't exist
-    const uploadDir = join(process.cwd(), "public", "uploads");
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
+    // Create directories if they don't exist
+    if (!existsSync(userDir)) {
+      await mkdir(userDir, { recursive: true });
+    }
+    if (!existsSync(profileDir)) {
+      await mkdir(profileDir, { recursive: true });
     }
     
+    // Always use the same filename for profile image (overwrite existing)
+    const fileName = `profile.${fileExtension}`;
+    const filePath = join(profileDir, fileName);
+    
     // Write file to disk
-    const filePath = join(uploadDir, fileName);
     const fileBuffer = await file.arrayBuffer();
     await writeFile(filePath, Buffer.from(fileBuffer));
     
-    // Create the public URL
-    const fileUrl = `/uploads/${fileName}`;
+    // Create the public URL that matches what the image serving API expects
+    const fileUrl = `/uploads/${homestayId}/profile/${fileName}`;
     
     // Update homestay with image URL
     await HomestaySingle.updateOne(

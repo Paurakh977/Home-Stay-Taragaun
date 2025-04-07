@@ -1,21 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import fs from 'fs';
-import mime from 'mime-types'; // We might need this library
+import mime from 'mime-types';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { slug: string[] } }
 ) {
   try {
-    const filename = params.slug.join('/'); // Reconstruct filename if it contained slashes
+    // Extract homestayId and type from the path
+    const filename = params.slug.join('/');
 
     if (!filename) {
       return new NextResponse('Filename missing', { status: 400 });
     }
 
     // IMPORTANT: Construct the correct path to the uploads directory
-    // Assumes uploads are in `public/uploads` relative to the project root
+    // Now handles nested structure: /uploads/[homestayId]/(profile|gallery)/[filename]
     const filePath = path.join(process.cwd(), 'public', 'uploads', filename);
 
     // Security check: Ensure the path doesn't try to escape the uploads directory
@@ -33,19 +34,18 @@ export async function GET(
 
     // Get file stats to determine content length and type
     const stats = fs.statSync(filePath);
-    const contentType = mime.lookup(filePath) || 'application/octet-stream'; // Guess mime type
+    const contentType = mime.lookup(filePath) || 'application/octet-stream';
 
     // Read the file content
     const fileBuffer = fs.readFileSync(filePath);
 
-    // Create the response
+    // Create the response with cache control for better performance
     const response = new NextResponse(fileBuffer, {
       status: 200,
       headers: {
         'Content-Type': contentType,
         'Content-Length': stats.size.toString(),
-        // Optional: Add cache control headers if desired
-        // 'Cache-Control': 'public, max-age=31536000, immutable', 
+        'Cache-Control': 'public, max-age=31536000, immutable', // Cache for 1 year since we use unique filenames
       },
     });
 

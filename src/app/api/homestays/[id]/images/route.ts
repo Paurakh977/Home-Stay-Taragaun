@@ -42,24 +42,30 @@ export async function POST(
       );
     }
     
+    // Create organized directory structure
+    const userDir = join(process.cwd(), "public", "uploads", homestayId);
+    const galleryDir = join(userDir, "gallery");
+    
+    // Create directories if they don't exist
+    if (!existsSync(userDir)) {
+      await mkdir(userDir, { recursive: true });
+    }
+    if (!existsSync(galleryDir)) {
+      await mkdir(galleryDir, { recursive: true });
+    }
+    
     // Create a unique filename for the gallery image
     const timestamp = Date.now();
     const randomString = Math.floor(Math.random() * 1000000000);
-    const fileName = `${homestayId}-gallery-${timestamp}-${randomString}.${fileType.split('/')[1]}`;
-    
-    // Create uploads directory if it doesn't exist
-    const uploadDir = join(process.cwd(), "public", "uploads");
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
+    const fileName = `${timestamp}-${randomString}.${fileType.split('/')[1]}`;
+    const filePath = join(galleryDir, fileName);
     
     // Write file to disk
-    const filePath = join(uploadDir, fileName);
     const fileBuffer = await file.arrayBuffer();
     await writeFile(filePath, Buffer.from(fileBuffer));
     
     // Create the public URL that matches what the image serving API expects
-    const fileUrl = `/uploads/${fileName}`;
+    const fileUrl = `/uploads/${homestayId}/gallery/${fileName}`;
     
     // Update homestay with new gallery image
     await HomestaySingle.updateOne(

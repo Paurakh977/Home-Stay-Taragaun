@@ -132,16 +132,17 @@ export default function DashboardLayout({
     
     // Check if profileImage state is a non-empty string 
     if (profileImage && typeof profileImage === 'string' && profileImage.trim() !== '') {
-      const imageUrl = `${profileImage}?t=${new Date().getTime()}`;
-      console.log("[Layout Render] Attempting to render profile image with src:", imageUrl);
+      // Convert /uploads/[...] path to /api/images/[...] path
+      const apiUrl = profileImage.replace('/uploads/', '/api/images/') + `?t=${new Date().getTime()}`;
+      console.log("[Layout Render] Attempting to render profile image with src:", apiUrl);
       return (
         <div className={`rounded-full overflow-hidden ${baseSizeClasses}`}>
           <img 
-            src={imageUrl} 
+            src={apiUrl} 
             alt={user?.homeStayName || "Profile"}
             className="h-full w-full object-cover"
             onError={(e) => {
-              console.warn(`[Layout Render] Failed to load profile image: ${imageUrl}`);
+              console.warn(`[Layout Render] Failed to load profile image: ${apiUrl}`);
               const target = e.currentTarget;
               const parent = target.parentElement;
               if (parent) {
