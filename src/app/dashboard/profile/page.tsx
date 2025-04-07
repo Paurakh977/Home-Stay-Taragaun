@@ -44,6 +44,17 @@ interface ProfileData {
   profileImage: string | null;
 }
 
+// Helper function to generate initials
+const getInitials = (name: string): string => {
+  if (!name) return "?";
+  const words = name.split(' ').filter(Boolean);
+  if (words.length === 0) return "?";
+  // Use first letter of the first word and first letter of the last word
+  const firstInitial = words[0].charAt(0);
+  const lastInitial = words.length > 1 ? words[words.length - 1].charAt(0) : '';
+  return (firstInitial + lastInitial).toUpperCase();
+};
+
 export default function ProfilePage() {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -261,6 +272,75 @@ export default function ProfilePage() {
     return profileData.contacts[0];
   };
   
+  // Function to render profile image or placeholder
+  const renderProfileImage = () => {
+    const sizeClasses = "h-24 w-24 md:h-32 md:w-32";
+    const initialsSizeClasses = "text-4xl md:text-5xl";
+
+    const currentImage = profileImage;
+    const currentName = profileData?.homeStayName || user?.homeStayName || "";
+
+    // Check for valid, non-empty string path 
+    if (currentImage && typeof currentImage === 'string' && currentImage.trim() !== '') {
+       // Handle potential data URL separately (from temporary preview)
+      if (currentImage.startsWith('data:image')) {
+          console.log("[Profile] Rendering image preview (data URL)");
+          return (
+            <img
+              src={currentImage}
+              alt="Profile Preview"
+              className={`rounded-full ${sizeClasses} object-cover`}
+            />
+          );
+      }
+      // It's an uploaded path, use the API route
+      // Extract filename from path like "/uploads/filename.jpg"
+      const filename = currentImage.split('/').pop(); 
+      if (!filename) {
+        // Fallback or error rendering if filename extraction fails
+        console.warn("[Profile] Could not extract filename from:", currentImage);
+         const initials = getInitials(currentName);
+         return (
+            <div className={`rounded-full ${sizeClasses} bg-gray-100 flex items-center justify-center text-gray-400 font-semibold ${initialsSizeClasses}`}>
+                {initials}
+            </div>
+         );
+      }
+      
+      const imageUrl = `/api/images/${filename}?t=${new Date().getTime()}`; // Use API route + cache busting
+      console.log("[Profile] Rendering profile image via API src:", imageUrl);
+      return (
+        <img 
+          src={imageUrl} 
+          alt={currentName} 
+          className={`rounded-full ${sizeClasses} object-cover`}
+          onError={(e) => {
+            console.warn(`[Profile] Failed to load profile image via API: ${imageUrl}`);
+            // Fallback logic remains
+            const target = e.currentTarget;
+            const parent = target.parentElement;
+            if (parent) {
+              const initials = getInitials(currentName);
+              const placeholder = document.createElement('div');
+              placeholder.className = `rounded-full ${sizeClasses} bg-gray-100 flex items-center justify-center text-gray-400 font-semibold ${initialsSizeClasses}`;
+              placeholder.textContent = initials;
+              parent.replaceChild(placeholder, target);
+            }
+          }}
+        />
+      );
+    } else {
+      // Render initials placeholder if no valid image or preview
+      console.log("[Profile] Rendering initials, profileImage was:", profileImage);
+      const initials = getInitials(currentName);
+      return (
+        <div className={`rounded-full ${sizeClasses} bg-gray-100 flex items-center justify-center text-gray-400 font-semibold ${initialsSizeClasses}`}>
+          {initials}
+        </div>
+      );
+    }
+  };
+  
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -310,17 +390,7 @@ export default function ProfilePage() {
           {/* Profile Image */}
           <div className="-mt-16 md:-mt-20 mb-4 md:mb-0 flex-shrink-0 relative">
             <div className="rounded-full h-24 w-24 md:h-32 md:w-32 bg-white p-1 shadow-md overflow-hidden">
-              {profileImage ? (
-                <img 
-                  src={profileImage.startsWith('data:') ? profileImage : `${profileImage}?t=${new Date().getTime()}`} 
-                  alt="Profile" 
-                  className="rounded-full h-full w-full object-cover"
-                />
-              ) : (
-                <div className="rounded-full h-full w-full bg-gray-100 flex items-center justify-center">
-                  <User className="h-12 w-12 md:h-16 md:w-16 text-gray-400" />
-                </div>
-              )}
+              {renderProfileImage()}
             </div>
             
             {/* Only show image upload button when editing */}

@@ -22,6 +22,17 @@ interface UserInfo {
   homeStayName: string;
 }
 
+// Helper function to generate initials
+const getInitials = (name: string): string => {
+  if (!name) return "?";
+  const words = name.split(' ').filter(Boolean);
+  if (words.length === 0) return "?";
+  // Use first letter of the first word and first letter of the last word
+  const firstInitial = words[0].charAt(0);
+  const lastInitial = words.length > 1 ? words[words.length - 1].charAt(0) : '';
+  return (firstInitial + lastInitial).toUpperCase();
+};
+
 export default function DashboardLayout({
   children,
 }: {
@@ -47,36 +58,41 @@ export default function DashboardLayout({
         
       } catch (err) {
         console.error("Error parsing user data:", err);
-        // If we can't parse the user data, clear it and redirect
         localStorage.removeItem("user");
         router.push("/login");
       }
     } else {
-      // No user data, redirect to login
       router.push("/login");
     }
-
-    // Load sidebar collapsed state from localStorage
     const savedCollapsedState = localStorage.getItem("sidebarCollapsed");
     if (savedCollapsedState) {
       setIsCollapsed(savedCollapsedState === "true");
     }
   }, [router]);
+
+  // ADDED: useEffect to track profileImage state changes
+  useEffect(() => {
+    console.log("[Layout State Change] profileImage state is now:", profileImage);
+  }, [profileImage]);
   
   // Fetch user's profile image
   const fetchProfileImage = async (homestayId: string) => {
+    console.log("[Layout Fetch] Fetching profile image for:", homestayId);
     try {
       const response = await fetch(`/api/homestays/${homestayId}`);
-      
       if (!response.ok) {
+        console.error("[Layout Fetch] Response not OK:", response.status);
         throw new Error('Failed to fetch homestay data');
       }
-      
       const data = await response.json();
-      setProfileImage(data.homestay.profileImage);
+      // ADDED: Log the exact value received from API
+      console.log("[Layout Fetch] Received profileImage from API:", data?.homestay?.profileImage);
+      // Set state (should handle null correctly)
+      setProfileImage(data?.homestay?.profileImage || null);
       
     } catch (err) {
-      console.error('Error fetching profile image:', err);
+      console.error('[Layout Fetch] Error fetching profile image:', err);
+      setProfileImage(null); // Explicitly set to null on error
     }
   };
 
@@ -109,22 +125,45 @@ export default function DashboardLayout({
     return pathname === `/dashboard${path}` ? "bg-primary/10 text-primary" : "text-gray-600 hover:bg-gray-100";
   };
 
-  // Function to render profile image or default user icon
+  // Function to render profile image or initials placeholder
   const renderProfileImage = (size: "small" | "medium") => {
-    const sizeClasses = size === "small" ? "h-6 w-6" : "h-10 w-10";
+    const baseSizeClasses = size === "small" ? "h-6 w-6" : "h-10 w-10";
+    const textSizeClasses = size === "small" ? "text-xs" : "text-base";
     
-    if (profileImage) {
+    // Check if profileImage state is a non-empty string 
+    if (profileImage && typeof profileImage === 'string' && profileImage.trim() !== '') {
+      const imageUrl = `${profileImage}?t=${new Date().getTime()}`;
+      console.log("[Layout Render] Attempting to render profile image with src:", imageUrl);
       return (
-        <div className={`rounded-full overflow-hidden ${sizeClasses}`}>
+        <div className={`rounded-full overflow-hidden ${baseSizeClasses}`}>
           <img 
-            src={`${profileImage}?t=${new Date().getTime()}`} 
-            alt="Profile" 
+            src={imageUrl} 
+            alt={user?.homeStayName || "Profile"}
             className="h-full w-full object-cover"
+            onError={(e) => {
+              console.warn(`[Layout Render] Failed to load profile image: ${imageUrl}`);
+              const target = e.currentTarget;
+              const parent = target.parentElement;
+              if (parent) {
+                const initials = getInitials(user?.homeStayName || "");
+                const placeholder = document.createElement('div');
+                placeholder.className = `flex items-center justify-center rounded-full bg-primary/20 text-primary font-semibold ${baseSizeClasses} ${textSizeClasses}`;
+                placeholder.textContent = initials;
+                parent.replaceChild(placeholder, target);
+              }
+            }}
           />
         </div>
       );
     } else {
-      return <User className={`${sizeClasses} text-primary`} />;
+      // Render initials placeholder
+      console.log("[Layout Render] Rendering initials, profileImage state was:", profileImage);
+      const initials = getInitials(user?.homeStayName || "");
+      return (
+        <div className={`flex items-center justify-center rounded-full bg-primary/20 text-primary font-semibold ${baseSizeClasses} ${textSizeClasses}`}>
+          {initials}
+        </div>
+      );
     }
   };
 
@@ -153,7 +192,7 @@ export default function DashboardLayout({
           {!isCollapsed && <h1 className="text-xl font-bold text-primary">Hamro Home Stay</h1>}
           {isCollapsed && (
             <div className="h-10 w-10 bg-primary rounded-full flex items-center justify-center text-white font-bold text-lg">
-              HH
+              {getInitials(user?.homeStayName || "")}
             </div>
           )}
           <button 
@@ -181,7 +220,7 @@ export default function DashboardLayout({
         {user && isCollapsed && (
           <div className="py-4 border-b border-gray-200 flex justify-center">
             <div className="bg-primary/10 p-2 rounded-full">
-              {renderProfileImage("small")}
+              {renderProfileImage("medium")}
             </div>
           </div>
         )}

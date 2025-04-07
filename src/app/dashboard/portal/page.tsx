@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Upload, Image as ImageIcon, X, Plus, Camera, Save, Eye, ChevronLeft, ChevronRight, Trash2, Edit3, User } from "lucide-react";
+import { Upload, Image as ImageIcon, X, Plus, Camera, Save, Eye, ChevronLeft, ChevronRight, Trash2, Edit3, User, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -40,6 +40,17 @@ interface HomestayData {
   description?: string;
 }
 
+// Helper function to generate initials
+const getInitials = (name: string): string => {
+  if (!name) return "?";
+  const words = name.split(' ').filter(Boolean);
+  if (words.length === 0) return "?";
+  // Use first letter of the first word and first letter of the last word
+  const firstInitial = words[0].charAt(0);
+  const lastInitial = words.length > 1 ? words[words.length - 1].charAt(0) : '';
+  return (firstInitial + lastInitial).toUpperCase();
+};
+
 export default function PortalPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -76,14 +87,14 @@ export default function PortalPage() {
 
   // Auto-slide functionality
   useEffect(() => {
-    // Calculate all images including profile image
-    const allImages = homestay ? 
-      [...galleryImages, ...(homestay.profileImage ? [homestay.profileImage] : [])] 
-      : [];
+    const allValidDisplayImages = [
+      ...(homestay?.profileImage ? [homestay.profileImage] : []),
+      ...galleryImages,
+    ].filter(img => typeof img === 'string' && img.trim().startsWith('/uploads/'));
     
-    if (autoSlide && allImages.length > 1) {
+    if (autoSlide && allValidDisplayImages.length > 1) {
       sliderInterval.current = setInterval(() => {
-        setCurrentSlide(prev => (prev === allImages.length - 1 ? 0 : prev + 1));
+        setCurrentSlide(prev => (prev === allValidDisplayImages.length - 1 ? 0 : prev + 1));
       }, 5000);
     } else if (sliderInterval.current) {
       clearInterval(sliderInterval.current);
@@ -94,7 +105,7 @@ export default function PortalPage() {
         clearInterval(sliderInterval.current);
       }
     };
-  }, [autoSlide, galleryImages, homestay, currentSlide]);
+  }, [autoSlide, homestay?.profileImage, galleryImages, currentSlide]);
 
   // Fetch homestay data
   const fetchHomestayData = async (homestayId: string) => {
@@ -120,10 +131,18 @@ export default function PortalPage() {
     }
   };
 
-  // Calculate all images for components to use
-  const allImages = homestay ? 
-    [...galleryImages, ...(homestay.profileImage ? [homestay.profileImage] : [])]
-    : [];
+  // Calculate VALID gallery images ONLY for the main check and slider
+  const validGalleryImages = galleryImages.filter(img => typeof img === 'string' && img.trim() !== '');
+
+  // For the slider, use only gallery images
+  const currentSlideIndex = validGalleryImages.length > 0 ? currentSlide % validGalleryImages.length : 0;
+  const currentImageSrc = validGalleryImages.length > 0 ? validGalleryImages[currentSlideIndex] : null;
+
+  // Profile image handling is separate now
+  const validProfileImage = homestay?.profileImage && typeof homestay.profileImage === 'string' && homestay.profileImage.trim() !== '' ? homestay.profileImage : null;
+
+  // Determine if the gallery is truly empty
+  const isGalleryEmpty = !validProfileImage && validGalleryImages.length === 0;
 
   // Handle profile image upload
   const handleProfileImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -168,13 +187,13 @@ export default function PortalPage() {
   const handleGalleryImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0] || !user) return;
     
+    let newImageUrl: string | null = null;
     try {
       setUploadingGallery(true);
       
       const file = e.target.files[0];
       const formData = new FormData();
-      formData.append('image', file);
-      formData.append('type', 'gallery');
+      formData.append('file', file);
       
       const response = await fetch(`/api/homestays/${user.homestayId}/images`, {
         method: 'POST',
@@ -184,14 +203,32 @@ export default function PortalPage() {
       if (!response.ok) throw new Error('Failed to upload gallery image');
       
       const data = await response.json();
+      newImageUrl = data.imageUrl; // This might be null or not a string
       
-      // Add new image to gallery
-      setGalleryImages(prev => [...prev, data.imageUrl]);
+      // Check if we got a valid string URL
+      if (newImageUrl && typeof newImageUrl === 'string') {
+          const validUrl = newImageUrl;
+          // Update state first
+          const updatedImages = [...galleryImages, validUrl]; 
+          setGalleryImages(updatedImages);
+          // Then trigger save with the updated list
+          await savePortalData(description, updatedImages); // Save with the new list
+          // Explicitly refetch after save
+          if (user) {
+            console.log("[Upload Single] Refetching homestay data after save...");
+            await fetchHomestayData(user.homestayId);
+          }
+      } else {
+         console.error('Upload succeeded but did not return a valid image URL.');
+         // Optionally show an error toast to the user
+      }
       
     } catch (err) {
       console.error('Error uploading gallery image:', err);
+      // Optionally show an error toast
     } finally {
       setUploadingGallery(false);
+      // No need for save logic here anymore, it's handled in the try block
     }
   };
 
@@ -199,27 +236,36 @@ export default function PortalPage() {
   const handleMultipleImagesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0 || !user) return;
     
+    let successfullyUploadedUrls: string[] = [];
     try {
       setUploadingGallery(true);
       const files = Array.from(e.target.files);
       const uploadPromises = files.map(file => {
         const formData = new FormData();
-        formData.append('image', file);
-        formData.append('type', 'gallery');
+        formData.append('file', file);
         
         return fetch(`/api/homestays/${user.homestayId}/images`, {
           method: 'POST',
           body: formData,
         })
-        .then(response => {
-          if (!response.ok) throw new Error('Failed to upload image');
-          return response.json();
+        .then(async response => { // Make async to parse json
+          if (!response.ok) {
+            console.error('Failed upload for file:', file.name);
+            return null; // Indicate failure for this file
+          }
+          const data = await response.json();
+          return data.imageUrl as string; // Ensure result is string or null
         })
-        .then(data => data.imageUrl);
       });
       
-      const newImageUrls = await Promise.all(uploadPromises);
-      setGalleryImages(prev => [...prev, ...newImageUrls]);
+      const results = await Promise.all(uploadPromises);
+      // Filter out nulls *before* updating state
+      successfullyUploadedUrls = results.filter((url): url is string => url !== null);
+      
+      if (successfullyUploadedUrls.length > 0) {
+        // Update state with successfully uploaded images (guaranteed to be string[])
+        setGalleryImages(prev => [...prev, ...successfullyUploadedUrls]);
+      }
       
     } catch (err) {
       console.error('Error uploading multiple gallery images:', err);
@@ -229,54 +275,100 @@ export default function PortalPage() {
       if (multipleFileInputRef.current) {
         multipleFileInputRef.current.value = '';
       }
+      // If at least one upload was successful, trigger save
+      if (successfullyUploadedUrls.length > 0 && user) {
+         // Use the state update function's callback to ensure state is set before saving
+        setGalleryImages(currentImages => {
+          const imagesToSave = [...currentImages]; // Use the latest state
+          savePortalData(description, imagesToSave).then(() => {
+            // Refetch AFTER save completes
+            if (user) { // Check user again just in case
+              console.log("[Upload Multiple] Refetching homestay data after save...");
+              fetchHomestayData(user.homestayId);
+            }
+          });
+          return currentImages; // Return the state passed to the callback
+        });
+      }
     }
   };
 
-  // Remove gallery image
-  const removeGalleryImage = (index: number) => {
-    setGalleryImages(prev => prev.filter((_, i) => i !== index));
+  // Remove gallery image and trigger save
+  const removeGalleryImage = async (imageUrlToRemove: string) => {
+    const updatedImages = galleryImages.filter(img => img !== imageUrlToRemove);
+    setGalleryImages(updatedImages);
+    // Immediately save the change
+    if (user) {
+        await savePortalData(description, updatedImages);
+    }
   };
 
   // Navigate slider
   const nextSlide = () => {
-    setCurrentSlide((prev) => (prev === allImages.length - 1 ? 0 : prev + 1));
+    const allValidDisplayImages = [
+      ...(homestay?.profileImage ? [homestay.profileImage] : []),
+      ...galleryImages,
+    ].filter(img => typeof img === 'string' && img.trim().startsWith('/uploads/'));
+    if (allValidDisplayImages.length === 0) return;
+    setCurrentSlide((prev) => (prev === allValidDisplayImages.length - 1 ? 0 : prev + 1));
   };
   
   const prevSlide = () => {
-    setCurrentSlide((prev) => (prev === 0 ? allImages.length - 1 : prev - 1));
+    const allValidDisplayImages = [
+      ...(homestay?.profileImage ? [homestay.profileImage] : []),
+      ...galleryImages,
+    ].filter(img => typeof img === 'string' && img.trim().startsWith('/uploads/'));
+    if (allValidDisplayImages.length === 0) return;
+    setCurrentSlide((prev) => (prev === 0 ? allValidDisplayImages.length - 1 : prev - 1));
   };
 
-  // Save portal changes
-  const saveChanges = async () => {
-    if (!user || !homestay) return;
+  // Refactored Save function to be called directly
+  const savePortalData = async (currentDescription: string, currentGalleryImages: string[]) => {
+      if (!user) {
+          console.error("Save failed: User not available");
+          return; 
+      }
     
-    try {
       setSaving(true);
-      
+      try {
       const response = await fetch(`/api/homestays/${user.homestayId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          description,
-          galleryImages,
+                  description: currentDescription,       // Use passed description
+                  galleryImages: currentGalleryImages, // Use passed gallery images
         }),
       });
       
-      if (!response.ok) throw new Error('Failed to update homestay portal');
-      
-      // Set editing mode off
-      setIsEditingDescription(false);
-      
-      // Refresh data
-      fetchHomestayData(user.homestayId);
+          if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || 'Failed to update homestay portal');
+          }
+
+          // Update local state with the saved data if needed (optional, as we updated state before saving)
+          const savedData = await response.json();
+          if (savedData.success && savedData.homestay) {
+              // Optional: Synchronize state precisely with server response
+              // setDescription(savedData.homestay.description || "");
+              // setGalleryImages(savedData.homestay.galleryImages || []);
+          } 
+          
+          setIsEditingDescription(false); // Ensure edit mode is off
+          // No need to call fetchHomestayData here as we already updated the state optimistically
       
     } catch (err) {
       console.error('Error updating homestay portal:', err);
+          // Maybe add toast notification here
     } finally {
       setSaving(false);
     }
+  };
+
+  // Original saveChanges (now just calls the refactored function)
+  const saveChanges = async () => {
+    await savePortalData(description, galleryImages);
   };
 
   // Toggle description editing mode
@@ -289,6 +381,123 @@ export default function PortalPage() {
     setAutoSlide(prev => !prev);
   };
 
+  // Main Slider Image (Uses validGalleryImages)
+  const renderSliderImage = (imageSrc: string, index: number) => {
+    const filename = imageSrc.split('/').pop();
+    if (!filename) return null; // Skip if filename invalid
+    const apiUrl = `/api/images/${filename}?t=${new Date().getTime()}`;
+    console.log(`[Portal Slider] Rendering image ${index} via API: ${apiUrl}`);
+    return (
+      <div
+        key={index}
+        className={`absolute inset-0 w-full h-full transition-opacity duration-700 ease-in-out ${
+          index === currentSlideIndex ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={() => openPreview(apiUrl)} // Open preview with API URL
+      >
+        <img 
+          src={apiUrl}
+          alt={`Gallery Image ${index + 1}`}
+          className="w-full h-full object-cover"
+          loading="lazy"
+          onError={(e) => {
+            console.warn(`[Portal Slider] Failed to load image via API: ${apiUrl}`);
+            // Optionally replace with a placeholder or hide
+            (e.target as HTMLImageElement).style.display = 'none'; 
+          }}
+        />
+      </div>
+    );
+  };
+
+  // Thumbnail rendering (Profile + Gallery)
+  const renderThumbnail = (imageSrc: string | null, type: 'profile' | 'gallery', index?: number) => {
+    const baseClasses = "h-16 w-16 md:h-20 md:w-20 rounded-md overflow-hidden cursor-pointer border-2 transition-all duration-200 relative group flex-shrink-0";
+    const activeClass = "border-primary scale-105 shadow-md";
+    const inactiveClass = "border-transparent hover:border-primary/50 opacity-80 hover:opacity-100";
+    
+    // Determine if this thumbnail corresponds to the current main slide
+    const isActive = (type === 'gallery' && validGalleryImages[currentSlideIndex] === imageSrc);
+
+    if (imageSrc && typeof imageSrc === 'string' && imageSrc.trim() !== '') {
+      const filename = imageSrc.split('/').pop();
+      if (!filename) return null; // Skip invalid paths
+      const apiUrl = `/api/images/${filename}?t=${new Date().getTime()}`;
+      console.log(`[Portal Thumb] Rendering ${type} thumb via API: ${apiUrl}`);
+
+      return (
+        <div 
+          key={type === 'profile' ? 'profile-thumb' : `gallery-thumb-${index}`}
+          className={`${baseClasses} ${isActive ? activeClass : inactiveClass}`}
+          onClick={() => {
+            if (type === 'gallery' && index !== undefined) {
+                // Find the index within validGalleryImages to set the main slide
+                const validIndex = validGalleryImages.findIndex(img => img === imageSrc);
+                if (validIndex !== -1) setCurrentSlide(validIndex);
+            } else {
+                // Clicking profile thumb could show it in preview?
+                openPreview(apiUrl);
+            }
+          }}
+        >
+          <img 
+            src={apiUrl} 
+            alt={type === 'profile' ? "Profile Thumbnail" : `Gallery Thumbnail ${index !== undefined ? index + 1 : ''}`}
+            className="w-full h-full object-cover"
+            loading="lazy"
+            onError={(e) => {
+                console.warn(`[Portal Thumb] Failed to load ${type} thumb via API: ${apiUrl}`);
+                 // Simple fallback: hide broken image
+                (e.target as HTMLImageElement).style.display = 'none';
+                // Consider adding initials here for profile if needed
+                 if (type === 'profile') {
+                    const initials = getInitials(homestay?.homeStayName || '');
+                    const placeholder = document.createElement('div');
+                    placeholder.className = 'w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 font-semibold text-xl';
+                    placeholder.textContent = initials;
+                    e.currentTarget.parentElement?.appendChild(placeholder);
+                 }
+            }}
+          />
+          {/* Delete button for gallery thumbs */}
+          {type === 'gallery' && (
+            <button 
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent triggering the main onClick
+                removeGalleryImage(imageSrc);
+              }}
+              className="absolute top-1 right-1 p-1 bg-red-500/80 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+              title="Remove Image"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+      );
+    } else if (type === 'profile') {
+      // Render profile initials placeholder if profile image is null/invalid
+      console.log("[Portal Thumb] Rendering profile initials placeholder");
+      const initials = getInitials(homestay?.homeStayName || '');
+      return (
+        <div key="profile-thumb-placeholder" className={`${baseClasses} ${inactiveClass} bg-gray-100 flex items-center justify-center`}>
+          <span className="text-gray-400 font-semibold text-xl">{initials}</span>
+        </div>
+      );
+    } 
+    
+    return null; // Return null if gallery image is invalid and not a profile placeholder
+  };
+
+  // Ensure the modal also uses the API path
+  const openPreview = (imageSrc: string | null) => {
+    if (imageSrc && typeof imageSrc === 'string' && imageSrc.trim() !== '') {
+        // Expecting an API URL like /api/images/filename.jpg?t=...
+        setPreviewImage(imageSrc);
+    } else {
+        setPreviewImage(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
@@ -297,8 +506,16 @@ export default function PortalPage() {
     );
   }
 
+  if (!homestay) {
   return (
-    <div className="max-w-6xl mx-auto">
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-6xl mx-auto p-4 md:p-6">
       {/* Header section with improved styling */}
       <div className="mb-8 bg-gradient-to-r from-primary/10 to-primary/5 p-6 rounded-lg border border-primary/20 shadow-sm">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Homestay Portal</h1>
@@ -341,9 +558,10 @@ export default function PortalPage() {
 
       {/* Main content area with cards layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
-        {/* Left column - Gallery */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-100">
+        {/* Left column - Gallery & Manage Gallery */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Main Gallery Display */}
+          <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold text-gray-800">
                 <span className="inline-block mr-2">📸</span> Gallery
@@ -359,214 +577,104 @@ export default function PortalPage() {
             </div>
             
             {/* Image Gallery with Editing - Enhanced */}
-            <div className="mb-6">
-            {allImages.length > 0 ? (
-              <>
-                  {/* Main Image Display with enhanced styling */}
-                  <div className="relative aspect-[16/9] bg-gray-100 rounded-lg overflow-hidden mb-4 shadow-md">
-                  <img 
-                    src={allImages[currentSlide]} 
-                    alt={`Gallery image ${currentSlide + 1}`}
-                      className="w-full h-full object-cover transition-opacity duration-500"
-                  />
-                  
-                    {/* Navigation controls with improved styling */}
-                  {allImages.length > 1 && (
+            <div className="relative h-64 md:h-96 bg-gray-200 rounded-lg overflow-hidden mb-4 shadow-inner">
+              {validGalleryImages.length > 0 ? (
+                validGalleryImages.map((img, index) => renderSliderImage(img, index))
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                  <ImageIcon className="h-16 w-16 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-700 mb-1">No Gallery Images Yet</h3>
+                  <p className="text-gray-500 text-sm">Upload images to showcase your homestay.</p>
+                </div>
+              )}
+              {/* Slider Navigation (only if multiple images) */}
+              {validGalleryImages.length > 1 && (
                     <>
                       <button 
-                        onClick={prevSlide}
-                          className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full transition-all hover:scale-110"
+                    onClick={(e) => { e.stopPropagation(); prevSlide(); }}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/40 text-white rounded-full hover:bg-black/60 transition-colors z-10"
+                    aria-label="Previous Image"
                       >
                         <ChevronLeft className="h-5 w-5" />
                       </button>
                       <button 
-                        onClick={nextSlide}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full transition-all hover:scale-110"
+                    onClick={(e) => { e.stopPropagation(); nextSlide(); }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/40 text-white rounded-full hover:bg-black/60 transition-colors z-10"
+                    aria-label="Next Image"
                       >
                         <ChevronRight className="h-5 w-5" />
                       </button>
-                    </>
-                  )}
-                  
-                    {/* Image counter */}
-                    <div className="absolute top-4 right-4 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
-                      {currentSlide + 1} / {allImages.length}
-                    </div>
-                    
-                    {/* Indicator dots with animation */}
-                  {allImages.length > 1 && (
-                    <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
-                      {allImages.map((_, index) => (
+                  {/* Dots indicator */}
+                  <div className="absolute bottom-3 left-0 right-0 flex justify-center space-x-2 z-10">
+                    {validGalleryImages.map((_, index) => (
                         <button
                           key={index}
                           onClick={() => setCurrentSlide(index)}
-                            className={`w-2 h-2 rounded-full transition-all ${
-                              currentSlide === index 
-                                ? 'bg-white w-4' 
-                                : 'bg-white/50 hover:bg-white/80'
-                          }`}
+                        className={`h-2 w-2 rounded-full transition-colors duration-300 ${currentSlideIndex === index ? 'bg-white' : 'bg-white/50 hover:bg-white/75'}`}
+                        aria-label={`Go to image ${index + 1}`}
                         />
                       ))}
                     </div>
+                </>
                   )}
                 </div>
-                
-                  {/* Thumbnails with improved styling */}
-                  <div className="flex flex-wrap gap-3 mt-4">
-                  {/* Existing images */}
-                  {galleryImages.map((image, index) => (
-                    <div key={index} className="relative group">
-                      <div 
-                          className={`h-20 w-20 rounded-md overflow-hidden cursor-pointer border-2 transition-all ${
-                            allImages[currentSlide] === image ? 'border-primary shadow-md scale-105' : 'border-transparent hover:border-gray-300'
-                        }`}
-                        onClick={() => setCurrentSlide(galleryImages.indexOf(image))}
-                      >
-                        <img 
-                          src={image} 
-                          alt={`Thumbnail ${index + 1}`}
-                          className="h-full w-full object-cover"
-                        />
                       </div>
-                      <button
-                        onClick={() => removeGalleryImage(index)}
-                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
-                  
-                  {/* Profile image thumbnail if exists */}
-                  {homestay?.profileImage && (
-                    <div className="relative group">
-                      <div 
-                          className={`h-20 w-20 rounded-md overflow-hidden cursor-pointer border-2 transition-all ${
-                            allImages[currentSlide] === homestay.profileImage ? 'border-primary shadow-md scale-105' : 'border-transparent hover:border-gray-300'
-                        }`}
-                        onClick={() => setCurrentSlide(allImages.indexOf(homestay.profileImage!))}
-                      >
-                        <img 
-                          src={homestay.profileImage} 
-                          alt="Profile image"
-                          className="h-full w-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <span className="text-white text-xs font-medium">Profile</span>
-                        </div>
-                      </div>
-                      
-                      {/* Profile edit button */}
-                        <label className="absolute -top-2 -right-2 bg-blue-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-sm">
-                        <Edit3 className="h-3 w-3" />
-                        <input 
-                          type="file" 
-                          className="hidden" 
-                          accept="image/*"
-                          onChange={handleProfileImageUpload}
-                        />
-                      </label>
-                    </div>
-                  )}
-                  
-                    {/* Upload buttons with improved styling */}
-                  <div className="flex gap-2">
-                    {/* Add single image */}
-                      <label className="h-20 w-20 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50 transition-colors hover:border-primary/50">
+
+          {/* Moved Thumbnails Section (Manage Gallery) */}
+          <div className="bg-white rounded-lg shadow-md p-4 border border-gray-100">
+            <h3 className="text-md font-semibold text-gray-700 mb-3">Manage Gallery</h3>
+            {/* Ensure flex-wrap and alignment */}
+            <div className="flex flex-wrap items-start gap-3">
+              {/* Always show profile slot */}
+              {renderThumbnail(validProfileImage, 'profile')}
+
+              {/* Render gallery thumbnails */}
+              {validGalleryImages.map((img, index) => renderThumbnail(img, 'gallery', index))}
+              
+              {/* Upload Buttons Container */}
+              <div className="flex gap-3">
+                {/* Single Upload Button */}
+                <label className="h-16 w-16 md:h-20 md:w-20 rounded-md border-2 border-dashed border-gray-300 hover:border-primary flex flex-col items-center justify-center cursor-pointer text-gray-500 hover:text-primary transition-all relative flex-shrink-0">
                       {uploadingGallery ? (
-                        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary"></div>
+                    <Loader2 className="h-6 w-6 animate-spin" />
                       ) : (
-                        <>
-                          <Plus className="h-6 w-6 text-gray-400 mb-1" />
-                          <span className="text-xs text-gray-500">Add image</span>
-                        </>
+                    <Plus className="h-6 w-6" />
                       )}
+                  <span className="text-xs mt-1">Add</span>
                       <input 
                         type="file" 
-                        className="hidden" 
-                        accept="image/*" 
+                    accept="image/jpeg, image/png, image/webp"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         onChange={handleGalleryImageUpload}
                         disabled={uploadingGallery}
                       />
                     </label>
                     
-                    {/* Add multiple images */}
-                      <label className="h-20 px-2 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50 transition-colors hover:border-primary/50">
-                      <Upload className="h-6 w-6 text-gray-400 mb-1" />
-                      <span className="text-xs text-gray-500">Upload multiple</span>
-                      <input 
-                        ref={multipleFileInputRef}
-                        type="file" 
-                        className="hidden" 
-                        accept="image/*" 
-                        multiple
-                        onChange={handleMultipleImagesUpload}
+                {/* Multiple Upload Button */}
+                <button 
+                  onClick={() => multipleFileInputRef.current?.click()}
+                  className="h-16 w-16 md:h-20 md:w-20 rounded-md border-2 border-dashed border-gray-300 hover:border-primary flex flex-col items-center justify-center cursor-pointer text-gray-500 hover:text-primary transition-all relative flex-shrink-0"
                         disabled={uploadingGallery}
-                      />
-                    </label>
-                    
-                    {/* Add profile if not exists */}
-                    {!homestay?.profileImage && (
-                        <label className="h-20 px-2 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50 transition-colors hover:border-primary/50">
-                        {uploadingProfile ? (
-                          <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary"></div>
-                        ) : (
-                          <>
-                            <User className="h-6 w-6 text-gray-400 mb-1" />
-                            <span className="text-xs text-gray-500">Add profile</span>
-                          </>
-                        )}
-                        <input 
-                          type="file" 
-                          className="hidden" 
-                          accept="image/*"
-                          onChange={handleProfileImageUpload}
-                          disabled={uploadingProfile}
-                        />
-                      </label>
-                    )}
+                  title="Upload Multiple Images"
+                >
+                  {uploadingGallery ? (
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  ) : (
+                    <Camera className="h-6 w-6" />
+                  )}
+                  <span className="text-xs mt-1">Add Many</span>
+                </button>
                   </div>
-                </div>
-              </>
-            ) : (
-              <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 text-center">
-                <div className="mb-4">
-                  <ImageIcon className="h-12 w-12 mx-auto text-gray-400" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No images yet</h3>
-                <p className="text-gray-500 mb-6">Upload some images to showcase your homestay</p>
-                
-                <div className="flex flex-wrap justify-center gap-4">
-                  {/* Single image upload */}
-                    <label className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md cursor-pointer hover:bg-primary-dark transition shadow-sm">
-                    <Plus className="mr-2 h-5 w-5" />
-                    <span>Add image</span>
+              {/* Hidden input for multiple files (keep outside the button) */}
                     <input 
                       type="file" 
+                accept="image/jpeg, image/png, image/webp"
                       className="hidden" 
-                      accept="image/*"
-                      onChange={handleGalleryImageUpload}
-                      disabled={uploadingGallery}
-                    />
-                  </label>
-                  
-                  {/* Multiple image upload */}
-                    <label className="inline-flex items-center px-4 py-2 border border-primary text-primary font-medium rounded-md cursor-pointer hover:bg-primary hover:text-white transition-colors shadow-sm">
-                    <Upload className="mr-2 h-5 w-5" />
-                    <span>Upload multiple</span>
-                    <input 
-                      ref={multipleFileInputRef}
-                      type="file" 
-                      className="hidden" 
-                      accept="image/*"
-                      multiple
                       onChange={handleMultipleImagesUpload}
                       disabled={uploadingGallery}
+                multiple
+                ref={multipleFileInputRef}
                     />
-                  </label>
-                </div>
-              </div>
-            )}
           </div>
         </div>
         
@@ -768,23 +876,30 @@ export default function PortalPage() {
         </div>
       </div>
 
-      {/* Image Preview Modal with enhanced styling */}
+      {/* Image Preview Modal */}
       {previewImage && (
         <div 
-          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"
-          onClick={() => setPreviewImage(null)}
+          className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 backdrop-blur-sm"
+          onClick={() => setPreviewImage(null)} // Close on backdrop click
         >
+          <div className="relative max-w-[90vw] max-h-[90vh]" onClick={e => e.stopPropagation()}> 
           <img 
-            src={previewImage} 
+              src={previewImage} // Already contains /api/images path
             alt="Preview" 
-            className="max-h-[90vh] max-w-[90vw] object-contain"
+              className="block object-contain max-w-full max-h-full rounded-lg shadow-2xl"
+              onError={(e) => {
+                console.error("Failed to load preview image:", previewImage);
+                setPreviewImage(null); // Close modal on error
+              }}
           />
           <button
             onClick={() => setPreviewImage(null)}
-            className="absolute top-4 right-4 p-2 text-white hover:bg-white/20 rounded-full transition-colors"
+              className="absolute -top-4 -right-4 p-2 bg-white/80 text-black rounded-full hover:bg-white shadow-lg"
+              aria-label="Close preview"
           >
-            <X className="h-6 w-6" />
+              <X className="h-5 w-5" />
           </button>
+          </div>
         </div>
       )}
     </div>

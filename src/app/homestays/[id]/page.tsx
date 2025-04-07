@@ -58,6 +58,17 @@ interface OfficialData {
   contactNo: string;
 }
 
+// Helper function to generate initials
+const getInitials = (name: string): string => {
+  if (!name) return "?";
+  const words = name.split(' ').filter(Boolean);
+  if (words.length === 0) return "?";
+  // Use first letter of the first word and first letter of the last word
+  const firstInitial = words[0].charAt(0);
+  const lastInitial = words.length > 1 ? words[words.length - 1].charAt(0) : '';
+  return (firstInitial + lastInitial).toUpperCase();
+};
+
 export default function HomestayPortalPage() {
   const params = useParams();
   const homestayId = params.id as string;
@@ -314,27 +325,22 @@ export default function HomestayPortalPage() {
   
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-slate-50">
-        <div className="flex flex-col items-center gap-3">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-          <p className="text-gray-600 animate-pulse">Loading amazing homestay...</p>
-        </div>
+      <div className="flex justify-center items-center min-h-screen bg-gray-50">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary"></div>
       </div>
     );
   }
   
   if (error || !homestay) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-12 text-center">
-        <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
-        <p className="text-gray-700 mb-6">{error || "Homestay not found"}</p>
-        <Link href="/" className="inline-flex items-center text-primary hover:underline">
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Back to Home
-        </Link>
-      </div>
+      <div className="text-center py-10 text-red-600">{error || "Homestay not found"}</div>
     );
   }
+  
+  // Derive values after homestay is confirmed not null
+  const currentImageIndex = galleryImages.length > 0 ? currentSlide % galleryImages.length : 0;
+  const currentImageSrc = galleryImages.length > 0 ? galleryImages[currentImageIndex] : null;
+  const profileInitials = getInitials(homestay.homeStayName); // Get initials
   
   return (
     <>
@@ -345,22 +351,28 @@ export default function HomestayPortalPage() {
           <div className="relative h-[50vh] md:h-[70vh] overflow-hidden">
             {galleryImages.length > 0 ? (
               <>
-                {galleryImages.map((image, index) => (
-                  <div
-                    key={index}
-                    className={`absolute inset-0 w-full h-full transition-opacity duration-1000 cursor-pointer ${
-                      index === currentSlide ? "opacity-100" : "opacity-0"
-                    }`}
-                    onClick={() => openFullscreenViewer(index)}
-                  >
-                    <div className="absolute inset-0 bg-black/20 z-10"></div>
-                    <img 
-                      src={image} 
-                      alt={`${homestay.homeStayName} - Photo ${index + 1}`} 
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ))}
+                {galleryImages.map((imagePath, index) => {
+                  const filename = imagePath.split('/').pop();
+                  if (!filename) return null; // Skip invalid paths
+                  const apiUrl = `/api/images/${filename}?t=${new Date().getTime()}`;
+                  return (
+                    <div
+                      key={index}
+                      className={`absolute inset-0 w-full h-full transition-opacity duration-1000 cursor-pointer ${
+                        index === currentSlide ? "opacity-100" : "opacity-0"
+                      }`}
+                      onClick={() => openFullscreenViewer(index)} // Use index to find the API url later
+                    >
+                      <div className="absolute inset-0 bg-black/20 z-10"></div>
+                      <img 
+                        src={apiUrl}
+                        alt={`${homestay.homeStayName} - Photo ${index + 1}`} 
+                        className="w-full h-full object-cover"
+                        onError={(e) => { console.warn(`[Public Slider] Failed to load image via API: ${apiUrl}`); }}
+                      />
+                    </div>
+                  );
+                })}
               
                 {galleryImages.length > 1 && (
                   <>
@@ -442,15 +454,52 @@ export default function HomestayPortalPage() {
           <div className="bg-white rounded-lg shadow-lg mb-8 p-6">
             <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
               <div className="flex items-center gap-4">
-                {homestay.profileImage && (
-                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden border-2 border-primary flex-shrink-0">
-                    <img 
-                      src={homestay.profileImage} 
-                      alt={`${homestay.homeStayName} profile`} 
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                )}
+                {/* Profile Image or Initials */}
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden border-2 border-primary flex-shrink-0 bg-primary/10 flex items-center justify-center">
+                  {homestay.profileImage ? (
+                    () => { // Use a function to handle logic
+                      const filename = homestay.profileImage.split('/').pop();
+                      if (!filename) {
+                        console.warn(`[Public Page] Could not extract filename for profile: ${homestay.profileImage}`);
+                        return (
+                          <span className="text-2xl md:text-3xl font-bold text-primary">
+                            {profileInitials}
+                          </span>
+                        );
+                      }
+                      const apiUrl = `/api/images/${filename}?t=${new Date().getTime()}`;
+                      return (
+                        <img 
+                          src={apiUrl} 
+                          alt={`${homestay.homeStayName} profile`} 
+                          className="w-full h-full object-cover"
+                          onError={(e) => { 
+                            console.warn(`[Public Page] Failed to load public profile image via API: ${apiUrl}`); 
+                            // Hide image and show initials on error
+                            const target = e.currentTarget;
+                            const parent = target.parentElement;
+                            if (parent) {
+                                target.style.display = 'none'; // Hide broken image
+                                const placeholder = document.createElement('span');
+                                placeholder.className = "text-2xl md:text-3xl font-bold text-primary";
+                                placeholder.textContent = profileInitials;
+                                // Check if placeholder already added
+                                if (!parent.querySelector('.initials-placeholder')) {
+                                     placeholder.classList.add('initials-placeholder');
+                                     parent.appendChild(placeholder);
+                                }
+                            }
+                           }} 
+                        />
+                      );
+                    }
+                  )() : (
+                    <span className="text-2xl md:text-3xl font-bold text-primary">
+                      {profileInitials} 
+                    </span>
+                  )}
+                </div>
+                
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900">{homestay.homeStayName}</h1>
                   
@@ -628,22 +677,29 @@ export default function HomestayPortalPage() {
               <section className="bg-white p-6 rounded-lg shadow-sm mb-8">
                 <h2 className="text-xl font-semibold mb-4 pb-2 border-b border-gray-100">Photo Gallery</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
-                  {galleryImages.map((image, index) => (
-                    <div 
-                      key={index}
-                      className="relative aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity group"
-                      onClick={() => openFullscreenViewer(index)}
-                    >
-                      <img 
-                        src={image} 
-                        alt={`${homestay.homeStayName} - Gallery ${index + 1}`} 
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span className="text-white bg-black/50 px-2 py-1 rounded-md text-sm">View</span>
+                  {galleryImages.map((imagePath, index) => {
+                    const filename = imagePath.split('/').pop();
+                    if (!filename) return null; // Filter out invalid paths
+                    const apiUrl = `/api/images/${filename}?t=${new Date().getTime()}`;
+                    return (
+                      // Return the JSX element directly
+                      <div 
+                        key={index}
+                        className="relative aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity group"
+                        onClick={() => openFullscreenViewer(index)} // Use index
+                      >
+                        <img 
+                          src={apiUrl}
+                          alt={`${homestay.homeStayName} - Gallery ${index + 1}`} 
+                          className="w-full h-full object-cover"
+                          onError={(e) => { console.warn(`[Public Grid] Failed to load image via API: ${apiUrl}`); }}
+                        />
+                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <span className="text-white bg-black/50 px-2 py-1 rounded-md text-sm">View</span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
             )}
@@ -807,65 +863,83 @@ export default function HomestayPortalPage() {
       )}
       
       {/* Fullscreen Image Viewer */}
-      {showFullImage && (
-        <div 
-          className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center"
-          onClick={() => setShowFullImage(false)}
-        >
-          <button 
-            onClick={(e) => { e.stopPropagation(); prevSlide(); }} 
-            className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 p-2 text-white rounded-full z-10 hover:bg-white/10"
+      {showFullImage && galleryImages.length > 0 && (() => { // Ensure galleryImages exists
+        const currentImagePath = galleryImages[currentSlide];
+        const currentFilename = currentImagePath?.split('/').pop();
+        if (!currentFilename) {
+          console.error("Error: Could not get filename for fullscreen image");
+          setShowFullImage(false); // Close viewer if path is invalid
+          return null;
+        }
+        const currentApiUrl = `/api/images/${currentFilename}?t=${new Date().getTime()}`;
+
+        return (
+          <div 
+            className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center"
+            onClick={() => setShowFullImage(false)}
           >
-            <ChevronLeft className="h-8 w-8" />
-          </button>
-          
-          <img 
-            src={galleryImages[currentSlide]} 
-            alt={`${homestay.homeStayName} - Photo ${currentSlide + 1}`} 
-            className="max-h-[90vh] max-w-[90vw] object-contain"
-          />
-          
-          <button 
-            onClick={(e) => { e.stopPropagation(); nextSlide(); }} 
-            className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 p-2 text-white rounded-full z-10 hover:bg-white/10"
-          >
-            <ChevronRight className="h-8 w-8" />
-          </button>
-          
-          <button
-            onClick={(e) => { e.stopPropagation(); setShowFullImage(false); }}
-            className="absolute top-4 right-4 p-2 text-white hover:bg-white/10 rounded-full"
-          >
-            <X className="h-6 w-6" />
-          </button>
-          
-          {/* Thumbnails row */}
-          <div className="absolute bottom-10 left-0 right-0 flex justify-center overflow-x-auto py-2 px-4 gap-2 hide-scrollbar">
-            {galleryImages.map((image, index) => (
-              <div 
-                key={index} 
-                className={`h-16 w-24 flex-shrink-0 rounded-md overflow-hidden cursor-pointer border-2 transition-all ${
-                  index === currentSlide ? 'border-white scale-105' : 'border-transparent opacity-60 hover:opacity-100'
-                }`}
-                onClick={(e) => { 
-                  e.stopPropagation();
-                  setCurrentSlide(index);
-                }}
-              >
-                <img 
-                  src={image} 
-                  alt={`Thumbnail ${index + 1}`} 
-                  className="h-full w-full object-cover"
-                />
-              </div>
-            ))}
+            <button 
+              onClick={(e) => { e.stopPropagation(); prevSlide(); }} 
+              className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 p-2 text-white rounded-full z-10 hover:bg-white/10"
+            >
+              <ChevronLeft className="h-8 w-8" />
+            </button>
+            
+            <img 
+              src={currentApiUrl} 
+              alt={`${homestay.homeStayName} - Photo ${currentSlide + 1}`} 
+              className="max-h-[90vh] max-w-[90vw] object-contain"
+              onError={(e) => { console.error(`[Fullscreen Viewer] Failed to load image via API: ${currentApiUrl}`); setShowFullImage(false); }}
+            />
+            
+            <button 
+              onClick={(e) => { e.stopPropagation(); nextSlide(); }} 
+              className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 p-2 text-white rounded-full z-10 hover:bg-white/10"
+            >
+              <ChevronRight className="h-8 w-8" />
+            </button>
+            
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowFullImage(false); }}
+              className="absolute top-4 right-4 p-2 text-white hover:bg-white/10 rounded-full"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            
+            {/* Thumbnails row */}
+            <div className="absolute bottom-10 left-0 right-0 flex justify-center overflow-x-auto py-2 px-4 gap-2 hide-scrollbar">
+              {galleryImages.map((thumbPath, index) => {
+                const thumbFilename = thumbPath.split('/').pop();
+                if (!thumbFilename) return null;
+                const thumbApiUrl = `/api/images/${thumbFilename}?t=${new Date().getTime()}`;
+                return (
+                  <div 
+                    key={index} 
+                    className={`h-16 w-24 flex-shrink-0 rounded-md overflow-hidden cursor-pointer border-2 transition-all ${
+                      index === currentSlide ? 'border-white scale-105' : 'border-transparent opacity-60 hover:opacity-100'
+                    }`}
+                    onClick={(e) => { 
+                      e.stopPropagation();
+                      setCurrentSlide(index);
+                    }}
+                  >
+                    <img 
+                      src={thumbApiUrl} 
+                      alt={`Thumbnail ${index + 1}`} 
+                      className="h-full w-full object-cover"
+                      onError={(e) => { console.warn(`[Fullscreen Thumb] Failed to load image via API: ${thumbApiUrl}`); }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 px-4 py-2 rounded-full text-white text-sm">
+              {currentSlide + 1} / {galleryImages.length}
+            </div>
           </div>
-          
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 px-4 py-2 rounded-full text-white text-sm">
-            {currentSlide + 1} / {galleryImages.length}
-          </div>
-        </div>
-      )}
+        );
+      })()}
       
       {/* Add custom CSS for thumbnail scrollbar */}
       <style jsx global>{`

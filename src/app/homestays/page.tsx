@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Search, MapPin, Star, Bed, Home, Filter, X, ChevronDown, ArrowRight, Utensils, Wifi, Users, Mountain } from "lucide-react";
@@ -59,8 +59,8 @@ const facilityCategories = [
   { name: "Infrastructure", key: "infrastructure", icon: <Wifi size={16} className="mr-1" /> }
 ];
 
-// Main component
-export default function AllHomestaysPage() {
+// New component to contain the logic using searchParams
+function HomestayContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -435,38 +435,17 @@ export default function AllHomestaysPage() {
     return description.substring(0, maxLength) + '...';
   };
   
-  // Loading state
-  if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-12 flex justify-center items-center min-h-[60vh]">
-        <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-          <p className="mt-4 text-gray-600">Loading amazing homestays...</p>
-        </div>
-      </div>
-    );
-  }
-  
-  // Error state
-  if (error) {
-    return (
-      <div className="container mx-auto px-4 py-12 text-center min-h-[60vh]">
-        <div className="max-w-lg mx-auto bg-red-50 p-6 rounded-lg">
-          <h1 className="text-2xl font-semibold text-red-600 mb-3">Something went wrong</h1>
-          <p className="text-gray-700 mb-6">{error}</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Initialize state from searchParams (Example)
+  useEffect(() => {
+    const initialSearch = searchParams.get('q') || "";
+    setSearchQuery(initialSearch);
+    const initialProvince = searchParams.get('province') || "";
+    setSelectedProvince(initialProvince);
+    // ... initialize other filters from searchParams ...
+  }, [searchParams]);
   
   return (
-    <div className="bg-gray-50 min-h-screen">
+    <div className="container mx-auto px-4 py-8 bg-gray-50 min-h-screen">
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-primary/90 to-primary text-white py-16">
         <div className="container mx-auto px-4">
@@ -797,5 +776,14 @@ export default function AllHomestaysPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+// Main page component now wraps HomestayContent in Suspense
+export default function AllHomestaysPage() {
+  return (
+    <Suspense fallback={<div className="container mx-auto px-4 py-8 text-center text-gray-600">Loading homestay filters and listings...</div>}>
+      <HomestayContent />
+    </Suspense>
   );
 } 

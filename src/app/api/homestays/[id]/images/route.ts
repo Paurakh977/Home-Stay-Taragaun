@@ -1,91 +1,81 @@
-import { NextRequest, NextResponse } from 'next/server';
-import path from 'path';
-import { writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import dbConnect from '@/lib/mongodb';
-import HomestaySingle from '@/lib/models/HomestaySingle';
-
-// Helper to ensure directory exists
-async function ensureDir(dirPath: string) {
-  if (!existsSync(dirPath)) {
-    await mkdir(dirPath, { recursive: true });
-  }
-}
+import { NextRequest, NextResponse } from "next/server";
+import dbConnect from "@/lib/mongodb";
+import HomestaySingle from "@/lib/models/HomestaySingle";
+import { join } from "path";
+import { mkdir, writeFile } from "fs/promises";
+import { existsSync } from "fs";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    // Connect to database
     await dbConnect();
-    
-    // Get homestay ID from params
     const homestayId = params.id;
     
-    // Check if homestay exists and user has permission
+    // Validate homestay exists
     const homestay = await HomestaySingle.findOne({ homestayId });
-    
     if (!homestay) {
-      return NextResponse.json({ error: 'Homestay not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: "Homestay not found" },
+        { status: 404 }
+      );
     }
-    
-    // Get formData from request
+
+    // Get the form data
     const formData = await request.formData();
-    const imageFile = formData.get('image') as File;
-    const type = formData.get('type') as string;
+    const file = formData.get("file") as File;
     
-    if (!imageFile) {
-      return NextResponse.json({ error: 'Image file is required' }, { status: 400 });
+    if (!file) {
+      return NextResponse.json(
+        { error: "No file uploaded" },
+        { status: 400 }
+      );
     }
     
-    if (!type || (type !== 'profile' && type !== 'gallery')) {
-      return NextResponse.json({ error: 'Valid image type is required' }, { status: 400 });
+    // Validate file type
+    const fileType = file.type;
+    if (!fileType.startsWith('image/')) {
+      return NextResponse.json(
+        { error: "File must be an image" },
+        { status: 400 }
+      );
     }
     
-    // Get file buffer
-    const buffer = await imageFile.arrayBuffer();
+    // Create a unique filename for the gallery image
+    const timestamp = Date.now();
+    const randomString = Math.floor(Math.random() * 1000000000);
+    const fileName = `${homestayId}-gallery-${timestamp}-${randomString}.${fileType.split('/')[1]}`;
     
-    // Generate unique filename with current timestamp
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    const extension = path.extname(imageFile.name) || '.jpg';
-    const filename = `${homestayId}-${type}-${uniqueSuffix}${extension}`;
-    
-    // Path to save the file
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', homestayId);
-    await ensureDir(uploadDir);
-    
-    const filePath = path.join(uploadDir, filename);
-    const relativePath = `/uploads/${homestayId}/${filename}`;
+    // Create uploads directory if it doesn't exist
+    const uploadDir = join(process.cwd(), "public", "uploads");
+    if (!existsSync(uploadDir)) {
+      await mkdir(uploadDir, { recursive: true });
+    }
     
     // Write file to disk
-    await writeFile(filePath, Buffer.from(buffer));
+    const filePath = join(uploadDir, fileName);
+    const fileBuffer = await file.arrayBuffer();
+    await writeFile(filePath, Buffer.from(fileBuffer));
     
-    // Update homestay document based on image type
-    if (type === 'profile') {
-      // Update profile image
-      await HomestaySingle.findOneAndUpdate(
-        { homestayId },
-        { profileImage: relativePath }
-      );
-    } else if (type === 'gallery') {
-      // Add image to gallery
-      await HomestaySingle.findOneAndUpdate(
-        { homestayId },
-        { $push: { galleryImages: relativePath } }
-      );
-    }
+    // Create the public URL that matches what the image serving API expects
+    const fileUrl = `/uploads/${fileName}`;
     
-    // Return success response with image URL
-    return NextResponse.json({
-      success: true,
-      imageUrl: relativePath
+    // Update homestay with new gallery image
+    await HomestaySingle.updateOne(
+      { homestayId }, 
+      { $push: { galleryImages: fileUrl } }
+    );
+    
+    return NextResponse.json({ 
+      success: true, 
+      imageUrl: fileUrl 
     });
     
   } catch (error) {
-    console.error('Error uploading image:', error);
+    console.error("Error uploading gallery image:", error);
     return NextResponse.json(
-      { error: 'Failed to upload image', message: error instanceof Error ? error.message : 'Unknown error' },
+      { error: "Failed to upload gallery image", message: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

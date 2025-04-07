@@ -28,9 +28,10 @@ const nextConfig = {
   // Configure experimental features
   experimental: {
     // Set the maximum request body size for API routes (10MB)
-    serverComponentsExternalPackages: [],
     largePageDataBytes: 10 * 1024 * 1024, // 10MB
   },
+  // Add the updated key here
+  serverExternalPackages: [],
 };
 
 module.exports = nextConfig; 
