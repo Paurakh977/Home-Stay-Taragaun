@@ -90,8 +90,10 @@ function HomestayContent() {
   // Filter states
   const [selectedProvince, setSelectedProvince] = useState<string>("");
   const [selectedDistrict, setSelectedDistrict] = useState<string>("");
+  const [selectedMunicipality, setSelectedMunicipality] = useState<string>("");
   const [selectedType, setSelectedType] = useState<string>("");
   const [availableDistricts, setAvailableDistricts] = useState<string[]>([]);
+  const [availableMunicipalities, setAvailableMunicipalities] = useState<string[]>([]);
   
   // Facility filter states
   const [allFacilities, setAllFacilities] = useState<{
@@ -157,11 +159,32 @@ function HomestayContent() {
       // Reset district if it's no longer valid
       if (selectedDistrict && !districts.includes(selectedDistrict)) {
         setSelectedDistrict("");
+        setSelectedMunicipality(""); // Also reset municipality
+        setAvailableMunicipalities([]);
       }
     } else {
       setAvailableDistricts([]);
+      setSelectedDistrict("");
+      setSelectedMunicipality("");
+      setAvailableMunicipalities([]);
     }
   }, [selectedProvince, addressData.provinceDistrictsMap, selectedDistrict]);
+  
+  // Update available municipalities when district changes
+  useEffect(() => {
+    if (selectedDistrict && addressData.districtMunicipalitiesMap) {
+      const municipalities = addressData.districtMunicipalitiesMap[selectedDistrict] || [];
+      setAvailableMunicipalities(municipalities);
+      
+      // Reset municipality if it's no longer valid
+      if (selectedMunicipality && !municipalities.includes(selectedMunicipality)) {
+        setSelectedMunicipality("");
+      }
+    } else {
+      setAvailableMunicipalities([]);
+      setSelectedMunicipality("");
+    }
+  }, [selectedDistrict, addressData.districtMunicipalitiesMap, selectedMunicipality]);
   
   // Fetch homestays
   useEffect(() => {
@@ -333,13 +356,14 @@ function HomestayContent() {
   useEffect(() => {
     let results = [...homestays];
     
-    // Apply search query
-    if (searchQuery) {
-      results = results.filter(homestay => 
-        homestay.homeStayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        homestay.villageName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        homestay.address.formattedAddress.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (homestay.description && homestay.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    // Apply text search
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      results = results.filter(homestay =>
+        homestay.homeStayName.toLowerCase().includes(query) ||
+        homestay.villageName.toLowerCase().includes(query) ||
+        (homestay.address.formattedAddress && homestay.address.formattedAddress.toLowerCase().includes(query)) ||
+        (homestay.description && homestay.description.toLowerCase().includes(query))
       );
     }
     
@@ -353,26 +377,30 @@ function HomestayContent() {
       results = results.filter(homestay => homestay.address.district === selectedDistrict);
     }
     
+    // Apply municipality filter
+    if (selectedMunicipality) {
+      results = results.filter(homestay => homestay.address.municipality === selectedMunicipality);
+    }
+    
     // Apply homestay type filter
     if (selectedType) {
       results = results.filter(homestay => homestay.homeStayType === selectedType);
     }
     
     // Apply facility filters
-    facilityCategories.forEach(category => {
+    for (const category of facilityCategories) {
       const key = category.key as keyof typeof selectedFacilities;
       if (selectedFacilities[key].length > 0) {
-        results = results.filter(homestay => 
-          homestay.features && 
-          selectedFacilities[key].some(facility => 
-            homestay.features?.[key]?.includes(facility)
+        results = results.filter(homestay =>
+          selectedFacilities[key].every(facility => 
+            homestay.features?.[key]?.some(f => f.toLowerCase().includes(facility.toLowerCase()))
           )
         );
       }
-    });
+    }
     
     setFilteredHomestays(results);
-  }, [homestays, searchQuery, selectedProvince, selectedDistrict, selectedType, selectedFacilities]);
+  }, [homestays, searchQuery, selectedProvince, selectedDistrict, selectedMunicipality, selectedType, selectedFacilities]);
   
   // Handle facility selection
   const toggleFacility = (category: keyof typeof selectedFacilities, facility: string) => {
@@ -392,6 +420,7 @@ function HomestayContent() {
     setSearchQuery("");
     setSelectedProvince("");
     setSelectedDistrict("");
+    setSelectedMunicipality("");
     setSelectedType("");
     setSelectedFacilities({
       localAttractions: [],
@@ -443,6 +472,52 @@ function HomestayContent() {
     setSelectedProvince(initialProvince);
     // ... initialize other filters from searchParams ...
   }, [searchParams]);
+  
+  // Format the image path correctly
+  const getImageUrl = (imagePath: string | undefined): string => {
+    if (!imagePath) return '';
+    
+    // Check if it's already a full URL (e.g., https://...)
+    if (imagePath.startsWith('http')) {
+      return imagePath;
+    }
+    
+    // Check if it's an upload path (/uploads/...)
+    if (imagePath.startsWith('/uploads/')) {
+      // Extract homestayId and filename from the path
+      const parts = imagePath.split('/');
+      console.log("Image path parts:", parts);
+      
+      if (parts.length >= 3) {
+        const homestayId = parts[2];
+        const filename = parts[parts.length - 1];
+        
+        // If it's a gallery image
+        if (parts.includes('gallery')) {
+          const galleryUrl = `/api/images/${homestayId}/gallery/${filename}?t=${new Date().getTime()}`;
+          console.log("Processing gallery image:", imagePath, "→", galleryUrl);
+          return galleryUrl;
+        }
+        
+        // If it's a profile image
+        if (parts.includes('profile') || filename.startsWith('profile.')) {
+          const profileUrl = `/api/images/${homestayId}/profile/${filename}?t=${new Date().getTime()}`;
+          console.log("Processing profile image:", imagePath, "→", profileUrl);
+          return profileUrl;
+        }
+        
+        // For older profile images that might not have the /profile/ segment
+        // Default to profile directory
+        const defaultUrl = `/api/images/${homestayId}/profile/${filename}?t=${new Date().getTime()}`;
+        console.log("Processing image with default profile path:", imagePath, "→", defaultUrl);
+        return defaultUrl;
+      }
+    }
+    
+    // Return as is if we can't determine the format
+    console.log("Unable to process image path, returning as is:", imagePath);
+    return imagePath;
+  };
   
   return (
     <div className="container mx-auto px-4 py-8 bg-gray-50 min-h-screen">
@@ -545,18 +620,22 @@ function HomestayContent() {
                   </div>
                 </div>
                 
-                {/* Homestay type filter */}
+                {/* Municipality filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Homestay Type</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Municipality</label>
                   <div className="relative">
                     <select
-                      value={selectedType}
-                      onChange={(e) => setSelectedType(e.target.value)}
+                      value={selectedMunicipality}
+                      onChange={(e) => setSelectedMunicipality(e.target.value)}
                       className="appearance-none w-full p-2 pr-8 rounded border border-gray-200 focus:outline-none focus:border-primary"
+                      disabled={!selectedDistrict}
                     >
-                      <option value="">All Types</option>
-                      <option value="community">Community</option>
-                      <option value="private">Private</option>
+                      <option value="">All Municipalities</option>
+                      {availableMunicipalities.map((municipality) => (
+                        <option key={municipality} value={municipality}>
+                          {addressData.municipalityTranslations[municipality] || municipality}
+                        </option>
+                      ))}
                     </select>
                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
                       <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
@@ -564,6 +643,48 @@ function HomestayContent() {
                       </svg>
                     </div>
                   </div>
+                </div>
+              </div>
+              
+              {/* Homestay type filter */}
+              <div className="mb-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Homestay Type</h4>
+                <div className="flex gap-4">
+                  <label className="inline-flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="homeStayType"
+                      value=""
+                      checked={selectedType === ""}
+                      onChange={() => setSelectedType("")}
+                      className="form-radio text-primary focus:ring-primary h-4 w-4"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">All Types</span>
+                  </label>
+                  
+                  <label className="inline-flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="homeStayType"
+                      value="community"
+                      checked={selectedType === "community"}
+                      onChange={() => setSelectedType("community")}
+                      className="form-radio text-primary focus:ring-primary h-4 w-4"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Community</span>
+                  </label>
+                  
+                  <label className="inline-flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="homeStayType"
+                      value="private"
+                      checked={selectedType === "private"}
+                      onChange={() => setSelectedType("private")}
+                      className="form-radio text-primary focus:ring-primary h-4 w-4"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Private</span>
+                  </label>
                 </div>
               </div>
               
@@ -667,13 +788,42 @@ function HomestayContent() {
                 <div className="h-48 bg-gray-200 relative overflow-hidden">
                   {homestay.profileImage ? (
                     <img 
-                      src={homestay.profileImage} 
+                      src={getImageUrl(homestay.profileImage)} 
                       alt={homestay.homeStayName} 
                       className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                      onError={(e) => {
+                        console.warn(`[Homestay List] Failed to load image: ${homestay.profileImage}`, e);
+                        // Hide the broken image and show placeholder
+                        const target = e.currentTarget;
+                        target.style.display = 'none';
+                        
+                        // Find parent and add placeholder
+                        const parent = target.parentElement;
+                        if (parent) {
+                          // Create placeholder with consistent styling
+                          const placeholder = document.createElement('div');
+                          placeholder.className = "w-full h-full flex flex-col items-center justify-center bg-gray-100";
+                          
+                          // Add house icon
+                          const icon = document.createElement('div');
+                          icon.className = "text-gray-400 mb-2";
+                          icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>';
+                          
+                          // Add text explanation
+                          const text = document.createElement('div');
+                          text.className = "text-sm text-gray-500";
+                          text.textContent = "Image unavailable";
+                          
+                          placeholder.appendChild(icon);
+                          placeholder.appendChild(text);
+                          parent.appendChild(placeholder);
+                        }
+                      }}
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                      <Home size={32} className="text-gray-400" />
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100">
+                      <Home size={32} className="text-gray-400 mb-2" />
+                      <span className="text-sm text-gray-500">No image available</span>
                     </div>
                   )}
                   

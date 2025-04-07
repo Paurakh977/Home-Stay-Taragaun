@@ -27,8 +27,8 @@ export async function POST(request: NextRequest) {
     
     if (!homestay) {
       return NextResponse.json(
-        { success: false, error: "Invalid credentials" },
-        { status: 401 }
+        { success: false, error: "Homestay not found or has been deleted" },
+        { status: 404 }
       );
     }
     

@@ -14,8 +14,8 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_for_developmen
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // If it's an API route, just pass through (API body limits are handled by config)
-  if (pathname.startsWith('/api/')) {
+  // If it's an API route that's not a protected API route, just pass through
+  if (pathname.startsWith('/api/') && !pathname.startsWith('/api/auth/change-password')) {
     return NextResponse.next();
   }
   
@@ -43,16 +43,44 @@ export async function middleware(request: NextRequest) {
     // Verify the token
     const textEncoder = new TextEncoder();
     const encodedKey = textEncoder.encode(JWT_SECRET);
-    await jwtVerify(token, encodedKey);
+    const verified = await jwtVerify(token, encodedKey);
     
-    // Token is valid, allow the request
+    // Extract homestayId from the token payload
+    const payload = verified.payload as { homestayId?: string };
+    const homestayId = payload.homestayId;
+    
+    if (!homestayId) {
+      throw new Error('Invalid token payload - missing homestayId');
+    }
+    
+    // Check if the user still exists in the database
+    const userResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || request.nextUrl.origin}/api/homestays/${homestayId}`, {
+      headers: {
+        'Cookie': `auth_token=${token}`
+      }
+    });
+    
+    // If user doesn't exist or response is not ok, redirect to login
+    if (!userResponse.ok) {
+      throw new Error('User no longer exists in the database');
+    }
+    
+    // Token is valid and user exists, allow the request
     return NextResponse.next();
   } catch (error) {
-    // Token verification failed, redirect to login
+    // Token verification failed or user doesn't exist, redirect to login
     console.error('Authentication error:', error);
-    const url = new URL('/login', request.url);
-    url.searchParams.set('callbackUrl', pathname);
-    return NextResponse.redirect(url);
+    
+    // Clear the auth_token cookie
+    const response = NextResponse.redirect(new URL('/login', request.url));
+    response.cookies.set({
+      name: 'auth_token',
+      value: '',
+      expires: new Date(0), // Expire immediately
+      path: '/',
+    });
+    
+    return response;
   }
 }
 

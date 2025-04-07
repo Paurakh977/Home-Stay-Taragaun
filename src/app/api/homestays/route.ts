@@ -8,6 +8,19 @@ import { generateHomestayId, generateSecurePassword, hashPassword } from "@/lib/
 import mongoose from "mongoose";
 import fs from 'fs';
 import path from 'path';
+import { nanoid } from "nanoid";
+
+
+// Map province names to numbers for DHSR number generation (1-7)
+const provinceNumbers: Record<string, string> = {
+  "कोशी": "1", // Koshi
+  "मधेश": "2", // Madhesh
+  "वागमती": "3", // Bagmati
+  "गण्डकी": "4", // Gandaki
+  "लुम्बिनी": "5", // Lumbini
+  "कर्णाली": "6", // Karnali
+  "सुदुर पश्चिम": "7" // Sudurpashchim
+};
 
 // Import translation maps
 const provinceTranslations: Record<string, string> = {
@@ -91,6 +104,38 @@ const translateWard = (ward: string): string => {
   
   return englishWard;
 };
+
+/**
+ * Generate a DHSR number in the format:
+ * P-[province number (1-7)]-[private/public (0/1)]-000[provincial count]-[overall count]
+ */
+async function generateDHSRNumber(province: string, homeStayType: string): Promise<string> {
+  try {
+    // Get province number (1-7)
+    const provinceNumber = provinceNumbers[province] || "0";
+    
+    // Determine if private (0) or community (1)
+    const typeCode = homeStayType === "private" ? "0" : "1";
+    
+    // Count homestays in this province
+    const provincialCount = await HomestaySingle.countDocuments({
+      "address.province.ne": province
+    });
+    
+    // Get total count of all homestays
+    const totalCount = await HomestaySingle.countDocuments();
+    
+    // Format the provincial count with leading zeros (at least 3 digits)
+    const formattedProvincialCount = String(provincialCount + 1).padStart(3, '0');
+    
+    // Format the DHSR number
+    return `P-${provinceNumber}-${typeCode}-${formattedProvincialCount}-${totalCount + 1}`;
+  } catch (error) {
+    console.error("Error generating DHSR number:", error);
+    // Fallback to a simple format if there's an error
+    return `P-0-0-000-${Date.now().toString().slice(-4)}`;
+  }
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -251,10 +296,15 @@ export async function POST(req: NextRequest) {
     const formattedAddressNe = `${body.tole}, ${body.city}, ${body.municipality}, ${body.district}, ${body.province}`;
     const formattedAddressEn = `${body.tole}, ${body.city}, ${municipalityEn}, ${districtEn}, ${provinceEn}`;
     
+    // Generate DHSR number
+    const dhsrNo = await generateDHSRNumber(body.province, body.homeStayType);
+    console.log(`Generated DHSR number: ${dhsrNo} for homestay: ${homestayId}`);
+    
     // Format data for HomestaySingle model with bilingual address
     const homestayData = {
       homestayId,
       password: hashedPassword,
+      dhsrNo, // Add DHSR number
       homeStayName: body.homeStayName,
       villageName: body.villageName,
       homeCount: body.homeCount,
@@ -396,6 +446,7 @@ export async function POST(req: NextRequest) {
         message: "Homestay registered successfully",
         homestayId,
         password, // Sending plain password for display to user ONCE
+        dhsrNo, // Include DHSR number in the response
         homestay: {
           ...createdHomestay.toObject(),
           password: undefined // Remove hashed password from response

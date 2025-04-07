@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { FormButton } from "@/components/ui/form-button";
-import { X, Save, Check, Copy, Info } from "lucide-react";
+import { X, Save, Check, Copy, Info, LogIn } from "lucide-react";
 import Link from "next/link";
 
 // Form steps components
@@ -63,6 +63,7 @@ type FormData = {
 type RegistrationSuccess = {
   homestayId: string;
   password: string;
+  dhsrNo: string;
 };
 
 export default function RegisterPage() {
@@ -319,7 +320,8 @@ export default function RegisterPage() {
       // Store credentials for display
       setRegistrationSuccess({
         homestayId: data.homestayId,
-        password: data.password
+        password: data.password,
+        dhsrNo: data.dhsrNo
       });
       
     } catch (error) {
@@ -351,67 +353,64 @@ export default function RegisterPage() {
           
           <h2 className="text-2xl font-bold text-gray-800">Registration Successful!</h2>
           <p className="text-gray-600 max-w-md mx-auto">
-            Your homestay has been registered successfully. Please save your login credentials below:
+            Your homestay has been registered successfully. Please save your login credentials and registration number below:
           </p>
           
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-6 max-w-md mx-auto">
-            <div className="flex items-start mb-2">
-              <Info className="h-5 w-5 text-blue-500 mr-2 mt-0.5" />
-              <p className="text-sm text-blue-700 text-left">
-                Please save these credentials in a secure place. You will need them to log in to your homestay portal.
-              </p>
+          <div className="bg-gray-50 p-6 max-w-md mx-auto rounded-lg border border-gray-200 space-y-4 text-left">
+            <div>
+              <p className="text-sm text-gray-500 mb-1">Homestay ID:</p>
+              <div className="flex items-center justify-between">
+                <p className="font-mono text-primary font-semibold">{registrationSuccess.homestayId}</p>
+                <button 
+                  onClick={() => copyToClipboard(registrationSuccess.homestayId)}
+                  className="text-gray-500 hover:text-primary"
+                  title="Copy to clipboard"
+                >
+                  <Copy className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-            
-            <div className="space-y-4 mt-4">
-              <div className="bg-white rounded-md p-3 border border-gray-200">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm text-gray-500">Homestay ID</p>
-                    <p className="font-mono font-medium">{registrationSuccess.homestayId}</p>
-                  </div>
-                  <button 
-                    onClick={() => copyToClipboard(registrationSuccess.homestayId)}
-                    className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-md"
-                  >
-                    <Copy className="h-5 w-5" />
-                  </button>
-                </div>
+            <div>
+              <p className="text-sm text-gray-500 mb-1">Password:</p>
+              <div className="flex items-center justify-between">
+                <p className="font-mono text-primary font-semibold">{registrationSuccess.password}</p>
+                <button 
+                  onClick={() => copyToClipboard(registrationSuccess.password)}
+                  className="text-gray-500 hover:text-primary"
+                  title="Copy to clipboard"
+                >
+                  <Copy className="h-4 w-4" />
+                </button>
               </div>
-              
-              <div className="bg-white rounded-md p-3 border border-gray-200">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm text-gray-500">Password</p>
-                    <p className="font-mono font-medium">{registrationSuccess.password}</p>
-                  </div>
-                  <button 
-                    onClick={() => copyToClipboard(registrationSuccess.password)}
-                    className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-md"
-                  >
-                    <Copy className="h-5 w-5" />
-                  </button>
-                </div>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 mb-1">Registration Number (DHSR No.):</p>
+              <div className="flex items-center justify-between">
+                <p className="font-mono text-primary font-semibold">{registrationSuccess.dhsrNo}</p>
+                <button 
+                  onClick={() => copyToClipboard(registrationSuccess.dhsrNo)}
+                  className="text-gray-500 hover:text-primary"
+                  title="Copy to clipboard"
+                >
+                  <Copy className="h-4 w-4" />
+                </button>
               </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <p className="text-xs text-gray-500 mb-2">
+                <strong>Important:</strong> Please save these details. Your password cannot be recovered if lost.
+              </p>
             </div>
           </div>
           
-          <div className="pt-4">
-            <div className="flex justify-center space-x-4">
-              <Link href="/">
-                <button 
-                  className="mt-4 px-6 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
-                >
-                  Return to Home Page
-                </button>
-              </Link>
-              <Link href="/login">
-                <button 
-                  className="mt-4 px-6 py-2 bg-primary text-white rounded-md hover:bg-primary-dark transition-colors"
-                >
-                  Login Now
-                </button>
-              </Link>
-            </div>
+          <div className="flex justify-center mt-6">
+            <Link
+              href="/login"
+              className="inline-flex items-center px-4 py-2 rounded-md bg-primary text-white hover:bg-primary-dark transition-colors"
+            >
+              <LogIn className="h-4 w-4 mr-2" />
+              Go to Login
+            </Link>
           </div>
         </div>
       );

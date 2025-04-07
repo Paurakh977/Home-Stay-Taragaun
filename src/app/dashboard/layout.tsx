@@ -54,8 +54,8 @@ export default function DashboardLayout({
         const userData = JSON.parse(userJson);
         setUser(userData);
         
-        // Fetch the user's profile image
-        fetchProfileImage(userData.homestayId);
+        // Verify user exists in the database
+        verifyUserExists(userData.homestayId);
         
       } catch (err) {
         console.error("Error parsing user data:", err);
@@ -71,31 +71,38 @@ export default function DashboardLayout({
     }
   }, [router]);
 
+  // Verify that the user exists in the database
+  const verifyUserExists = async (homestayId: string) => {
+    try {
+      const response = await fetch(`/api/homestays/${homestayId}`);
+      
+      if (!response.ok) {
+        console.error("User verification failed: User does not exist in database");
+        // User doesn't exist in the database anymore
+        localStorage.removeItem("user");
+        router.push("/login");
+        return;
+      }
+      
+      // User exists, fetch profile image
+      const data = await response.json();
+      console.log("[Layout Fetch] Received profileImage from API:", data?.homestay?.profileImage);
+      setProfileImage(data?.homestay?.profileImage || null);
+      
+    } catch (err) {
+      console.error("Error verifying user:", err);
+      // On error, log out the user
+      localStorage.removeItem("user");
+      router.push("/login");
+    }
+  };
+  
   // ADDED: useEffect to track profileImage state changes
   useEffect(() => {
     console.log("[Layout State Change] profileImage state is now:", profileImage);
   }, [profileImage]);
   
-  // Fetch user's profile image
-  const fetchProfileImage = async (homestayId: string) => {
-    console.log("[Layout Fetch] Fetching profile image for:", homestayId);
-    try {
-      const response = await fetch(`/api/homestays/${homestayId}`);
-      if (!response.ok) {
-        console.error("[Layout Fetch] Response not OK:", response.status);
-        throw new Error('Failed to fetch homestay data');
-      }
-      const data = await response.json();
-      // ADDED: Log the exact value received from API
-      console.log("[Layout Fetch] Received profileImage from API:", data?.homestay?.profileImage);
-      // Set state (should handle null correctly)
-      setProfileImage(data?.homestay?.profileImage || null);
-      
-    } catch (err) {
-      console.error('[Layout Fetch] Error fetching profile image:', err);
-      setProfileImage(null); // Explicitly set to null on error
-    }
-  };
+  // Fetch user's profile image - Removed, now part of verifyUserExists
 
   // Handle sidebar collapse toggle
   const toggleSidebar = () => {

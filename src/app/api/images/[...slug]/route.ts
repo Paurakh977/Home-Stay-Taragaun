@@ -10,31 +10,35 @@ export async function GET(
   try {
     // Extract homestayId and type from the path
     const filename = params.slug.join('/');
+    console.log(`API: Image request for: ${filename}`, params.slug);
 
     if (!filename) {
+      console.error('API: Filename missing in request');
       return new NextResponse('Filename missing', { status: 400 });
     }
 
     // IMPORTANT: Construct the correct path to the uploads directory
     // Now handles nested structure: /uploads/[homestayId]/(profile|gallery)/[filename]
     const filePath = path.join(process.cwd(), 'public', 'uploads', filename);
+    console.log(`API: Looking for image at: ${filePath}`);
 
     // Security check: Ensure the path doesn't try to escape the uploads directory
     const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
     if (!filePath.startsWith(uploadsDir)) {
-        console.error(`Attempted access outside uploads directory: ${filePath}`);
+        console.error(`API: Attempted access outside uploads directory: ${filePath}`);
         return new NextResponse('Forbidden', { status: 403 });
     }
 
     // Check if file exists
     if (!fs.existsSync(filePath)) {
-      console.warn(`Image not found at path: ${filePath}`);
+      console.warn(`API: Image not found at path: ${filePath}`);
       return new NextResponse('Not Found', { status: 404 });
     }
 
     // Get file stats to determine content length and type
     const stats = fs.statSync(filePath);
     const contentType = mime.lookup(filePath) || 'application/octet-stream';
+    console.log(`API: Serving image of type ${contentType}, size ${stats.size} bytes`);
 
     // Read the file content
     const fileBuffer = fs.readFileSync(filePath);
@@ -52,7 +56,7 @@ export async function GET(
     return response;
 
   } catch (error) {
-    console.error('Error serving image:', error);
+    console.error('API: Error serving image:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 } 

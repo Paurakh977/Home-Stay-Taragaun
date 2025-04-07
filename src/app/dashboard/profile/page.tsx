@@ -74,11 +74,11 @@ export default function ProfilePage() {
       try {
         const userData = JSON.parse(userJson);
         setUser(userData);
-        
-        // Fetch the homestay data
+        // After setting user data from local storage, verify it against the database
         fetchHomestayData(userData.homestayId);
       } catch (err) {
         console.error("Error parsing user data:", err);
+        localStorage.removeItem("user");
         router.push("/login");
       }
     } else {
@@ -88,15 +88,26 @@ export default function ProfilePage() {
   
   // Fetch homestay data from API
   const fetchHomestayData = async (homestayId: string) => {
+    setLoading(true);
     try {
-      setLoading(true);
       const response = await fetch(`/api/homestays/${homestayId}`);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch homestay data');
+        console.error("Failed to fetch homestay data:", response.status);
+        // User doesn't exist in the database anymore
+        localStorage.removeItem("user");
+        router.push("/login");
+        return;
       }
       
       const data = await response.json();
+      
+      if (!data.homestay) {
+        console.error("Homestay data not found");
+        localStorage.removeItem("user");
+        router.push("/login");
+        return;
+      }
       
       // Transform data for our profile view
       const formattedData: ProfileData = {
@@ -115,12 +126,14 @@ export default function ProfilePage() {
       
       setProfileData(formattedData);
       setProfileImage(data.homestay.profileImage || null);
-      
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      console.error('Error fetching homestay data:', err);
-    } finally {
       setLoading(false);
+    } catch (error) {
+      console.error("Error fetching homestay data:", error);
+      setError("Failed to load homestay data. Please try again later.");
+      setLoading(false);
+      // On severe errors, log the user out
+      localStorage.removeItem("user");
+      router.push("/login");
     }
   };
   

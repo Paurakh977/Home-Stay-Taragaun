@@ -21,6 +21,13 @@ const homestaySchema = new Schema(
       required: true
     },
     
+    // Digital Homestay Registration Number
+    dhsrNo: {
+      type: String,
+      unique: true,
+      sparse: true
+    },
+    
     // Basic homestay information
     homeStayName: { type: String, required: true },
     villageName: { type: String, required: true },
