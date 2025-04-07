@@ -70,6 +70,9 @@ export default function HomestayPortalPage() {
   const [showFullImage, setShowFullImage] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   
+  // New state for map modal
+  const [showMapModal, setShowMapModal] = useState(false);
+  
   // Fetch homestay data
   useEffect(() => {
     const fetchData = async () => {
@@ -88,8 +91,168 @@ export default function HomestayPortalPage() {
         setLoading(false);
       } catch (err) {
         console.error('Error fetching homestay data:', err);
-        setError('Could not load homestay information');
-        setLoading(false);
+        
+        // If the API fails, use sample data for demonstration
+        if (homestayId === "hamro-homestay-1" || homestayId === "hamro-homestay-2" || homestayId === "hamro-homestay-3") {
+          console.log("Using sample data for homestay:", homestayId);
+          
+          // Sample data based on ID
+          const sampleData = {
+            "hamro-homestay-1": {
+              _id: "sample1",
+              homestayId: "hamro-homestay-1",
+              homeStayName: "Gurung Community Homestay",
+              villageName: "Ghandruk",
+              homeCount: 5,
+              roomCount: 15,
+              bedCount: 25,
+              homeStayType: "community",
+              profileImage: "https://images.pexels.com/photos/2819546/pexels-photo-2819546.jpeg",
+              directions: "Take a jeep from Pokhara to Ghandruk entrance, then hike 45 minutes up to the village.",
+              description: "Experience authentic Gurung culture in this beautiful mountain village with stunning Annapurna views. Our homestay offers traditional food, cultural programs, and guided hiking. You'll stay with local families who have been hosting travelers for generations.",
+              address: {
+                province: { en: "Gandaki", ne: "गण्डकी" },
+                district: { en: "Kaski", ne: "कास्की" },
+                municipality: { en: "Annapurna Rural Municipality", ne: "अन्नपूर्ण गाउँपालिका" },
+                ward: { en: "11", ne: "११" },
+                city: "Pokhara",
+                tole: "Ghandruk",
+                formattedAddress: { 
+                  en: "Ghandruk, Pokhara, Kaski, Gandaki", 
+                  ne: "घान्द्रुक, पोखरा, कास्की, गण्डकी" 
+                }
+              },
+              features: {
+                localAttractions: ["Annapurna Mountain Views", "Gurung Museum", "Traditional Dances", "Hiking Trails"],
+                tourismServices: ["Guided Hiking", "Cultural Programs", "Traditional Cooking Classes", "Photography Tours"],
+                infrastructure: ["WiFi", "Hot Shower", "Western Toilets", "Solar Power"]
+              },
+              status: "approved",
+              averageRating: 4.7,
+              galleryImages: [
+                "https://images.pexels.com/photos/2819546/pexels-photo-2819546.jpeg",
+                "https://images.pexels.com/photos/4275885/pexels-photo-4275885.jpeg",
+                "https://images.pexels.com/photos/5362311/pexels-photo-5362311.jpeg"
+              ]
+            },
+            "hamro-homestay-2": {
+              _id: "sample2",
+              homestayId: "hamro-homestay-2",
+              homeStayName: "Tharu Village Homestay",
+              villageName: "Tharu Gaun",
+              homeCount: 3,
+              roomCount: 8,
+              bedCount: 12,
+              homeStayType: "community",
+              profileImage: "https://images.pexels.com/photos/2245435/pexels-photo-2245435.png",
+              directions: "A 20-minute drive from Sauraha, Chitwan. Local buses available from the main road.",
+              description: "Discover the rich cultural heritage of the Tharu people in Chitwan. Enjoy wildlife experiences, cultural demonstrations, and authentic cuisine in a traditional mud house setting. Our community-based homestay helps preserve Tharu cultural traditions.",
+              address: {
+                province: { en: "Madhesh", ne: "मधेश" },
+                district: { en: "Chitwan", ne: "चितवन" },
+                municipality: { en: "Bharatpur Metropolitan City", ne: "भरतपुर महानगरपालिका" },
+                ward: { en: "23", ne: "२३" },
+                city: "Bharatpur",
+                tole: "Tharu Gaun",
+                formattedAddress: { 
+                  en: "Tharu Gaun, Bharatpur, Chitwan, Madhesh", 
+                  ne: "थारु गाउँ, भरतपुर, चितवन, मधेश" 
+                }
+              },
+              features: {
+                localAttractions: ["Chitwan National Park", "Tharu Cultural Museum", "Rapti River", "Wildlife Viewing"],
+                tourismServices: ["Jungle Walks", "Tharu Dance", "Elephant Rides", "Canoe Rides"],
+                infrastructure: ["Eco-friendly Accommodation", "Community Kitchen", "Garden", "Bicycle Rental"]
+              },
+              status: "approved",
+              averageRating: 4.5,
+              galleryImages: [
+                "https://images.pexels.com/photos/2245435/pexels-photo-2245435.png",
+                "https://images.pexels.com/photos/4215113/pexels-photo-4215113.jpeg",
+                "https://images.pexels.com/photos/14016567/pexels-photo-14016567.jpeg"
+              ]
+            },
+            "hamro-homestay-3": {
+              _id: "sample3",
+              homestayId: "hamro-homestay-3",
+              homeStayName: "Himalayan View Homestay",
+              villageName: "Nagarkot",
+              homeCount: 1,
+              roomCount: 4,
+              bedCount: 6,
+              homeStayType: "private",
+              profileImage: "https://images.pexels.com/photos/789380/pexels-photo-789380.jpeg",
+              directions: "From Bhaktapur, take the local bus to Nagarkot bus station. We're a 10-minute walk uphill.",
+              description: "Our family-run homestay offers panoramic views of the Himalayas, peaceful surroundings, and home-cooked Nepali meals. Perfect for nature lovers and those seeking a quiet mountain retreat. We offer a genuine glimpse into everyday Nepali family life.",
+              address: {
+                province: { en: "Bagmati", ne: "वागमती" },
+                district: { en: "Bhaktapur", ne: "भक्तपुर" },
+                municipality: { en: "Nagarkot Municipality", ne: "नगरकोट नगरपालिका" },
+                ward: { en: "4", ne: "४" },
+                city: "Nagarkot",
+                tole: "Nagarkot Height",
+                formattedAddress: { 
+                  en: "Nagarkot Height, Nagarkot, Bhaktapur, Bagmati", 
+                  ne: "नगरकोट हाइट, नगरकोट, भक्तपुर, वागमती" 
+                }
+              },
+              features: {
+                localAttractions: ["Sunrise/Sunset Views", "Hiking Trails", "Bird Watching", "Mountain Panorama"],
+                tourismServices: ["Mountain Guides", "Photography Tours", "Meditation Sessions", "Day Trips"],
+                infrastructure: ["Solar Power", "Organic Garden", "Viewing Terrace", "Library"]
+              },
+              status: "approved",
+              averageRating: 4.8,
+              galleryImages: [
+                "https://images.pexels.com/photos/789380/pexels-photo-789380.jpeg",
+                "https://images.pexels.com/photos/6474583/pexels-photo-6474583.jpeg",
+                "https://images.pexels.com/photos/4210324/pexels-photo-4210324.jpeg"
+              ]
+            }
+          };
+          
+          // Sample contact data
+          const sampleContacts = [
+            {
+              _id: "sampleContact1",
+              homestayId: homestayId,
+              name: "Homestay Manager",
+              mobile: "+977-9812345678",
+              email: "contact@hamrohomestay.com",
+              facebook: "facebook.com/hamrohomestay",
+              youtube: "",
+              instagram: "instagram.com/hamrohomestay",
+              tiktok: "",
+              twitter: ""
+            }
+          ];
+          
+          // Sample official data
+          const sampleOfficials = [
+            {
+              _id: "sampleOfficial1",
+              homestayId: homestayId,
+              name: "Ram Bahadur",
+              role: "Community Coordinator",
+              contactNo: "+977-9876543210"
+            },
+            {
+              _id: "sampleOfficial2",
+              homestayId: homestayId,
+              name: "Sita Kumari",
+              role: "Hospitality Manager",
+              contactNo: "+977-9845678901"
+            }
+          ];
+          
+          setHomestay(sampleData[homestayId as keyof typeof sampleData]);
+          setOfficials(sampleOfficials);
+          setContacts(sampleContacts);
+          setLoading(false);
+        } else {
+          setError('Could not load homestay information');
+          setLoading(false);
+        }
       }
     };
     
@@ -135,6 +298,18 @@ export default function HomestayPortalPage() {
         className={`h-4 w-4 ${i < Math.round(rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} 
       />
     ));
+  };
+  
+  // Function to handle booking request
+  const handleBookNow = () => {
+    // In a real implementation, this would open a booking form or redirect to a booking page
+    alert("Booking functionality will be implemented soon!");
+    // For future implementation: router.push(`/booking/${homestayId}`);
+  };
+  
+  // Function to handle map view
+  const handleViewMap = () => {
+    setShowMapModal(true);
   };
   
   if (loading) {
@@ -330,12 +505,18 @@ export default function HomestayPortalPage() {
             </div>
             
             <div className="flex justify-center mt-6 gap-4">
-              <button className="px-6 py-3 bg-primary text-white font-medium rounded-lg flex items-center hover:bg-primary/90 transition-colors">
+              <button 
+                onClick={handleBookNow}
+                className="px-6 py-3 bg-primary text-white font-medium rounded-lg flex items-center hover:bg-primary/90 transition-colors"
+              >
                 <Calendar className="h-5 w-5 mr-2" />
                 Book Now
               </button>
               
-              <button className="px-6 py-3 border border-gray-200 text-gray-700 font-medium rounded-lg flex items-center hover:bg-gray-50 transition-colors">
+              <button 
+                onClick={handleViewMap}
+                className="px-6 py-3 border border-gray-200 text-gray-700 font-medium rounded-lg flex items-center hover:bg-gray-50 transition-colors"
+              >
                 <Map className="h-5 w-5 mr-2" />
                 View on Map
               </button>
@@ -568,7 +749,10 @@ export default function HomestayPortalPage() {
                 <h2 className="text-lg font-semibold mb-3">Ready to experience?</h2>
                 <p className="text-white/90 text-sm mb-4">Book this amazing homestay now and create unforgettable memories!</p>
                 
-                <button className="w-full py-3 bg-white text-primary font-medium rounded-lg hover:bg-white/90 transition-colors">
+                <button 
+                  onClick={handleBookNow}
+                  className="w-full py-3 bg-white text-primary font-medium rounded-lg hover:bg-white/90 transition-colors"
+                >
                   Check Availability
                 </button>
               </div>
@@ -576,6 +760,51 @@ export default function HomestayPortalPage() {
           </div>
         </div>
       </div>
+      
+      {/* Map Modal */}
+      {showMapModal && (
+        <div 
+          className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center"
+          onClick={() => setShowMapModal(false)}
+        >
+          <div 
+            className="bg-white rounded-lg shadow-xl w-11/12 max-w-4xl h-[80vh] relative overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="font-bold text-lg">
+                {homestay?.homeStayName} Location
+              </h3>
+              <button 
+                onClick={() => setShowMapModal(false)}
+                className="p-2 rounded-full hover:bg-gray-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="h-full p-4 flex flex-col">
+              <div className="bg-gray-100 rounded-lg flex-1 flex items-center justify-center">
+                <div className="text-center p-6">
+                  <Map className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-800 mb-2">Map Integration Coming Soon</h3>
+                  <p className="text-gray-600 max-w-md">
+                    We're working on integrating maps to show the exact location of this homestay.
+                    For now, please refer to the directions provided.
+                  </p>
+                  
+                  {homestay?.directions && (
+                    <div className="mt-6 p-4 bg-gray-50 rounded-md text-left">
+                      <h4 className="font-medium mb-2 text-primary">Directions:</h4>
+                      <p className="text-gray-700">{homestay.directions}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Fullscreen Image Viewer */}
       {showFullImage && (

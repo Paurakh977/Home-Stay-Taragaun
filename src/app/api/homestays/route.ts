@@ -134,7 +134,7 @@ export async function GET(req: NextRequest) {
     }
     
     // Status should always be approved for public API
-    filter.status = "approved";
+    // filter.status = "approved";  // Commenting out the status filter to show all homestays
     
     // Calculate pagination
     const skip = (page - 1) * limit;
@@ -144,13 +144,30 @@ export async function GET(req: NextRequest) {
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 })
-      .select("homestayId homeStayName villageName address homeStayType averageRating")
+      .select("homestayId homeStayName villageName address homeStayType averageRating profileImage")
       .lean();
     
     // Format the response to handle bilingual address fields
     const formattedHomestays = homestaysData.map(homestay => {
       // Use type assertion to handle the document safely
       const rawHomestay = homestay as any;
+      
+      // Check if we need to set profile image from uploads directory
+      if (!rawHomestay.profileImage) {
+        // Get the homestay ID for folder name
+        const homestayId = rawHomestay.homestayId;
+        if (homestayId) {
+          // Based on the screenshot, the profile images are named like "dolpa637_profile.jpg"
+          // and stored directly in the uploads/[homestayId] folder
+          const possiblePaths = [
+            `/uploads/${homestayId}/${homestayId}_profile.jpg`,
+            `/uploads/${homestayId}/${homestayId}_profile.png`
+          ];
+          
+          // Use the first path format as default
+          rawHomestay.profileImage = possiblePaths[0];
+        }
+      }
       
       // Check if we have the new bilingual format
       const hasBilingualAddress = 

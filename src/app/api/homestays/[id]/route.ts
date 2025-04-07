@@ -113,6 +113,19 @@ export async function GET(
       );
     }
 
+    // Check if profile image needs to be set from uploads directory
+    if (!homestay.profileImage) {
+      // Based on the screenshot, the profile images are named like "dolpa637_profile.jpg"
+      // and stored directly in the uploads/[homestayId] folder
+      const possiblePaths = [
+        `/uploads/${homestayId}/${homestayId}_profile.jpg`,
+        `/uploads/${homestayId}/${homestayId}_profile.png`
+      ];
+      
+      // Set the first path as default
+      homestay.profileImage = possiblePaths[0];
+    }
+
     // Fetch related officials and contacts
     const [officials, contacts] = await Promise.all([
       Official.find({ homestayId }),

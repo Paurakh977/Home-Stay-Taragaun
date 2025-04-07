@@ -11,7 +11,7 @@ const CtaSection = () => {
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-5">
             <Link 
-              href="/register" 
+              href="/homestays" 
               className="bg-primary hover:bg-opacity-90 text-white font-medium px-8 py-3.5 rounded-md transition-all duration-300 text-center shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
             >
               Book Now

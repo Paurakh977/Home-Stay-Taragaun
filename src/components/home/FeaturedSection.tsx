@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -67,9 +68,11 @@ const FeaturedSection = () => {
         </div>
         
         <div className="mt-12 text-center">
-          <Button className="bg-primary hover:bg-primary/90 text-white px-8 py-6" size="lg">
-            View All Home Stays
-          </Button>
+          <Link href="/homestays">
+            <Button className="bg-primary hover:bg-primary/90 text-white px-8 py-6" size="lg">
+              View All Home Stays
+            </Button>
+          </Link>
         </div>
       </div>
     </section>

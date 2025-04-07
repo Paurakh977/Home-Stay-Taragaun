@@ -120,6 +120,7 @@ const Navbar = () => {
                 }`}></span>
               </div>
             </Link>
+            
             <Link 
               href="/news" 
               className={`group font-medium px-3 py-5 transition-all duration-300 ease-in-out ${
