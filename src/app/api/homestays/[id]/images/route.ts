@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import HomestaySingle from "@/lib/models/HomestaySingle";
 import { join } from "path";
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, writeFile, unlink } from "fs/promises";
 import { existsSync } from "fs";
 
 export async function POST(
@@ -82,6 +82,74 @@ export async function POST(
     console.error("Error uploading gallery image:", error);
     return NextResponse.json(
       { error: "Failed to upload gallery image", message: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}
+
+// New DELETE endpoint for gallery images
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await dbConnect();
+    const homestayId = params.id;
+    
+    // Validate homestay exists
+    const homestay = await HomestaySingle.findOne({ homestayId });
+    if (!homestay) {
+      return NextResponse.json(
+        { error: "Homestay not found" },
+        { status: 404 }
+      );
+    }
+
+    // Get the image path from the request URL
+    const { searchParams } = new URL(request.url);
+    const imagePath = searchParams.get("imagePath");
+    
+    if (!imagePath) {
+      return NextResponse.json(
+        { error: "No image path provided" },
+        { status: 400 }
+      );
+    }
+    
+    // Extract the filename from the path
+    const filename = imagePath.split('/').pop();
+    if (!filename) {
+      return NextResponse.json(
+        { error: "Invalid image path" },
+        { status: 400 }
+      );
+    }
+    
+    // Create the filesystem path
+    const galleryDir = join(process.cwd(), "public", "uploads", homestayId, "gallery");
+    const filePath = join(galleryDir, filename);
+    
+    // Check if file exists
+    if (existsSync(filePath)) {
+      // Delete the file from filesystem
+      await unlink(filePath);
+    }
+    
+    // Remove the image from the database
+    await HomestaySingle.updateOne(
+      { homestayId }, 
+      { $pull: { galleryImages: imagePath } }
+    );
+    
+    return NextResponse.json({ 
+      success: true, 
+      message: "Image deleted successfully" 
+    });
+    
+  } catch (error) {
+    console.error("Error deleting gallery image:", error);
+    return NextResponse.json(
+      { error: "Failed to delete gallery image", message: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

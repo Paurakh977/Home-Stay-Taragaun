@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import { Toaster } from "sonner";
 import {
   User,
   LogOut,
@@ -170,6 +171,7 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Toaster position="top-right" />
       {/* Mobile top bar - positioned below the main navbar */}
       <div className="lg:hidden fixed top-16 left-0 z-30 w-full bg-white shadow-sm p-4 flex justify-between items-center">
         <div className="font-bold text-lg text-gray-800 truncate">

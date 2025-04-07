@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Upload, Image as ImageIcon, X, Plus, Camera, Save, Eye, ChevronLeft, ChevronRight, Trash2, Edit3, User, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { toast } from "sonner";
 
 interface UserInfo {
   homestayId: string;
@@ -183,6 +184,38 @@ export default function PortalPage() {
     }
   };
 
+  // Remove gallery image and trigger save
+  const removeGalleryImage = async (imageUrlToRemove: string) => {
+    if (!user || !imageUrlToRemove) return;
+
+    try {
+      // First update the UI optimistically
+      const updatedImages = galleryImages.filter(img => img !== imageUrlToRemove);
+      setGalleryImages(updatedImages);
+      
+      // Call the DELETE endpoint to remove the image
+      const response = await fetch(`/api/homestays/${user.homestayId}/images?imagePath=${encodeURIComponent(imageUrlToRemove)}`, {
+        method: 'DELETE'
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete image');
+      }
+      
+      // Show success toast
+      toast.success("Image deleted successfully");
+      
+      // Refresh data after deletion
+      fetchHomestayData(user.homestayId);
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      toast.error("Failed to delete image");
+      // Revert the optimistic update if the API call fails
+      fetchHomestayData(user.homestayId);
+    }
+  };
+
   // Handle single gallery image upload
   const handleGalleryImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0] || !user) return;
@@ -213,6 +246,8 @@ export default function PortalPage() {
           setGalleryImages(updatedImages);
           // Then trigger save with the updated list
           await savePortalData(description, updatedImages); // Save with the new list
+          // Show success toast
+          toast.success("Image uploaded successfully");
           // Explicitly refetch after save
           if (user) {
             console.log("[Upload Single] Refetching homestay data after save...");
@@ -220,15 +255,14 @@ export default function PortalPage() {
           }
       } else {
          console.error('Upload succeeded but did not return a valid image URL.');
-         // Optionally show an error toast to the user
+         toast.error("Failed to process uploaded image");
       }
       
     } catch (err) {
       console.error('Error uploading gallery image:', err);
-      // Optionally show an error toast
+      toast.error("Failed to upload image");
     } finally {
       setUploadingGallery(false);
-      // No need for save logic here anymore, it's handled in the try block
     }
   };
 
@@ -248,58 +282,53 @@ export default function PortalPage() {
           method: 'POST',
           body: formData,
         })
-        .then(async response => { // Make async to parse json
-          if (!response.ok) {
-            console.error('Failed upload for file:', file.name);
-            return null; // Indicate failure for this file
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            return data.imageUrl;
           }
-          const data = await response.json();
-          return data.imageUrl as string; // Ensure result is string or null
-        })
+          throw new Error(data.error || 'Upload failed');
+        });
       });
       
-      const results = await Promise.all(uploadPromises);
-      // Filter out nulls *before* updating state
-      successfullyUploadedUrls = results.filter((url): url is string => url !== null);
+      // Wait for all upload promises to resolve
+      const results = await Promise.allSettled(uploadPromises);
+      
+      // Extract successful uploads
+      results.forEach(result => {
+        if (result.status === 'fulfilled' && result.value) {
+          successfullyUploadedUrls.push(result.value);
+        }
+      });
       
       if (successfullyUploadedUrls.length > 0) {
-        // Update state with successfully uploaded images (guaranteed to be string[])
-        setGalleryImages(prev => [...prev, ...successfullyUploadedUrls]);
+        // Update the gallery images with the newly uploaded images
+        const updatedImages = [...galleryImages, ...successfullyUploadedUrls];
+        setGalleryImages(updatedImages);
+        
+        // Save changes to the database
+        await savePortalData(description, updatedImages);
+        
+        // Show success toast with count
+        toast.success(`${successfullyUploadedUrls.length} images uploaded successfully`);
+        
+        // Refresh data after upload
+        if (user) {
+          fetchHomestayData(user.homestayId);
+        }
+      } else {
+        toast.error("No images were uploaded successfully");
       }
       
     } catch (err) {
-      console.error('Error uploading multiple gallery images:', err);
+      console.error('Error uploading multiple images:', err);
+      toast.error("Failed to upload images");
     } finally {
       setUploadingGallery(false);
-      // Reset file input
+      // Clear the file input
       if (multipleFileInputRef.current) {
         multipleFileInputRef.current.value = '';
       }
-      // If at least one upload was successful, trigger save
-      if (successfullyUploadedUrls.length > 0 && user) {
-         // Use the state update function's callback to ensure state is set before saving
-        setGalleryImages(currentImages => {
-          const imagesToSave = [...currentImages]; // Use the latest state
-          savePortalData(description, imagesToSave).then(() => {
-            // Refetch AFTER save completes
-            if (user) { // Check user again just in case
-              console.log("[Upload Multiple] Refetching homestay data after save...");
-              fetchHomestayData(user.homestayId);
-            }
-          });
-          return currentImages; // Return the state passed to the callback
-        });
-      }
-    }
-  };
-
-  // Remove gallery image and trigger save
-  const removeGalleryImage = async (imageUrlToRemove: string) => {
-    const updatedImages = galleryImages.filter(img => img !== imageUrlToRemove);
-    setGalleryImages(updatedImages);
-    // Immediately save the change
-    if (user) {
-        await savePortalData(description, updatedImages);
     }
   };
 
@@ -326,6 +355,7 @@ export default function PortalPage() {
   const savePortalData = async (currentDescription: string, currentGalleryImages: string[]) => {
       if (!user) {
           console.error("Save failed: User not available");
+          toast.error("Save failed: User not available");
           return; 
       }
     
@@ -353,6 +383,7 @@ export default function PortalPage() {
               // Optional: Synchronize state precisely with server response
               // setDescription(savedData.homestay.description || "");
               // setGalleryImages(savedData.homestay.galleryImages || []);
+              toast.success("Changes saved successfully");
           } 
           
           setIsEditingDescription(false); // Ensure edit mode is off
@@ -360,7 +391,7 @@ export default function PortalPage() {
       
     } catch (err) {
       console.error('Error updating homestay portal:', err);
-          // Maybe add toast notification here
+      toast.error("Failed to save changes");
     } finally {
       setSaving(false);
     }
