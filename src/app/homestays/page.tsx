@@ -39,6 +39,7 @@ interface HomestayListing {
     infrastructure: string[];
   };
   profileImage?: string;
+  dhsrNo?: string;
 }
 
 // Address translations
@@ -203,149 +204,47 @@ function HomestayContent() {
         console.log("API response data:", data);
         console.log("Number of homestays returned:", data.data?.length || 0);
         
-        // If no homestays are returned from the API, use sample data for testing
-        if (!data.data || data.data.length === 0) {
-          console.log("Using sample data since no homestays were returned from API");
-          
-          // Sample homestay data for testing
-          const sampleHomestays: HomestayListing[] = [
-            {
-              _id: "sample1",
-              homestayId: "hamro-homestay-1",
-              homeStayName: "Gurung Community Homestay",
-              villageName: "Ghandruk",
-              homeCount: 5,
-              roomCount: 15,
-              bedCount: 25,
-              homeStayType: "community",
-              description: "Experience authentic Gurung culture in this beautiful mountain village with stunning Annapurna views. Our homestay offers traditional food, cultural programs, and guided hiking.",
-              averageRating: 4.7,
-              address: {
-                province: "गण्डकी",
-                district: "कास्की",
-                municipality: "अन्नपूर्ण गाउँपालिका",
-                ward: "११",
-                city: "पोखरा",
-                tole: "घान्द्रुक",
-                formattedAddress: "घान्द्रुक, पोखरा, कास्की, गण्डकी"
-              },
-              features: {
-                localAttractions: ["Annapurna Mountain Views", "Gurung Museum", "Traditional Dances"],
-                tourismServices: ["Guided Hiking", "Cultural Programs", "Traditional Cooking Classes"],
-                infrastructure: ["WiFi", "Hot Shower", "Western Toilets"]
-              },
-              profileImage: "https://images.pexels.com/photos/2819546/pexels-photo-2819546.jpeg"
-            },
-            {
-              _id: "sample2",
-              homestayId: "hamro-homestay-2",
-              homeStayName: "Tharu Village Homestay",
-              villageName: "Tharu Gaun",
-              homeCount: 3,
-              roomCount: 8,
-              bedCount: 12,
-              homeStayType: "community",
-              description: "Discover the rich cultural heritage of the Tharu people in Chitwan. Enjoy wildlife experiences, cultural demonstrations, and authentic cuisine in a traditional mud house setting.",
-              averageRating: 4.5,
-              address: {
-                province: "मधेश",
-                district: "चितवन",
-                municipality: "भरतपुर महानगरपालिका",
-                ward: "२३",
-                city: "भरतपुर",
-                tole: "थारु गाउँ",
-                formattedAddress: "थारु गाउँ, भरतपुर, चितवन, मधेश"
-              },
-              features: {
-                localAttractions: ["Chitwan National Park", "Tharu Cultural Museum", "Rapti River"],
-                tourismServices: ["Jungle Walks", "Tharu Dance", "Elephant Rides"],
-                infrastructure: ["Eco-friendly Accommodation", "Community Kitchen", "Garden"]
-              },
-              profileImage: "https://images.pexels.com/photos/2245435/pexels-photo-2245435.png"
-            },
-            {
-              _id: "sample3",
-              homestayId: "hamro-homestay-3",
-              homeStayName: "Himalayan View Homestay",
-              villageName: "Nagarkot",
-              homeCount: 1,
-              roomCount: 4,
-              bedCount: 6,
-              homeStayType: "private",
-              description: "Our family-run homestay offers panoramic views of the Himalayas, peaceful surroundings, and home-cooked Nepali meals. Perfect for nature lovers and those seeking a quiet mountain retreat.",
-              averageRating: 4.8,
-              address: {
-                province: "वागमती",
-                district: "भक्तपुर",
-                municipality: "नगरकोट नगरपालिका",
-                ward: "४",
-                city: "नगरकोट",
-                tole: "नगरकोट हाइट",
-                formattedAddress: "नगरकोट हाइट, नगरकोट, भक्तपुर, वागमती"
-              },
-              features: {
-                localAttractions: ["Sunrise/Sunset Views", "Hiking Trails", "Bird Watching"],
-                tourismServices: ["Mountain Guides", "Photography Tours", "Meditation Sessions"],
-                infrastructure: ["Solar Power", "Organic Garden", "Viewing Terrace"]
-              },
-              profileImage: "https://images.pexels.com/photos/789380/pexels-photo-789380.jpeg"
-            }
-          ];
-          
-          setHomestays(sampleHomestays);
-          setFilteredHomestays(sampleHomestays);
-          
-          // Extract facilities from sample data
-          const allLocalAttractions = new Set<string>();
-          const allTourismServices = new Set<string>();
-          const allInfrastructure = new Set<string>();
-          
-          sampleHomestays.forEach((homestay) => {
+        // Set homestays from API data (empty array if no data)
+        setHomestays(data.data || []);
+        setFilteredHomestays(data.data || []);
+        
+        // Extract all unique facilities for filter options
+        const allLocalAttractions = new Set<string>();
+        const allTourismServices = new Set<string>();
+        const allInfrastructure = new Set<string>();
+        
+        if (data.data && data.data.length > 0) {
+          data.data.forEach((homestay: HomestayListing) => {
             if (homestay.features) {
               homestay.features.localAttractions?.forEach(item => allLocalAttractions.add(item));
               homestay.features.tourismServices?.forEach(item => allTourismServices.add(item));
               homestay.features.infrastructure?.forEach(item => allInfrastructure.add(item));
             }
           });
-          
-          setAllFacilities({
-            localAttractions: Array.from(allLocalAttractions),
-            tourismServices: Array.from(allTourismServices),
-            infrastructure: Array.from(allInfrastructure)
-          });
         } else {
-          setHomestays(data.data || []);
-          setFilteredHomestays(data.data || []);
-          
-          // Extract all unique facilities for filter options
-          const allLocalAttractions = new Set<string>();
-          const allTourismServices = new Set<string>();
-          const allInfrastructure = new Set<string>();
-          
-          if (data.data && data.data.length > 0) {
-            data.data.forEach((homestay: HomestayListing) => {
-              if (homestay.features) {
-                homestay.features.localAttractions?.forEach(item => allLocalAttractions.add(item));
-                homestay.features.tourismServices?.forEach(item => allTourismServices.add(item));
-                homestay.features.infrastructure?.forEach(item => allInfrastructure.add(item));
-              }
-            });
-          } else {
-            console.warn("No homestays found or empty data returned");
-          }
-          
-          setAllFacilities({
-            localAttractions: Array.from(allLocalAttractions),
-            tourismServices: Array.from(allTourismServices),
-            infrastructure: Array.from(allInfrastructure)
-          });
+          console.warn("No homestays found or empty data returned");
         }
+        
+        setAllFacilities({
+          localAttractions: Array.from(allLocalAttractions),
+          tourismServices: Array.from(allTourismServices),
+          infrastructure: Array.from(allInfrastructure)
+        });
         
         setLoading(false);
       } catch (err) {
         console.error("Error fetching homestays:", err);
         setError("Could not load homestays. Please try again later.");
         setLoading(false);
+        
+        // Set empty arrays on error
+        setHomestays([]);
+        setFilteredHomestays([]);
+        setAllFacilities({
+          localAttractions: [],
+          tourismServices: [],
+          infrastructure: []
+        });
       }
     }
     
@@ -859,6 +758,15 @@ function HomestayContent() {
                   <p className="text-sm text-gray-600 mb-3 line-clamp-2">
                     {formatDescription(homestay.description)}
                   </p>
+                  
+                  {/* DHSR Number */}
+                  {homestay.dhsrNo && (
+                    <div className="mb-3">
+                      <span className="inline-flex items-center text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded-full font-mono">
+                        DHSR: {homestay.dhsrNo}
+                      </span>
+                    </div>
+                  )}
                   
                   {/* Key Facilities */}
                   <div className="flex flex-wrap gap-1 mb-3">

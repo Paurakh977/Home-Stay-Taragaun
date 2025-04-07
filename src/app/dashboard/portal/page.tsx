@@ -39,6 +39,7 @@ interface HomestayData {
   status: string;
   galleryImages?: string[];
   description?: string;
+  dhsrNo?: string;
 }
 
 // Helper function to generate initials
@@ -817,6 +818,17 @@ export default function PortalPage() {
                   <p><span className="text-gray-500 font-medium">Name:</span> {homestay?.homeStayName}</p>
                   <p><span className="text-gray-500 font-medium">Village:</span> {homestay?.villageName}</p>
                   <p><span className="text-gray-500 font-medium">Type:</span> {homestay?.homeStayType === 'community' ? 'Community Homestay' : 'Private Homestay'}</p>
+                  
+                  {/* DHSR Number */}
+                  <div className="mt-2 border-t border-gray-200 pt-2">
+                    <p className="flex justify-between items-center">
+                      <span className="text-gray-500 font-medium">DHSR No:</span> 
+                      <span className="font-mono bg-primary/10 px-2 py-0.5 rounded text-primary font-medium">
+                        {homestay?.dhsrNo || 'Not Assigned'}
+                      </span>
+                    </p>
+                  </div>
+                  
                   <div className="flex gap-4 pt-1 border-t border-gray-200 mt-2">
                     <div className="text-center">
                       <span className="block text-lg font-semibold text-primary">{homestay?.homeCount}</span>

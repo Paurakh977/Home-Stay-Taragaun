@@ -15,7 +15,9 @@ import {
   MenuIcon,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  FileText,
+  Layout
 } from "lucide-react";
 
 interface UserInfo {
@@ -265,8 +267,16 @@ export default function DashboardLayout({
             className={`flex items-center ${isCollapsed ? "justify-center" : ""} px-4 py-3 rounded-md transition-colors ${isActive("/portal")}`}
             title={isCollapsed ? "Portal" : ""}
           >
-            <Upload className="h-5 w-5 min-w-5" />
+            <Layout className="h-5 w-5 min-w-5" />
             {!isCollapsed && <span className="ml-3">Portal</span>}
+          </Link>
+          <Link
+            href="/dashboard/documents"
+            className={`flex items-center ${isCollapsed ? "justify-center" : ""} px-4 py-3 rounded-md transition-colors ${isActive("/documents")}`}
+            title={isCollapsed ? "Upload Documents" : ""}
+          >
+            <FileText className="h-5 w-5 min-w-5" />
+            {!isCollapsed && <span className="ml-3">Upload Documents</span>}
           </Link>
           <Link
             href="/dashboard/update-info"
@@ -356,8 +366,16 @@ export default function DashboardLayout({
                 className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("/portal")}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                <Upload className="h-5 w-5 mr-3" />
+                <Layout className="h-5 w-5 mr-3" />
                 Portal
+              </Link>
+              <Link
+                href="/dashboard/documents"
+                className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("/documents")}`}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <FileText className="h-5 w-5 mr-3" />
+                Upload Documents
               </Link>
               <Link
                 href="/dashboard/update-info"
