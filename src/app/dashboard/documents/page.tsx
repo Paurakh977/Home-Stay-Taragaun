@@ -3,6 +3,12 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { FilePlus, Upload, X, Plus, Loader2, File, CheckCircle, Eye, Download, ExternalLink, FileText } from "lucide-react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation"; // For redirection if not authenticated
+
+interface UserInfo {
+  homestayId: string;
+  homeStayName: string;
+}
 
 interface DocumentItem {
   id: string;
@@ -12,6 +18,8 @@ interface DocumentItem {
 }
 
 export default function DocumentsPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<UserInfo | null>(null);
   const [documentItems, setDocumentItems] = useState<DocumentItem[]>([
     { id: crypto.randomUUID(), title: "", description: "", files: [] }
   ]);
@@ -21,6 +29,23 @@ export default function DocumentsPage() {
   // State for preview functionality
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ file: File; url: string } | null>(null);
+
+  // Check authentication on component mount
+  useEffect(() => {
+    const userJson = localStorage.getItem("user");
+    if (userJson) {
+      try {
+        const userData = JSON.parse(userJson);
+        setUser(userData);
+      } catch (err) {
+        console.error("Error parsing user data:", err);
+        localStorage.removeItem("user");
+        router.push("/login");
+      }
+    } else {
+      router.push("/login");
+    }
+  }, [router]);
 
   // Clean up object URLs when component unmounts
   useEffect(() => {
@@ -130,40 +155,70 @@ export default function DocumentsPage() {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check if user is logged in
+    if (!user) {
+      toast.error("Authentication required. Please log in.");
+      router.push("/login");
+      return;
+    }
+
+    // Get homestayId from the user object
+    const homestayId = user.homestayId;
     
-    // Validate form
+    // Validate form (title and files)
     const hasEmptyTitle = documentItems.some(item => !item.title.trim());
     if (hasEmptyTitle) {
       toast.error("Please provide titles for all documents");
       return;
     }
-    
+
     const hasNoFiles = documentItems.some(item => item.files.length === 0);
     if (hasNoFiles) {
-      toast.error("Please upload at least one file for each document");
+      toast.error("Please upload at least one file for each document entry");
       return;
     }
-    
+
     setIsUploading(true);
-    
+
     try {
-      // This is a placeholder for the actual upload logic
-      // In a real implementation, you would:
-      // 1. Create FormData instances
-      // 2. Send API requests to upload files and document metadata
+      const formData = new FormData();
+
+      // 1. Prepare metadata (titles and descriptions)
+      const metadata = documentItems.map(item => ({ 
+        title: item.title,
+        description: item.description 
+      }));
+      formData.append("metadata", JSON.stringify(metadata));
+
+      // 2. Append files with structured keys (file_{itemIndex}_{fileIndex})
+      documentItems.forEach((item, itemIndex) => {
+        item.files.forEach((file, fileIndex) => {
+          formData.append(`file_${itemIndex}_${fileIndex}`, file, file.name);
+        });
+      });
       
-      // Simulating API call delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      toast.success("Documents uploaded successfully");
-      
+      // 3. Send the request to the API endpoint using the retrieved homestayId
+      const response = await fetch(`/api/homestays/${homestayId}/documents`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to upload documents');
+      }
+
+      toast.success(result.message || "Documents uploaded successfully");
+
       // Reset form
       setDocumentItems([
         { id: crypto.randomUUID(), title: "", description: "", files: [] }
       ]);
     } catch (error) {
       console.error("Error uploading documents:", error);
-      toast.error("Failed to upload documents. Please try again.");
+      toast.error(`Upload failed: ${error instanceof Error ? error.message : 'Please try again.'}`);
     } finally {
       setIsUploading(false);
     }
