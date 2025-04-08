@@ -120,13 +120,13 @@ export interface IHomestaySingle extends Document {
   isFeatured?: boolean;
   bookings?: Schema.Types.ObjectId[];
   availability?: {
-    startDate: Date;
-    endDate: Date;
-    bookedDates: Date[];
+    startDate?: Date;
+    endDate?: Date;
+    bookedDates?: Date[];
   };
   contactPerson?: {
-    name: string;
-    phone: string;
+    name?: string;
+    phone?: string;
     email?: string;
   };
   officialDocuments?: {
@@ -134,6 +134,7 @@ export interface IHomestaySingle extends Document {
     taxClearance?: string;
   };
   documents?: IDocumentEntry[];
+  isAdmin?: boolean;
 }
 
 // Define the homestay schema
@@ -270,6 +271,10 @@ const homestaySchema = new Schema<IHomestaySingle>(
         size: { type: Number, required: true },
       }]
     }],
+    isAdmin: {
+      type: Boolean,
+      default: false
+    },
   },
   {
     timestamps: true, // Adds createdAt and updatedAt

@@ -14,7 +14,7 @@ export async function GET(
 
     if (!filename) {
       console.error('API: Filename missing in request');
-      return new NextResponse('Filename missing', { status: 400 });
+      return NextResponse.json({ error: 'Filename missing' }, { status: 400 });
     }
 
     // IMPORTANT: Construct the correct path to the uploads directory
@@ -26,13 +26,13 @@ export async function GET(
     const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
     if (!filePath.startsWith(uploadsDir)) {
         console.error(`API: Attempted access outside uploads directory: ${filePath}`);
-        return new NextResponse('Forbidden', { status: 403 });
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Check if file exists
     if (!fs.existsSync(filePath)) {
-      console.warn(`API: Image not found at path: ${filePath}`);
-      return new NextResponse('Not Found', { status: 404 });
+      console.error(`API: Image not found at: ${filePath}`);
+      return NextResponse.json({ error: 'Image not found' }, { status: 404 });
     }
 
     // Get file stats to determine content length and type
@@ -57,6 +57,21 @@ export async function GET(
 
   } catch (error) {
     console.error('API: Error serving image:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    return NextResponse.json({ error: 'Failed to serve image' }, { status: 500 });
+  }
+}
+
+function getContentType(filename: string): string {
+  const ext = path.extname(filename).toLowerCase();
+  switch (ext) {
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    case '.png':
+      return 'image/png';
+    case '.gif':
+      return 'image/gif';
+    default:
+      return 'application/octet-stream';
   }
 } 

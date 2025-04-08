@@ -47,7 +47,8 @@ export async function POST(request: NextRequest) {
       { 
         homestayId: homestay.homestayId,
         id: homestay._id.toString(),
-        homeStayName: homestay.homeStayName
+        homeStayName: homestay.homeStayName,
+        isAdmin: homestay.isAdmin
       },
       JWT_SECRET,
       { expiresIn: '7d' } // Token valid for 7 days
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest) {
         user: {
           homestayId: homestay.homestayId,
           homeStayName: homestay.homeStayName,
+          isAdmin: homestay.isAdmin
         }
       },
       { status: 200 }
