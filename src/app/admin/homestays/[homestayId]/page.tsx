@@ -242,15 +242,19 @@ export default function AdminHomestayDetailPage({ params: paramsPromise }: PageP
   };
   // --- Helper Functions ---
   const getImageUrl = (filePath?: string) => {
-    if (!filePath) return '/placeholder.png'; // Provide a placeholder image path
-    // Adjust base URL if images are served from a specific path or CDN
-    return filePath.startsWith('http') || filePath.startsWith('/') ? filePath : `/${filePath}`;
+    if (!filePath) return '/placeholder.png';
+    // Convert /uploads/ path to /api/images/ path
+    return filePath.startsWith('/uploads/') 
+      ? filePath.replace('/uploads/', '/api/images/')
+      : filePath;
   };
 
   const getDocumentUrl = (filePath?: string) => {
     if (!filePath) return '#';
-    // Adjust base URL if documents are served from a specific path or CDN
-    return filePath.startsWith('http') || filePath.startsWith('/') ? filePath : `/${filePath}`;
+    // Convert /uploads/ path to /api/images/ path
+    return filePath.startsWith('/uploads/') 
+      ? filePath.replace('/uploads/', '/api/images/')
+      : filePath;
   };
   
   // formatAddress helper might not be needed if using direct fields

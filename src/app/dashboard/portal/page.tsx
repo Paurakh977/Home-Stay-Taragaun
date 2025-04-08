@@ -513,15 +513,64 @@ export default function PortalPage() {
     return null; // Return null if gallery image is invalid and not a profile placeholder
   };
 
-  // Ensure the modal also uses the API path
+  // Update the image URL handling
+  const getImageUrl = (filePath?: string) => {
+    if (!filePath) return '/placeholder.png';
+    // Convert /uploads/ path to /api/images/ path
+    return filePath.startsWith('/uploads/') 
+      ? filePath.replace('/uploads/', '/api/images/')
+      : filePath;
+  };
+
+  // Update the image preview handling
   const openPreview = (imageSrc: string | null) => {
     if (imageSrc && typeof imageSrc === 'string' && imageSrc.trim() !== '') {
-        // Expecting an API URL like /api/images/filename.jpg?t=...
-        setPreviewImage(imageSrc);
+      // Convert to API URL if needed
+      const apiUrl = imageSrc.startsWith('/uploads/') 
+        ? imageSrc.replace('/uploads/', '/api/images/')
+        : imageSrc;
+      setPreviewImage(apiUrl);
     } else {
-        setPreviewImage(null);
+      setPreviewImage(null);
     }
   };
+
+  // Add auto-refresh functionality
+  useEffect(() => {
+    const fetchHomestayData = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/homestays/${user?.homestayId}`);
+        
+        if (!response.ok) throw new Error('Failed to fetch homestay data');
+        
+        const data = await response.json();
+        setHomestay(data.homestay);
+        setDescription(data.homestay.description || "");
+        setGalleryImages(data.homestay.galleryImages || []);
+        
+      } catch (err) {
+        console.error('Error fetching homestay data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Initial fetch
+    if (user?.homestayId) {
+      fetchHomestayData();
+    }
+
+    // Set up polling every 30 seconds
+    const interval = setInterval(() => {
+      if (user?.homestayId) {
+        fetchHomestayData();
+      }
+    }, 30000);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
+  }, [user?.homestayId]);
 
   if (loading) {
     return (
