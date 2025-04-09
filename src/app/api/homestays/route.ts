@@ -179,7 +179,7 @@ export async function GET(req: NextRequest) {
     }
     
     // Status should always be approved for public API
-    // filter.status = "approved";  // Commenting out the status filter to show all homestays
+    filter.status = "approved";  // Commenting out the status filter to show all homestays
     
     // Calculate pagination
     const skip = (page - 1) * limit;
