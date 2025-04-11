@@ -19,6 +19,11 @@ const Navbar = () => {
   const pathname = usePathname();
   const router = useRouter();
 
+  // Prevent Navbar rendering on superadmin pages
+  if (pathname.startsWith('/superadmin')) {
+    return null;
+  }
+
   // Check authentication status when component mounts and pathname changes
   useEffect(() => {
     const checkAuth = () => {
