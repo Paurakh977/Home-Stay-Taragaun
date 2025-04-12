@@ -44,6 +44,10 @@ interface ProfileData {
   profileImage: string | null;
 }
 
+interface ProfilePageProps {
+  adminUsername?: string;
+}
+
 // Helper function to generate initials
 const getInitials = (name: string): string => {
   if (!name) return "?";
@@ -55,7 +59,7 @@ const getInitials = (name: string): string => {
   return (firstInitial + lastInitial).toUpperCase();
 };
 
-export default function ProfilePage() {
+export default function ProfilePage({ adminUsername }: ProfilePageProps) {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,24 +83,28 @@ export default function ProfilePage() {
       } catch (err) {
         console.error("Error parsing user data:", err);
         localStorage.removeItem("user");
-        router.push("/login");
+        router.push(adminUsername ? `/${adminUsername}/login` : "/login");
       }
     } else {
-      router.push("/login");
+      router.push(adminUsername ? `/${adminUsername}/login` : "/login");
     }
-  }, [router]);
+  }, [router, adminUsername]);
   
   // Fetch homestay data from API
   const fetchHomestayData = async (homestayId: string) => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/homestays/${homestayId}`);
+      const apiUrl = adminUsername 
+        ? `/api/homestays/${homestayId}?adminUsername=${adminUsername}`
+        : `/api/homestays/${homestayId}`;
+        
+      const response = await fetch(apiUrl);
       
       if (!response.ok) {
         console.error("Failed to fetch homestay data:", response.status);
         // User doesn't exist in the database anymore
         localStorage.removeItem("user");
-        router.push("/login");
+        router.push(adminUsername ? `/${adminUsername}/login` : "/login");
         return;
       }
       
@@ -105,7 +113,7 @@ export default function ProfilePage() {
       if (!data.homestay) {
         console.error("Homestay data not found");
         localStorage.removeItem("user");
-        router.push("/login");
+        router.push(adminUsername ? `/${adminUsername}/login` : "/login");
         return;
       }
       
@@ -133,7 +141,7 @@ export default function ProfilePage() {
       setLoading(false);
       // On severe errors, log the user out
       localStorage.removeItem("user");
-      router.push("/login");
+      router.push(adminUsername ? `/${adminUsername}/login` : "/login");
     }
   };
   
@@ -160,8 +168,13 @@ export default function ProfilePage() {
       // Upload the image to the server
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("type", "profile"); // Explicitly mark this as a profile image
       
-      const response = await fetch(`/api/homestays/${user.homestayId}/upload`, {
+      const uploadUrl = adminUsername 
+        ? `/api/homestays/${user.homestayId}/images?adminUsername=${adminUsername}`
+        : `/api/homestays/${user.homestayId}/images`;
+        
+      const response = await fetch(uploadUrl, {
         method: 'POST',
         body: formData
       });
@@ -306,40 +319,47 @@ export default function ProfilePage() {
             />
           );
       }
-      // It's an uploaded path, use the API route
-      // Convert /uploads/[...] path to /api/images/[...] path
-      const apiUrl = currentImage.replace('/uploads/', '/api/images/') + `?t=${new Date().getTime()}`;
-      console.log("[Profile] Rendering profile image via API src:", apiUrl);
-      return (
-        <img 
-          src={apiUrl} 
-          alt={currentName} 
-          className={`rounded-full ${sizeClasses} object-cover`}
-          onError={(e) => {
-            console.warn(`[Profile] Failed to load profile image via API: ${apiUrl}`);
-            // Fallback logic remains
-            const target = e.currentTarget;
-            const parent = target.parentElement;
-            if (parent) {
-              const initials = getInitials(currentName);
-              const placeholder = document.createElement('div');
-              placeholder.className = `rounded-full ${sizeClasses} bg-gray-100 flex items-center justify-center text-gray-400 font-semibold ${initialsSizeClasses}`;
-              placeholder.textContent = initials;
-              parent.replaceChild(placeholder, target);
-            }
-          }}
-        />
-      );
-    } else {
-      // Render initials placeholder if no valid image or preview
-      console.log("[Profile] Rendering initials, profileImage was:", profileImage);
-      const initials = getInitials(currentName);
-      return (
-        <div className={`rounded-full ${sizeClasses} bg-gray-100 flex items-center justify-center text-gray-400 font-semibold ${initialsSizeClasses}`}>
-          {initials}
-        </div>
-      );
+      
+      // For uploaded images, convert the path properly
+      // The image path should be in format: /uploads/[...path]
+      if (currentImage.startsWith('/uploads/')) {
+        // Replace /uploads/ prefix with /api/images/ to use the image serving API
+        const apiImagePath = currentImage.replace('/uploads/', '/api/images/');
+        // Add cache-busting timestamp parameter
+        const apiUrl = `${apiImagePath}?t=${new Date().getTime()}`;
+        
+        console.log("[Profile] Rendering profile image via API src:", apiUrl);
+        return (
+          <img 
+            src={apiUrl} 
+            alt={currentName} 
+            className={`rounded-full ${sizeClasses} object-cover`}
+            onError={(e) => {
+              console.error(`[Profile] Failed to load profile image: ${apiUrl}`);
+              // Fallback to initials on error
+              const target = e.currentTarget;
+              const parent = target.parentElement;
+              if (parent) {
+                const initials = getInitials(currentName);
+                const placeholder = document.createElement('div');
+                placeholder.className = `rounded-full ${sizeClasses} bg-gray-100 flex items-center justify-center text-gray-400 font-semibold ${initialsSizeClasses}`;
+                placeholder.textContent = initials;
+                parent.replaceChild(placeholder, target);
+              }
+            }}
+          />
+        );
+      }
     }
+    
+    // Render initials placeholder if no valid image or preview
+    console.log("[Profile] Rendering initials, profileImage was:", profileImage);
+    const initials = getInitials(currentName);
+    return (
+      <div className={`rounded-full ${sizeClasses} bg-gray-100 flex items-center justify-center text-gray-400 font-semibold ${initialsSizeClasses}`}>
+        {initials}
+      </div>
+    );
   };
   
   if (loading) {

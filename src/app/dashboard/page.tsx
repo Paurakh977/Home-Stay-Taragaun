@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { HomeIcon, Building2Icon, CalendarIcon, MapPinIcon, UserIcon, ClipboardCheckIcon } from "lucide-react";
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { HomeIcon, Building2Icon, CalendarIcon, MapPinIcon, UserIcon, ClipboardCheckIcon } from 'lucide-react';
 
 interface HomeStay {
   _id: string;
@@ -22,7 +22,11 @@ interface UserInfo {
   homeStayName: string;
 }
 
-export default function DashboardPage() {
+interface DashboardPageProps {
+  adminUsername?: string;
+}
+
+export default function DashboardPage({ adminUsername }: DashboardPageProps) {
   const [homestays, setHomestays] = useState<HomeStay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,17 +42,35 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchHomestays = async () => {
       try {
+        // Check if user is logged in first
+        const userJson = localStorage.getItem('user');
+        if (!userJson) {
+          router.push(adminUsername ? `/${adminUsername}/login` : '/login');
+          return;
+        }
+
         setLoading(true);
         setError(null);
         
-        const response = await fetch(`/api/homestays?limit=5`);
+        const user = JSON.parse(userJson);
+        // Build API URL with adminUsername if available
+        const apiUrl = adminUsername 
+          ? `/api/homestays?limit=5&adminUsername=${adminUsername}`
+          : `/api/homestays?limit=5`;
+          
+        const response = await fetch(apiUrl);
         
         if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            localStorage.removeItem('user');
+            router.push(adminUsername ? `/${adminUsername}/login` : '/login');
+            return;
+          }
           throw new Error('Failed to fetch homestays');
         }
         
         const data = await response.json();
-        setHomestays(data.data.slice(0, 5)); // Only take first 5
+        setHomestays(data.data?.slice(0, 5) || []); // Only take first 5
         
         // Set mock stats (would come from real API in production)
         setStats({
@@ -66,7 +88,7 @@ export default function DashboardPage() {
     };
     
     fetchHomestays();
-  }, []);
+  }, [router, adminUsername]);
   
   // Format date
   const formatDate = (dateString: string) => {
@@ -182,7 +204,7 @@ export default function DashboardPage() {
               <Building2Icon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No homestays found</h3>
             <p className="text-gray-600 mb-4">No homestays have been registered yet.</p>
-            <Link href="/register">
+            <Link href={adminUsername ? `/${adminUsername}/register` : "/register"}>
               <button className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark transition">
                 Register a Homestay
               </button>
@@ -239,7 +261,7 @@ export default function DashboardPage() {
                         {formatDate(homestay.createdAt)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link href={`/dashboard/homestays/${homestay._id}`}>
+                        <Link href={adminUsername ? `/${adminUsername}/dashboard/homestays/${homestay._id}` : `/dashboard/homestays/${homestay._id}`}>
                           <span className="text-primary hover:text-primary-dark">View</span>
                         </Link>
                       </td>
@@ -252,7 +274,7 @@ export default function DashboardPage() {
           
           {homestays.length > 0 && (
             <div className="mt-4 text-right">
-              <Link href="/dashboard/homestays">
+              <Link href={adminUsername ? `/${adminUsername}/dashboard/homestays` : "/dashboard/homestays"}>
                 <span className="text-primary hover:text-primary-dark text-sm font-medium">
                   View all homestays →
                 </span>
@@ -261,7 +283,7 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
-      
+
       {/* Quick Links */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
@@ -269,7 +291,7 @@ export default function DashboardPage() {
         </div>
         <div className="px-6 py-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Link href="/dashboard/profile">
+            <Link href={adminUsername ? `/${adminUsername}/dashboard/profile` : "/dashboard/profile"}>
               <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
                 <div className="flex items-center">
                   <div className="p-2 bg-primary/10 rounded-md">
@@ -283,7 +305,7 @@ export default function DashboardPage() {
               </div>
             </Link>
             
-            <Link href="/dashboard/update-info">
+            <Link href={adminUsername ? `/${adminUsername}/dashboard/update-info` : "/dashboard/update-info"}>
               <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
                 <div className="flex items-center">
                   <div className="p-2 bg-green-100 rounded-md">
@@ -297,7 +319,7 @@ export default function DashboardPage() {
               </div>
             </Link>
             
-            <Link href="/dashboard/settings">
+            <Link href={adminUsername ? `/${adminUsername}/dashboard/settings` : "/dashboard/settings"}>
               <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
                 <div className="flex items-center">
                   <div className="p-2 bg-blue-100 rounded-md">
@@ -317,4 +339,4 @@ export default function DashboardPage() {
       </div>
     </div>
   );
-} 
+}

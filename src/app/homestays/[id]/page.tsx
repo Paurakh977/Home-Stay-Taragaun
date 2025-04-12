@@ -70,6 +70,43 @@ const getInitials = (name: string): string => {
   return (firstInitial + lastInitial).toUpperCase();
 };
 
+// Add helper function for constructing image URLs with adminContext support
+const getApiImageUrl = (
+  imagePath: string, 
+  homestayId: string, 
+  adminContext?: string | null
+): string => {
+  // Add cache-busting timestamp
+  const timestamp = `?t=${new Date().getTime()}`;
+  
+  let result = '';
+  
+  if (!imagePath) {
+    console.error('No image path provided to getApiImageUrl');
+    return '/images/placeholder-homestay.jpg';
+  }
+  
+  if (imagePath.startsWith('/uploads/')) {
+    // The image path in the database is like /uploads/admin1/homestayId/gallery/image.jpg
+    // We need to make it /api/images/admin1/homestayId/gallery/image.jpg
+    
+    // Just replace /uploads/ with /api/images/
+    result = imagePath.replace('/uploads/', '/api/images/') + timestamp;
+  } else {
+    // For direct API paths or other URLs
+    result = `${imagePath}${timestamp}`;
+  }
+  
+  console.log('Generated image URL:', {
+    originalPath: imagePath,
+    homestayId,
+    adminContext,
+    result
+  });
+  
+  return result;
+};
+
 export default function HomestayPortalPage() {
   const params = useParams();
   const homestayId = params.id as string;
@@ -90,13 +127,48 @@ export default function HomestayPortalPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`/api/homestays/${homestayId}`);
+        
+        // Extract and validate homestayId from params
+        const currentHomestayId = params.id;
+        
+        if (!currentHomestayId || currentHomestayId === 'undefined') {
+          console.error("Invalid homestayId parameter:", currentHomestayId);
+          setError("Invalid homestay ID provided. Please check the URL and try again.");
+          setLoading(false);
+          return;
+        }
+        
+        // Get URL params - we might be coming from an admin route
+        const urlParams = new URLSearchParams(window.location.search);
+        const adminContext = urlParams.get('adminContext');
+        
+        let apiUrl = `/api/homestays/${currentHomestayId}`;
+        if (adminContext) {
+          apiUrl += `?adminUsername=${adminContext}`;
+        }
+        
+        console.log(`Fetching homestay data from: ${apiUrl}`);
+        const response = await fetch(apiUrl);
         
         if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Failed to fetch homestay data: Status ${response.status} - ${errorText}`);
           throw new Error('Failed to fetch homestay data');
         }
         
         const data = await response.json();
+        
+        if (!data || !data.homestay) {
+          console.error("Invalid homestay data received:", data);
+          throw new Error('Invalid homestay data received');
+        }
+        
+        console.log("Successfully fetched homestay:", data.homestay.homestayId);
+        
+        // Log image paths for debugging
+        console.log("Profile image path:", data.homestay.profileImage);
+        console.log("Gallery image paths:", data.homestay.galleryImages);
+        
         setHomestay(data.homestay);
         setOfficials(data.officials || []);
         setContacts(data.contacts || []);
@@ -109,7 +181,7 @@ export default function HomestayPortalPage() {
     };
     
     fetchData();
-  }, [homestayId]);
+  }, [homestayId, params.id]);
   
   // Prepare gallery images excluding profile image
   const galleryImages = homestay ? (homestay.galleryImages || []) : [];
@@ -191,9 +263,6 @@ export default function HomestayPortalPage() {
             {galleryImages.length > 0 ? (
               <>
                 {galleryImages.map((imagePath, index) => {
-                  const filename = imagePath.split('/').pop();
-                  if (!filename) return null;
-                  const apiUrl = `/api/images/${homestayId}/gallery/${filename}?t=${new Date().getTime()}`;
                   return (
                     <div
                       key={index}
@@ -204,10 +273,10 @@ export default function HomestayPortalPage() {
                     >
                       <div className="absolute inset-0 bg-black/20 z-10"></div>
                       <img 
-                        src={apiUrl}
+                        src={getApiImageUrl(imagePath, params.id, new URLSearchParams(window.location.search).get('adminContext'))}
                         alt={`${homestay.homeStayName} - Photo ${index + 1}`} 
                         className="w-full h-full object-cover"
-                        onError={(e) => { console.warn(`[Public Slider] Failed to load image via API: ${apiUrl}`); }}
+                        onError={(e) => { console.warn(`[Public Slider] Failed to load image: ${(e.target as HTMLImageElement).src}`); }}
                       />
                     </div>
                   );
@@ -296,36 +365,19 @@ export default function HomestayPortalPage() {
                 {/* Profile Image or Initials */}
                 <div className="w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden border-2 border-primary flex-shrink-0 bg-primary/10 flex items-center justify-center">
                   {homestay.profileImage ? (
-                    () => { // Use a function to handle logic
-                      // Convert /uploads/[...] path to /api/images/[...] path
-                      const apiUrl = homestay.profileImage.replace('/uploads/', '/api/images/') + `?t=${new Date().getTime()}`;
-                      console.log(`[Public Page] Rendering profile image via API: ${apiUrl}`);
-                      return (
-                        <img 
-                          src={apiUrl} 
-                          alt={`${homestay.homeStayName} profile`} 
-                          className="w-full h-full object-cover"
-                          onError={(e) => { 
-                            console.warn(`[Public Page] Failed to load public profile image via API: ${apiUrl}`); 
-                            // Hide image and show initials on error
-                            const target = e.currentTarget;
-                            const parent = target.parentElement;
-                            if (parent) {
-                                target.style.display = 'none'; // Hide broken image
-                                const placeholder = document.createElement('span');
-                                placeholder.className = "text-2xl md:text-3xl font-bold text-primary";
-                                placeholder.textContent = profileInitials;
-                                // Check if placeholder already added
-                                if (!parent.querySelector('.initials-placeholder')) {
-                                     placeholder.classList.add('initials-placeholder');
-                                     parent.appendChild(placeholder);
-                                }
-                            }
-                           }} 
-                        />
-                      );
-                    }
-                  )() : (
+                    <Image
+                      src={getApiImageUrl(homestay.profileImage, params.id, new URLSearchParams(window.location.search).get('adminContext'))}
+                      alt="Profile"
+                      width={80}
+                      height={80}
+                      className="object-cover w-full h-full rounded-xl"
+                      loading="lazy"
+                      onError={(e) => {
+                        console.error("Failed to load profile image:", e);
+                        e.currentTarget.src = '/images/placeholder-homestay.jpg';
+                      }}
+                    />
+                  ) : (
                     <span className="text-2xl md:text-3xl font-bold text-primary">
                       {profileInitials} 
                     </span>
@@ -518,20 +570,19 @@ export default function HomestayPortalPage() {
                 <h2 className="text-xl font-semibold mb-4 pb-2 border-b border-gray-100">Photo Gallery</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
                   {galleryImages.map((imagePath, index) => {
-                    const filename = imagePath.split('/').pop();
-                    if (!filename) return null; // Filter out invalid paths
-                    const apiUrl = `/api/images/${homestayId}/gallery/${filename}?t=${new Date().getTime()}`;
                     return (
                       <div 
                         key={index}
-                        className="relative aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity group"
+                        className="relative overflow-hidden rounded-lg shadow-md cursor-pointer h-44"
                         onClick={() => openFullscreenViewer(index)}
                       >
-                        <img 
-                          src={apiUrl}
-                          alt={`${homestay.homeStayName} - Gallery ${index + 1}`} 
+                        <Image
+                          src={getApiImageUrl(imagePath, params.id, new URLSearchParams(window.location.search).get('adminContext'))}
+                          alt={`Gallery ${index + 1}`}
+                          width={176}
+                          height={176}
                           className="w-full h-full object-cover"
-                          onError={(e) => { console.warn(`[Public Grid] Failed to load image via API: ${apiUrl}`); }}
+                          onError={(e) => { console.warn(`[Public Grid] Failed to load image: ${(e.target as HTMLImageElement).src}`); }}
                         />
                         <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <span className="text-white bg-black/50 px-2 py-1 rounded-md text-sm">View</span>
@@ -702,15 +753,15 @@ export default function HomestayPortalPage() {
       )}
       
       {/* Fullscreen Image Viewer */}
-      {showFullImage && galleryImages.length > 0 && (() => { // Ensure galleryImages exists
+      {showFullImage && galleryImages.length > 0 && (() => {
         const currentImagePath = galleryImages[currentSlide];
-        const currentFilename = currentImagePath?.split('/').pop();
-        if (!currentFilename) {
-          console.error("Error: Could not get filename for fullscreen image");
-          setShowFullImage(false); // Close viewer if path is invalid
+        if (!currentImagePath) {
+          console.error("Error: Invalid image path for fullscreen");
+          setShowFullImage(false);
           return null;
         }
-        const currentApiUrl = `/api/images/${homestayId}/gallery/${currentFilename}?t=${new Date().getTime()}`;
+        
+        const currentApiUrl = getApiImageUrl(currentImagePath, params.id, new URLSearchParams(window.location.search).get('adminContext'));
 
         return (
           <div 
@@ -728,7 +779,10 @@ export default function HomestayPortalPage() {
               src={currentApiUrl} 
               alt={`${homestay.homeStayName} - Photo ${currentSlide + 1}`} 
               className="max-h-[90vh] max-w-[90vw] object-contain"
-              onError={(e) => { console.error(`[Fullscreen Viewer] Failed to load image via API: ${currentApiUrl}`); setShowFullImage(false); }}
+              onError={(e) => { 
+                console.error(`[Fullscreen Viewer] Failed to load image: ${(e.target as HTMLImageElement).src}`); 
+                setShowFullImage(false); 
+              }}
             />
             
             <button 
@@ -750,7 +804,7 @@ export default function HomestayPortalPage() {
               {galleryImages.map((thumbPath, index) => {
                 const thumbFilename = thumbPath.split('/').pop();
                 if (!thumbFilename) return null;
-                const thumbApiUrl = `/api/images/${homestayId}/gallery/${thumbFilename}?t=${new Date().getTime()}`;
+                const thumbApiUrl = getApiImageUrl(thumbPath, params.id, new URLSearchParams(window.location.search).get('adminContext'));
                 return (
                   <div 
                     key={index} 
@@ -766,7 +820,7 @@ export default function HomestayPortalPage() {
                       src={thumbApiUrl} 
                       alt={`Thumbnail ${index + 1}`} 
                       className="h-full w-full object-cover"
-                      onError={(e) => { console.warn(`[Fullscreen Thumb] Failed to load image via API: ${thumbApiUrl}`); }}
+                      onError={(e) => { console.warn(`[Fullscreen Thumb] Failed to load image: ${(e.target as HTMLImageElement).src}`); }}
                     />
                   </div>
                 );

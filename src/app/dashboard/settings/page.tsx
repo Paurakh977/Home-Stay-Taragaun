@@ -9,7 +9,11 @@ interface UserInfo {
   homeStayName: string;
 }
 
-export default function SettingsPage() {
+interface SettingsPageProps {
+  adminUsername?: string;
+}
+
+export default function SettingsPage({ adminUsername }: SettingsPageProps) {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,12 +41,12 @@ export default function SettingsPage() {
         setLoading(false);
       } catch (err) {
         console.error("Error parsing user data:", err);
-        router.push("/login");
+        router.push(adminUsername ? `/${adminUsername}/login` : "/login");
       }
     } else {
-      router.push("/login");
+      router.push(adminUsername ? `/${adminUsername}/login` : "/login");
     }
-  }, [router]);
+  }, [router, adminUsername]);
   
   // Handle password change
   const handleChangePassword = async (e: FormEvent) => {
@@ -72,7 +76,11 @@ export default function SettingsPage() {
       setSubmitLoading(true);
       
       // Call the change password API
-      const response = await fetch("/api/auth/change-password", {
+      const apiUrl = adminUsername 
+        ? `/api/auth/change-password?adminUsername=${adminUsername}`
+        : `/api/auth/change-password`;
+        
+      const response = await fetch(apiUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

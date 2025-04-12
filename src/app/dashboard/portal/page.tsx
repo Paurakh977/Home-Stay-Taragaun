@@ -42,6 +42,11 @@ interface HomestayData {
   dhsrNo?: string;
 }
 
+// Add adminUsername to the props interface
+interface PortalPageProps {
+  adminUsername?: string;
+}
+
 // Helper function to generate initials
 const getInitials = (name: string): string => {
   if (!name) return "?";
@@ -53,7 +58,7 @@ const getInitials = (name: string): string => {
   return (firstInitial + lastInitial).toUpperCase();
 };
 
-export default function PortalPage() {
+export default function PortalPage({ adminUsername }: PortalPageProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [user, setUser] = useState<UserInfo | null>(null);
@@ -70,50 +75,30 @@ export default function PortalPage() {
   const sliderInterval = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
 
-  // Load user data and homestay information
+  // Load user data and profile info
   useEffect(() => {
     const userJson = localStorage.getItem("user");
     if (userJson) {
       try {
         const userData = JSON.parse(userJson);
         setUser(userData);
+        // After setting user data from local storage, fetch homestay data
         fetchHomestayData(userData.homestayId);
       } catch (err) {
         console.error("Error parsing user data:", err);
-        router.push("/login");
+        localStorage.removeItem("user");
+        router.push(adminUsername ? `/${adminUsername}/login` : "/login");
       }
     } else {
-      router.push("/login");
+      router.push(adminUsername ? `/${adminUsername}/login` : "/login");
     }
-  }, [router]);
-
-  // Auto-slide functionality
-  useEffect(() => {
-    const allValidDisplayImages = [
-      ...(homestay?.profileImage ? [homestay.profileImage] : []),
-      ...galleryImages,
-    ].filter(img => typeof img === 'string' && img.trim().startsWith('/uploads/'));
-    
-    if (autoSlide && allValidDisplayImages.length > 1) {
-      sliderInterval.current = setInterval(() => {
-        setCurrentSlide(prev => (prev === allValidDisplayImages.length - 1 ? 0 : prev + 1));
-      }, 5000);
-    } else if (sliderInterval.current) {
-      clearInterval(sliderInterval.current);
-    }
-
-    return () => {
-      if (sliderInterval.current) {
-        clearInterval(sliderInterval.current);
-      }
-    };
-  }, [autoSlide, homestay?.profileImage, galleryImages, currentSlide]);
+  }, [router, adminUsername]);
 
   // Fetch homestay data
   const fetchHomestayData = async (homestayId: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/homestays/${homestayId}`);
+      const response = await fetch(`/api/homestays/${homestayId}?adminUsername=${adminUsername || ''}`);
       
       if (!response.ok) throw new Error('Failed to fetch homestay data');
       
@@ -140,6 +125,23 @@ export default function PortalPage() {
   const currentSlideIndex = validGalleryImages.length > 0 ? currentSlide % validGalleryImages.length : 0;
   const currentImageSrc = validGalleryImages.length > 0 ? validGalleryImages[currentSlideIndex] : null;
 
+  // Auto-slide functionality - moved after validGalleryImages definition
+  useEffect(() => {
+    if (validGalleryImages.length > 1 && autoSlide) {
+      sliderInterval.current = setInterval(() => {
+        setCurrentSlide(prev => (prev === validGalleryImages.length - 1 ? 0 : prev + 1));
+      }, 5000);
+    } else if (sliderInterval.current) {
+      clearInterval(sliderInterval.current);
+    }
+
+    return () => {
+      if (sliderInterval.current) {
+        clearInterval(sliderInterval.current);
+      }
+    };
+  }, [autoSlide, validGalleryImages, currentSlide]);
+
   // Profile image handling is separate now
   const validProfileImage = homestay?.profileImage && typeof homestay.profileImage === 'string' && homestay.profileImage.trim() !== '' ? homestay.profileImage : null;
 
@@ -158,7 +160,11 @@ export default function PortalPage() {
       formData.append('image', file);
       formData.append('type', 'profile');
       
-      const response = await fetch(`/api/homestays/${user.homestayId}/images`, {
+      const uploadUrl = adminUsername 
+        ? `/api/homestays/${user.homestayId}/images?adminUsername=${adminUsername}`
+        : `/api/homestays/${user.homestayId}/images`;
+      
+      const response = await fetch(uploadUrl, {
         method: 'POST',
         body: formData,
       });
@@ -195,7 +201,11 @@ export default function PortalPage() {
       setGalleryImages(updatedImages);
       
       // Call the DELETE endpoint to remove the image
-      const response = await fetch(`/api/homestays/${user.homestayId}/images?imagePath=${encodeURIComponent(imageUrlToRemove)}`, {
+      const deleteUrl = adminUsername 
+        ? `/api/homestays/${user.homestayId}/images?imagePath=${encodeURIComponent(imageUrlToRemove)}&adminUsername=${adminUsername}`
+        : `/api/homestays/${user.homestayId}/images?imagePath=${encodeURIComponent(imageUrlToRemove)}`;
+      
+      const response = await fetch(deleteUrl, {
         method: 'DELETE'
       });
       
@@ -229,7 +239,11 @@ export default function PortalPage() {
       const formData = new FormData();
       formData.append('file', file);
       
-      const response = await fetch(`/api/homestays/${user.homestayId}/images`, {
+      const uploadUrl = adminUsername 
+        ? `/api/homestays/${user.homestayId}/images?adminUsername=${adminUsername}`
+        : `/api/homestays/${user.homestayId}/images`;
+      
+      const response = await fetch(uploadUrl, {
         method: 'POST',
         body: formData,
       });
@@ -279,7 +293,11 @@ export default function PortalPage() {
         const formData = new FormData();
         formData.append('file', file);
         
-        return fetch(`/api/homestays/${user.homestayId}/images`, {
+        const uploadUrl = adminUsername 
+          ? `/api/homestays/${user.homestayId}/images?adminUsername=${adminUsername}`
+          : `/api/homestays/${user.homestayId}/images`;
+          
+        return fetch(uploadUrl, {
           method: 'POST',
           body: formData,
         })
@@ -335,61 +353,57 @@ export default function PortalPage() {
 
   // Navigate slider
   const nextSlide = () => {
-    const allValidDisplayImages = [
-      ...(homestay?.profileImage ? [homestay.profileImage] : []),
-      ...galleryImages,
-    ].filter(img => typeof img === 'string' && img.trim().startsWith('/uploads/'));
-    if (allValidDisplayImages.length === 0) return;
-    setCurrentSlide((prev) => (prev === allValidDisplayImages.length - 1 ? 0 : prev + 1));
+    if (validGalleryImages.length === 0) return;
+    setCurrentSlide((prev) => (prev === validGalleryImages.length - 1 ? 0 : prev + 1));
   };
   
   const prevSlide = () => {
-    const allValidDisplayImages = [
-      ...(homestay?.profileImage ? [homestay.profileImage] : []),
-      ...galleryImages,
-    ].filter(img => typeof img === 'string' && img.trim().startsWith('/uploads/'));
-    if (allValidDisplayImages.length === 0) return;
-    setCurrentSlide((prev) => (prev === 0 ? allValidDisplayImages.length - 1 : prev - 1));
+    if (validGalleryImages.length === 0) return;
+    setCurrentSlide((prev) => (prev === 0 ? validGalleryImages.length - 1 : prev - 1));
   };
 
   // Refactored Save function to be called directly
   const savePortalData = async (currentDescription: string, currentGalleryImages: string[]) => {
-      if (!user) {
-          console.error("Save failed: User not available");
-          toast.error("Save failed: User not available");
-          return; 
-      }
-    
-      setSaving(true);
-      try {
-      const response = await fetch(`/api/homestays/${user.homestayId}`, {
+    if (!user) {
+      console.error("Save failed: User not available");
+      toast.error("Save failed: User not available");
+      return; 
+    }
+
+    setSaving(true);
+    try {
+      const saveUrl = adminUsername 
+        ? `/api/homestays/${user.homestayId}?adminUsername=${adminUsername}`
+        : `/api/homestays/${user.homestayId}`;
+      
+      const response = await fetch(saveUrl, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-                  description: currentDescription,       // Use passed description
-                  galleryImages: currentGalleryImages, // Use passed gallery images
+          description: currentDescription,
+          galleryImages: currentGalleryImages,
         }),
       });
       
-          if (!response.ok) {
-              const errorData = await response.json();
-              throw new Error(errorData.error || 'Failed to update homestay portal');
-          }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update homestay portal');
+      }
 
-          // Update local state with the saved data if needed (optional, as we updated state before saving)
-          const savedData = await response.json();
-          if (savedData.success && savedData.homestay) {
-              // Optional: Synchronize state precisely with server response
-              // setDescription(savedData.homestay.description || "");
-              // setGalleryImages(savedData.homestay.galleryImages || []);
-              toast.success("Changes saved successfully");
-          } 
-          
-          setIsEditingDescription(false); // Ensure edit mode is off
-          // No need to call fetchHomestayData here as we already updated the state optimistically
+      // Update local state with the saved data if needed (optional, as we updated state before saving)
+      const savedData = await response.json();
+      if (savedData.success && savedData.homestay) {
+        // Optional: Synchronize state precisely with server response
+        // setDescription(savedData.homestay.description || "");
+        // setGalleryImages(savedData.homestay.galleryImages || []);
+        toast.success("Changes saved successfully");
+      } 
       
+      setIsEditingDescription(false); // Ensure edit mode is off
+      // No need to call fetchHomestayData here as we already updated the state optimistically
+    
     } catch (err) {
       console.error('Error updating homestay portal:', err);
       toast.error("Failed to save changes");
@@ -540,7 +554,7 @@ export default function PortalPage() {
     const fetchHomestayData = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`/api/homestays/${user?.homestayId}`);
+        const response = await fetch(`/api/homestays/${user?.homestayId}?adminUsername=${adminUsername || ''}`);
         
         if (!response.ok) throw new Error('Failed to fetch homestay data');
         
@@ -570,7 +584,7 @@ export default function PortalPage() {
 
     // Cleanup interval on unmount
     return () => clearInterval(interval);
-  }, [user?.homestayId]);
+  }, [user?.homestayId, adminUsername]);
 
   if (loading) {
     return (
@@ -601,7 +615,21 @@ export default function PortalPage() {
         {homestay && (
           <div className="flex flex-wrap gap-4">
             <Link 
-              href={`/homestays/${homestay.homestayId}`}
+              href={adminUsername 
+                ? `/${adminUsername}/homestays/${homestay.homestayId}`
+                : `/homestays/${homestay.homestayId}`
+              }
+              onClick={(e) => {
+                // Validate the homestayId before allowing the navigation
+                if (!homestay.homestayId || homestay.homestayId === 'undefined') {
+                  e.preventDefault();
+                  console.error("Invalid homestayId parameter:", homestay.homestayId);
+                  toast.error("Error: Invalid homestay ID");
+                  // Don't navigate
+                  return false;
+                }
+                console.log("Navigating to public portal for homestay:", homestay.homestayId);
+              }}
               target="_blank"
               className="inline-flex items-center px-5 py-2.5 bg-white border border-primary text-primary font-medium rounded-md hover:bg-primary hover:text-white transition-colors shadow-sm"
             >

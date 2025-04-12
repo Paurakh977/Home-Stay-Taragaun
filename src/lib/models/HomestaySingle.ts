@@ -44,6 +44,7 @@ export interface IHomestaySingle extends Document {
   homestayId: string;
   password: string; // Added password field to match schema
   dhsrNo?: string;
+  adminUsername: string; // Added admin username field for multi-tenant support
   
   // Basic homestay information
   homeStayName: string;
@@ -150,6 +151,12 @@ const homestaySchema = new Schema<IHomestaySingle>(
     password: {
       type: String,
       required: true
+    },
+    adminUsername: {
+      type: String,
+      required: true,
+      index: true, // Add index for faster filtering by admin
+      trim: true
     },
     
     // Digital Homestay Registration Number

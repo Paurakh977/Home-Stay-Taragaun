@@ -3,6 +3,10 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
+interface FeaturedSectionProps {
+  adminUsername?: string;
+}
+
 const features = [
   {
     icon: "🏠",
@@ -30,7 +34,7 @@ const features = [
   }
 ];
 
-const FeaturedSection = () => {
+const FeaturedSection = ({ adminUsername }: FeaturedSectionProps) => {
   return (
     <section className="py-16 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -68,7 +72,7 @@ const FeaturedSection = () => {
         </div>
         
         <div className="mt-12 text-center">
-          <Link href="/homestays">
+          <Link href={adminUsername ? `/${adminUsername}/homestays` : "/homestays"}>
             <Button className="bg-primary hover:bg-primary/90 text-white px-8 py-6" size="lg">
               View All Home Stays
             </Button>

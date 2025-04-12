@@ -99,14 +99,46 @@ export async function GET(
   try {
     await dbConnect();
     
-    // Extract ID from URL directly to avoid the params.id issue
-    const pathname = request.nextUrl.pathname;
-    const homestayId = pathname.split('/').pop() || '';
+    // Get query parameters (check for adminUsername)
+    const searchParams = request.nextUrl.searchParams;
+    const adminUsername = searchParams.get("adminUsername");
     
-    // Find homestay by homestayId
-    const homestay = await HomestaySingle.findOne({ homestayId }).select("-password");
+    // Get homestayId from params or URL path - multiple fallbacks
+    let homestayId = params.id;
+    
+    // If params.id is undefined or 'undefined', extract from URL directly
+    if (!homestayId || homestayId === 'undefined') {
+      const pathname = request.nextUrl.pathname;
+      const pathParts = pathname.split('/');
+      homestayId = pathParts[pathParts.length - 1];
+      
+      console.log("Extracted homestayId from pathname:", homestayId);
+    }
+    
+    // Final validation
+    if (!homestayId || homestayId === 'undefined') {
+      console.error("Failed to extract valid homestayId from request");
+      return NextResponse.json(
+        { error: "Invalid homestay ID provided" },
+        { status: 400 }
+      );
+    }
+    
+    console.log(`Fetching homestay with ID: ${homestayId}`);
+    
+    // Build query
+    const query: any = { homestayId };
+    
+    // Add adminUsername condition if provided
+    if (adminUsername) {
+      query.adminUsername = adminUsername;
+    }
+    
+    // Find homestay 
+    const homestay = await HomestaySingle.findOne(query).select("-password");
 
     if (!homestay) {
+      console.log(`Homestay not found with ID: ${homestayId}`);
       return NextResponse.json(
         { error: "Homestay not found" },
         { status: 404 }
@@ -132,6 +164,7 @@ export async function GET(
       Contact.find({ homestayId })
     ]);
 
+    console.log(`Successfully retrieved homestay: ${homestayId}`);
     return NextResponse.json({
       homestay,
       officials,

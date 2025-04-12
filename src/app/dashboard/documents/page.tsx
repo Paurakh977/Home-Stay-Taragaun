@@ -17,12 +17,14 @@ interface DocumentItem {
   files: File[];
 }
 
-export default function DocumentsPage() {
+interface DocumentPageProps {
+  adminUsername?: string;
+}
+
+export default function DocumentsPage({ adminUsername }: DocumentPageProps) {
   const router = useRouter();
   const [user, setUser] = useState<UserInfo | null>(null);
-  const [documentItems, setDocumentItems] = useState<DocumentItem[]>([
-    { id: crypto.randomUUID(), title: "", description: "", files: [] }
-  ]);
+  const [documentItems, setDocumentItems] = useState<DocumentItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRefs = useRef<HTMLInputElement[]>([]);
   
@@ -30,22 +32,27 @@ export default function DocumentsPage() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ file: File; url: string } | null>(null);
 
-  // Check authentication on component mount
+  // Check authentication on component mount and initialize documentItems
   useEffect(() => {
     const userJson = localStorage.getItem("user");
     if (userJson) {
       try {
         const userData = JSON.parse(userJson);
         setUser(userData);
+        
+        // Initialize document items with a single empty item
+        setDocumentItems([
+          { id: crypto.randomUUID(), title: "", description: "", files: [] }
+        ]);
       } catch (err) {
         console.error("Error parsing user data:", err);
         localStorage.removeItem("user");
-        router.push("/login");
+        router.push(adminUsername ? `/${adminUsername}/login` : "/login");
       }
     } else {
-      router.push("/login");
+      router.push(adminUsername ? `/${adminUsername}/login` : "/login");
     }
-  }, [router]);
+  }, [router, adminUsername]);
 
   // Clean up object URLs when component unmounts
   useEffect(() => {
@@ -58,8 +65,8 @@ export default function DocumentsPage() {
 
   // Add a new document item
   const addDocumentItem = () => {
-    setDocumentItems([
-      ...documentItems,
+    setDocumentItems(prevItems => [
+      ...prevItems,
       { id: crypto.randomUUID(), title: "", description: "", files: [] }
     ]);
   };
@@ -159,7 +166,7 @@ export default function DocumentsPage() {
     // Check if user is logged in
     if (!user) {
       toast.error("Authentication required. Please log in.");
-      router.push("/login");
+      router.push(adminUsername ? `/${adminUsername}/login` : "/login");
       return;
     }
 
@@ -198,10 +205,15 @@ export default function DocumentsPage() {
         });
       });
       
-      // 3. Send the request to the API endpoint using the retrieved homestayId
-      const response = await fetch(`/api/homestays/${homestayId}/documents`, {
-        method: 'POST',
+      // 3. Send the request
+      const uploadUrl = adminUsername 
+        ? `/api/homestays/${user.homestayId}/documents?adminUsername=${adminUsername}`
+        : `/api/homestays/${user.homestayId}/documents`;
+
+      const response = await fetch(uploadUrl, {
+        method: "POST",
         body: formData,
+        // No need to set Content-Type for FormData - browser will handle it with proper boundary
       });
 
       const result = await response.json();
@@ -212,7 +224,8 @@ export default function DocumentsPage() {
 
       toast.success(result.message || "Documents uploaded successfully");
 
-      // Reset form
+      // Reset form with a single empty item
+      // Using a new UUID only in an event handler (safe for hydration)
       setDocumentItems([
         { id: crypto.randomUUID(), title: "", description: "", files: [] }
       ]);

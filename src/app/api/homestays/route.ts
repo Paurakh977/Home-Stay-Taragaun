@@ -149,9 +149,24 @@ export async function GET(req: NextRequest) {
     const district = searchParams.get("district");
     const query = searchParams.get("q");
     const lang = searchParams.get("lang") || "ne"; // Default to Nepali
+    const adminUsername = searchParams.get("adminUsername");
+    const status = searchParams.get("status");
     
     // Build filter
     const filter: any = {};
+    
+    // Add adminUsername filter if provided
+    if (adminUsername) {
+      filter.adminUsername = adminUsername;
+    }
+    
+    // Add status filter if provided, default to approved for public requests
+    if (status) {
+      filter.status = status;
+    } else {
+      filter.status = "approved"; // Default to showing only approved homestays
+    }
+    
     if (province) {
       // Handle both old and new schema
       if (province.includes('.')) {
@@ -178,9 +193,6 @@ export async function GET(req: NextRequest) {
       filter.$text = { $search: query };
     }
     
-    // Status should always be approved for public API
-    filter.status = "approved";  // Commenting out the status filter to show all homestays
-    
     // Calculate pagination
     const skip = (page - 1) * limit;
     
@@ -189,7 +201,7 @@ export async function GET(req: NextRequest) {
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 })
-      .select("homestayId homeStayName villageName address homeStayType averageRating profileImage")
+      .select("homestayId homeStayName villageName address homeStayType averageRating profileImage adminUsername")
       .lean();
     
     // Format the response to handle bilingual address fields
@@ -279,6 +291,27 @@ export async function POST(req: NextRequest) {
     // Parse request body
     const body = await req.json();
     
+    // Ensure adminUsername is provided
+    if (!body.adminUsername) {
+      return NextResponse.json(
+        { success: false, error: "Admin username is required" },
+        { status: 400 }
+      );
+    }
+    
+    // Verify that the admin user exists
+    const adminUser = await mongoose.model('User').findOne({
+      username: body.adminUsername,
+      role: 'admin'
+    });
+    
+    if (!adminUser) {
+      return NextResponse.json(
+        { success: false, error: "Admin user not found" },
+        { status: 404 }
+      );
+    }
+    
     // Generate unique homestay ID and password
     const homestayId = generateHomestayId(body.homeStayName);
     const password = generateSecurePassword();
@@ -305,6 +338,7 @@ export async function POST(req: NextRequest) {
       homestayId,
       password: hashedPassword,
       dhsrNo, // Add DHSR number
+      adminUsername: body.adminUsername, // Store the admin username
       homeStayName: body.homeStayName,
       villageName: body.villageName,
       homeCount: body.homeCount,

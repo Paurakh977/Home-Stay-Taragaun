@@ -61,7 +61,7 @@ const facilityCategories = [
 ];
 
 // New component to contain the logic using searchParams
-function HomestayContent() {
+export function HomestayContent({ adminContext }: { adminContext?: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -193,7 +193,14 @@ function HomestayContent() {
       try {
         setLoading(true);
         console.log("Fetching homestays from API...");
-        const response = await fetch("/api/homestays?limit=100");
+        
+        // Build the API URL with adminContext if provided
+        let apiUrl = "/api/homestays?limit=100";
+        if (adminContext) {
+          apiUrl += `&adminUsername=${adminContext}`;
+        }
+        
+        const response = await fetch(apiUrl);
         
         if (!response.ok) {
           console.error("API response not OK:", response.status, response.statusText);
@@ -249,7 +256,7 @@ function HomestayContent() {
     }
     
     fetchHomestays();
-  }, []);
+  }, [adminContext]);
   
   // Apply filters and search
   useEffect(() => {
@@ -381,36 +388,16 @@ function HomestayContent() {
       return imagePath;
     }
     
+    // Add cache-busting timestamp
+    const timestamp = `?t=${new Date().getTime()}`;
+    
     // Check if it's an upload path (/uploads/...)
     if (imagePath.startsWith('/uploads/')) {
-      // Extract homestayId and filename from the path
-      const parts = imagePath.split('/');
-      console.log("Image path parts:", parts);
-      
-      if (parts.length >= 3) {
-        const homestayId = parts[2];
-        const filename = parts[parts.length - 1];
-        
-        // If it's a gallery image
-        if (parts.includes('gallery')) {
-          const galleryUrl = `/api/images/${homestayId}/gallery/${filename}?t=${new Date().getTime()}`;
-          console.log("Processing gallery image:", imagePath, "→", galleryUrl);
-          return galleryUrl;
-        }
-        
-        // If it's a profile image
-        if (parts.includes('profile') || filename.startsWith('profile.')) {
-          const profileUrl = `/api/images/${homestayId}/profile/${filename}?t=${new Date().getTime()}`;
-          console.log("Processing profile image:", imagePath, "→", profileUrl);
-          return profileUrl;
-        }
-        
-        // For older profile images that might not have the /profile/ segment
-        // Default to profile directory
-        const defaultUrl = `/api/images/${homestayId}/profile/${filename}?t=${new Date().getTime()}`;
-        console.log("Processing image with default profile path:", imagePath, "→", defaultUrl);
-        return defaultUrl;
-      }
+      // Simply replace /uploads/ with /api/images/ 
+      // This maintains the exact same path structure that was stored in the database
+      const apiUrl = imagePath.replace('/uploads/', '/api/images/') + timestamp;
+      console.log("Processing image:", imagePath, "→", apiUrl);
+      return apiUrl;
     }
     
     // Return as is if we can't determine the format

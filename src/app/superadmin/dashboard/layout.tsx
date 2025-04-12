@@ -1,5 +1,9 @@
-import { ReactNode } from 'react';
+'use client';
+
+import { ReactNode, useEffect, useState } from 'react';
 import { SuperAdminSidebar } from '@/components/superadmin/SuperAdminSidebar';
+import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 // Import necessary components for mobile sidebar/header if needed
 // import Link from "next/link"
 // import {
@@ -37,16 +41,42 @@ interface SuperAdminLayoutProps {
 }
 
 export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
-  // TODO: Add client-side check for authentication token
-  // If no token, redirect to /superadmin/login
-  // Example (needs useEffect):
-  // const router = useRouter();
-  // useEffect(() => {
-  //   const token = localStorage.getItem('superadmin_token');
-  //   if (!token) {
-  //     router.replace('/superadmin/login');
-  //   }
-  // }, [router]);
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const response = await fetch('/api/superadmin/auth/me');
+        
+        if (!response.ok) {
+          // Not authenticated, redirect to login
+          window.location.href = '/superadmin/login';
+          return;
+        }
+        
+        // We're authenticated, continue loading the dashboard
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Authentication check failed:', error);
+        // On error, redirect to login
+        window.location.href = '/superadmin/login';
+      }
+    }
+    
+    checkAuth();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="flex flex-col items-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="mt-4 text-lg text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">

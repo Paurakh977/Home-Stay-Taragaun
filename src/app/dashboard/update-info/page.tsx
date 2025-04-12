@@ -65,7 +65,11 @@ interface OfficialInfo {
   contactNo: string;
 }
 
-export default function UpdateInfoPage() {
+interface UpdateInfoPageProps {
+  adminUsername?: string;
+}
+
+export default function UpdateInfoPage({ adminUsername }: UpdateInfoPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,12 +91,12 @@ export default function UpdateInfoPage() {
         fetchHomestayData(userData.homestayId);
       } catch (err) {
         console.error("Error parsing user data:", err);
-        router.push("/login");
+        router.push(adminUsername ? `/${adminUsername}/login` : "/login");
       }
     } else {
-      router.push("/login");
+      router.push(adminUsername ? `/${adminUsername}/login` : "/login");
     }
-  }, [router]);
+  }, [router, adminUsername]);
   
   // Fetch homestay data from API
   const fetchHomestayData = async (homestayId: string) => {
@@ -100,7 +104,11 @@ export default function UpdateInfoPage() {
       setIsLoading(true);
       setError(null);
       
-      const response = await fetch(`/api/homestays/${homestayId}`);
+      const apiUrl = adminUsername 
+        ? `/api/homestays/${homestayId}?adminUsername=${adminUsername}` 
+        : `/api/homestays/${homestayId}`;
+      
+      const response = await fetch(apiUrl);
       
       if (!response.ok) {
         throw new Error('Failed to fetch homestay data');
@@ -228,7 +236,11 @@ export default function UpdateInfoPage() {
       console.log("Sending update:", updateData);
       
       // Send update to API
-      const response = await fetch(`/api/homestays/${homeStay.homestayId}`, {
+      const updateUrl = adminUsername 
+        ? `/api/homestays/${homeStay.homestayId}?adminUsername=${adminUsername}`
+        : `/api/homestays/${homeStay.homestayId}`;
+        
+      const response = await fetch(updateUrl, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

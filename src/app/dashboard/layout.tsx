@@ -76,13 +76,18 @@ export default function DashboardLayout({
   // Verify that the user exists in the database
   const verifyUserExists = async (homestayId: string) => {
     try {
-      const response = await fetch(`/api/homestays/${homestayId}`);
+      // Add adminUsername to API call if we're in an admin route
+      const adminParam = isAdminRoute ? `adminUsername=${pathname.split('/')[1]}` : '';
+      const url = `/api/homestays/${homestayId}${adminParam ? `?${adminParam}` : ''}`;
+      console.log("Making API request to:", url);
+      const response = await fetch(url);
       
       if (!response.ok) {
         console.error("User verification failed: User does not exist in database");
         // User doesn't exist in the database anymore
         localStorage.removeItem("user");
-        router.push("/login");
+        // Redirect to appropriate login path
+        router.push(isAdminRoute ? `/${pathname.split('/')[1]}/login` : '/login');
         return;
       }
       
@@ -95,7 +100,8 @@ export default function DashboardLayout({
       console.error("Error verifying user:", err);
       // On error, log out the user
       localStorage.removeItem("user");
-      router.push("/login");
+      // Redirect to appropriate login path
+      router.push(isAdminRoute ? `/${pathname.split('/')[1]}/login` : '/login');
     }
   };
   
@@ -119,20 +125,54 @@ export default function DashboardLayout({
       // Clear user from localStorage
       localStorage.removeItem("user");
 
+      // Extract adminUsername from path if this is an admin route
+      const pathParts = pathname.split('/');
+      const isAdminRoute = pathParts.length > 2 && pathParts[1] !== 'dashboard';
+      const adminUsername = isAdminRoute ? pathParts[1] : null;
+      
       // Call logout API to clear the cookie
-      await fetch("/api/auth/logout", {
+      const adminParam = adminUsername ? `adminUsername=${adminUsername}` : '';
+      const logoutUrl = `/api/auth/logout${adminParam ? `?${adminParam}` : ''}`;
+      
+      console.log("Making logout request to:", logoutUrl);
+      await fetch(logoutUrl, {
         method: "POST",
       });
 
-      // Redirect to home page
-      router.push("/");
+      // Redirect to the appropriate path
+      if (adminUsername) {
+        // Redirect to admin home page
+        router.push(`/${adminUsername}`);
+      } else {
+        // Redirect to main home page
+        router.push("/");
+      }
     } catch (err) {
       console.error("Error during logout:", err);
+      // Still redirect even if there's an error
+      const pathParts = pathname.split('/');
+      const isAdminRoute = pathParts.length > 2 && pathParts[1] !== 'dashboard';
+      const adminUsername = isAdminRoute ? pathParts[1] : null;
+      
+      if (adminUsername) {
+        router.push(`/${adminUsername}`);
+      } else {
+        router.push("/");
+      }
     }
   };
 
   const isActive = (path: string) => {
-    return pathname === `/dashboard${path}` ? "bg-primary/10 text-primary" : "text-gray-600 hover:bg-gray-100";
+    // Check if we're in an admin route (pathname contains a segment between first and second slash)
+    const isAdminRoute = /^\/[^/]+\/dashboard/.test(pathname);
+    
+    if (isAdminRoute) {
+      // For admin routes, check if the path matches after the admin username
+      return pathname.endsWith(`/dashboard${path}`) ? "bg-primary/10 text-primary" : "text-gray-600 hover:bg-gray-100";
+    } else {
+      // For regular routes, direct match
+      return pathname === `/dashboard${path}` ? "bg-primary/10 text-primary" : "text-gray-600 hover:bg-gray-100";
+    }
   };
 
   // Function to render profile image or initials placeholder
@@ -143,6 +183,7 @@ export default function DashboardLayout({
     // Check if profileImage state is a non-empty string 
     if (profileImage && typeof profileImage === 'string' && profileImage.trim() !== '') {
       // Convert /uploads/[...] path to /api/images/[...] path
+      // Make sure to use the exact same path structure as stored in the database
       const apiUrl = profileImage.replace('/uploads/', '/api/images/') + `?t=${new Date().getTime()}`;
       console.log("[Layout Render] Attempting to render profile image with src:", apiUrl);
       return (
@@ -177,6 +218,11 @@ export default function DashboardLayout({
       );
     }
   };
+
+  const isAdminRoute = /^\/[^/]+\/dashboard/.test(pathname);
+  const basePath = isAdminRoute 
+    ? `/${pathname.split('/')[1]}/dashboard` // Extract adminUsername and create path
+    : '/dashboard';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -239,7 +285,7 @@ export default function DashboardLayout({
 
         <nav className={`mt-6 flex-1 ${isCollapsed ? "px-2" : "px-4"} space-y-2`}>
           <Link
-            href="/dashboard"
+            href={`${basePath}`}
             className={`flex items-center ${isCollapsed ? "justify-center" : ""} px-4 py-3 rounded-md transition-colors ${isActive("")}`}
             title={isCollapsed ? "Dashboard" : ""}
           >
@@ -247,7 +293,7 @@ export default function DashboardLayout({
             {!isCollapsed && <span className="ml-3">Dashboard</span>}
           </Link>
           <Link
-            href="/dashboard/profile"
+            href={`${basePath}/profile`}
             className={`flex items-center ${isCollapsed ? "justify-center" : ""} px-4 py-3 rounded-md transition-colors ${isActive("/profile")}`}
             title={isCollapsed ? "Profile" : ""}
           >
@@ -255,7 +301,7 @@ export default function DashboardLayout({
             {!isCollapsed && <span className="ml-3">Profile</span>}
           </Link>
           <Link
-            href="/dashboard/chats"
+            href={`${basePath}/chats`}
             className={`flex items-center ${isCollapsed ? "justify-center" : ""} px-4 py-3 rounded-md transition-colors ${isActive("/chats")}`}
             title={isCollapsed ? "Chats" : ""}
           >
@@ -263,7 +309,7 @@ export default function DashboardLayout({
             {!isCollapsed && <span className="ml-3">Chats</span>}
           </Link>
           <Link
-            href="/dashboard/portal"
+            href={`${basePath}/portal`}
             className={`flex items-center ${isCollapsed ? "justify-center" : ""} px-4 py-3 rounded-md transition-colors ${isActive("/portal")}`}
             title={isCollapsed ? "Portal" : ""}
           >
@@ -271,7 +317,7 @@ export default function DashboardLayout({
             {!isCollapsed && <span className="ml-3">Portal</span>}
           </Link>
           <Link
-            href="/dashboard/documents"
+            href={`${basePath}/documents`}
             className={`flex items-center ${isCollapsed ? "justify-center" : ""} px-4 py-3 rounded-md transition-colors ${isActive("/documents")}`}
             title={isCollapsed ? "Upload Documents" : ""}
           >
@@ -279,7 +325,7 @@ export default function DashboardLayout({
             {!isCollapsed && <span className="ml-3">Upload Documents</span>}
           </Link>
           <Link
-            href="/dashboard/update-info"
+            href={`${basePath}/update-info`}
             className={`flex items-center ${isCollapsed ? "justify-center" : ""} px-4 py-3 rounded-md transition-colors ${isActive("/update-info")}`}
             title={isCollapsed ? "Update Information" : ""}
           >
@@ -287,7 +333,7 @@ export default function DashboardLayout({
             {!isCollapsed && <span className="ml-3">Update Information</span>}
           </Link>
           <Link
-            href="/dashboard/settings"
+            href={`${basePath}/settings`}
             className={`flex items-center ${isCollapsed ? "justify-center" : ""} px-4 py-3 rounded-md transition-colors ${isActive("/settings")}`}
             title={isCollapsed ? "Settings" : ""}
           >
@@ -338,7 +384,7 @@ export default function DashboardLayout({
 
             <nav className="mt-6 px-4 space-y-2">
               <Link
-                href="/dashboard"
+                href={`${basePath}`}
                 className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("")}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
@@ -346,7 +392,7 @@ export default function DashboardLayout({
                 Dashboard
               </Link>
               <Link
-                href="/dashboard/profile"
+                href={`${basePath}/profile`}
                 className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("/profile")}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
@@ -354,7 +400,7 @@ export default function DashboardLayout({
                 Profile
               </Link>
               <Link
-                href="/dashboard/chats"
+                href={`${basePath}/chats`}
                 className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("/chats")}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
@@ -362,7 +408,7 @@ export default function DashboardLayout({
                 Chats
               </Link>
               <Link
-                href="/dashboard/portal"
+                href={`${basePath}/portal`}
                 className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("/portal")}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
@@ -370,7 +416,7 @@ export default function DashboardLayout({
                 Portal
               </Link>
               <Link
-                href="/dashboard/documents"
+                href={`${basePath}/documents`}
                 className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("/documents")}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
@@ -378,7 +424,7 @@ export default function DashboardLayout({
                 Upload Documents
               </Link>
               <Link
-                href="/dashboard/update-info"
+                href={`${basePath}/update-info`}
                 className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("/update-info")}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
@@ -386,7 +432,7 @@ export default function DashboardLayout({
                 Update Information
               </Link>
               <Link
-                href="/dashboard/settings"
+                href={`${basePath}/settings`}
                 className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("/settings")}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
@@ -412,4 +458,4 @@ export default function DashboardLayout({
       </div>
     </div>
   );
-} 
+}

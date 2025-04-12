@@ -66,7 +66,12 @@ type RegistrationSuccess = {
   dhsrNo: string;
 };
 
-export default function RegisterPage() {
+// Update the component interface to accept adminUsername
+interface RegisterPageProps {
+  adminUsername?: string;
+}
+
+export default function RegisterPage({ adminUsername }: RegisterPageProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [showValidationErrors, setShowValidationErrors] = useState(false);
@@ -282,12 +287,18 @@ export default function RegisterPage() {
       
       console.log('Submitting form data...');
       
+      // Include the adminUsername in the request data if provided
+      const requestData = {
+        ...formData,
+        adminUsername: adminUsername // Use the prop if available
+      };
+      
       const response = await fetch('/api/homestays', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(requestData),
       });
       
       // Check if the response is ok before trying to parse JSON

@@ -1,6 +1,12 @@
+'use client';
+
 import Link from "next/link";
 
-const CtaSection = () => {
+interface CtaSectionProps {
+  adminUsername?: string;
+}
+
+export default function CtaSection({ adminUsername }: CtaSectionProps) {
   return (
     <section className="py-20 bg-[#0a1428]">
       <div className="container mx-auto px-4">
@@ -11,13 +17,13 @@ const CtaSection = () => {
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-5">
             <Link 
-              href="/homestays" 
+              href={adminUsername ? `/${adminUsername}/homestays` : "/homestays"}
               className="bg-primary hover:bg-opacity-90 text-white font-medium px-8 py-3.5 rounded-md transition-all duration-300 text-center shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
             >
               Book Now
             </Link>
             <Link 
-              href="/contact" 
+              href={adminUsername ? `/${adminUsername}/contact` : "/contact"}
               className="bg-white/95 text-[#0a1428] font-medium px-8 py-3.5 rounded-md hover:bg-white transition-all duration-300 text-center shadow-sm hover:shadow-md transform hover:-translate-y-0.5"
             >
               Contact Us
@@ -27,6 +33,4 @@ const CtaSection = () => {
       </div>
     </section>
   );
-};
-
-export default CtaSection; 
+} 

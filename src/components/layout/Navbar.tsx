@@ -11,7 +11,11 @@ interface UserInfo {
   homeStayName: string;
 }
 
-const Navbar = () => {
+interface NavbarProps {
+  adminUsername?: string;
+}
+
+const Navbar = ({ adminUsername }: NavbarProps) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isVibrating, setIsVibrating] = useState(false);
   const [hasEntered, setHasEntered] = useState(false);
@@ -78,7 +82,12 @@ const Navbar = () => {
       localStorage.removeItem("user");
 
       // Call logout API to clear the cookie
-      await fetch("/api/auth/logout", {
+      // If we're in an admin route, use the adminUsername parameter
+      const logoutUrl = adminUsername 
+        ? `/api/auth/logout?adminUsername=${adminUsername}`
+        : "/api/auth/logout";
+        
+      await fetch(logoutUrl, {
         method: "POST",
       });
 
@@ -90,19 +99,38 @@ const Navbar = () => {
         setIsMenuOpen(false);
       }
 
-      // Redirect to home page
-      router.push("/");
+      // Redirect to the appropriate home page
+      if (adminUsername) {
+        router.push(`/${adminUsername}`);
+      } else {
+        router.push("/");
+      }
     } catch (err) {
       console.error("Error during logout:", err);
+      // Still redirect on error
+      if (adminUsername) {
+        router.push(`/${adminUsername}`);
+      } else {
+        router.push("/");
+      }
     }
   };
+
+  const baseHref = adminUsername ? `/${adminUsername}` : '';
+  
+  const routes = [
+    { name: 'Home', path: baseHref || '/' },
+    { name: 'Homestays', path: `${baseHref}/homestays` },
+    { name: 'About', path: `${baseHref}/about` },
+    { name: 'Contact', path: `${baseHref}/contact` },
+  ];
 
   return (
     <nav className="bg-white/95 backdrop-blur-sm sticky top-0 z-50 shadow-sm w-full">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Link href="/" className="flex-shrink-0 flex items-center">
+            <Link href={baseHref || '/'} className="flex-shrink-0 flex items-center">
               <div className="h-10 w-10 bg-primary rounded-full flex items-center justify-center text-white font-bold text-lg">
                 HH
               </div>
@@ -112,63 +140,28 @@ const Navbar = () => {
           
           {/* Desktop menu */}
           <div className="hidden md:flex items-center space-x-8">
-            <Link 
-              href="/" 
-              className={`group font-medium px-3 py-5 transition-all duration-300 ease-in-out ${
-                isActive('/') ? 'text-primary' : 'text-gray-700'
-              }`}
-            >
-              <div className="relative">
-                <span className="group-hover:text-primary">Home</span>
-                <span className={`absolute bottom-0 left-0 w-full h-[2px] bg-primary transform transition-transform duration-300 ease-in-out ${
-                  isActive('/') ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
-                }`}></span>
-              </div>
-            </Link>
-            
-            <Link 
-              href="/news" 
-              className={`group font-medium px-3 py-5 transition-all duration-300 ease-in-out ${
-                isActive('/news') ? 'text-primary' : 'text-gray-700'
-              }`}
-            >
-              <div className="relative">
-                <span className="group-hover:text-primary">News</span>
-                <span className={`absolute bottom-0 left-0 w-full h-[2px] bg-primary transform transition-transform duration-300 ease-in-out ${
-                  isActive('/news') ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
-                }`}></span>
-              </div>
-            </Link>
-            <Link 
-              href="/about" 
-              className={`group font-medium px-3 py-5 transition-all duration-300 ease-in-out ${
-                isActive('/about') ? 'text-primary' : 'text-gray-700'
-              }`}
-            >
-              <div className="relative">
-                <span className="group-hover:text-primary">About Us</span>
-                <span className={`absolute bottom-0 left-0 w-full h-[2px] bg-primary transform transition-transform duration-300 ease-in-out ${
-                  isActive('/about') ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
-                }`}></span>
-              </div>
-            </Link>
-            <Link 
-              href="/contact" 
-              className={`group font-medium px-3 py-5 transition-all duration-300 ease-in-out ${
-                isActive('/contact') ? 'text-primary' : 'text-gray-700'
-              }`}
-            >
-              <div className="relative">
-                <span className="group-hover:text-primary">Contact Us</span>
-                <span className={`absolute bottom-0 left-0 w-full h-[2px] bg-primary transform transition-transform duration-300 ease-in-out ${
-                  isActive('/contact') ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
-                }`}></span>
-              </div>
-            </Link>
+            {routes.map((route) => (
+              <Link
+                key={route.path}
+                href={route.path}
+                className={`group font-medium px-3 py-5 transition-all duration-300 ease-in-out ${
+                  pathname === route.path 
+                    ? 'text-primary' 
+                    : 'text-gray-700'
+                }`}
+              >
+                <div className="relative">
+                  <span className="group-hover:text-primary">{route.name}</span>
+                  <span className={`absolute bottom-0 left-0 w-full h-[2px] bg-primary transform transition-transform duration-300 ease-in-out ${
+                    pathname === route.path ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
+                  }`}></span>
+                </div>
+              </Link>
+            ))}
             
             {/* Dashboard Link */}
             <Link 
-              href={user ? "/dashboard" : "/login"}
+              href={user ? `${adminUsername ? `/${adminUsername}` : ""}/dashboard` : `${adminUsername ? `/${adminUsername}` : ""}/login`}
               onClick={handleDashboardClick}
               className={`group font-medium px-3 py-5 transition-all duration-300 ease-in-out ${
                 pathname.startsWith('/dashboard') ? 'text-primary' : 'text-gray-700'
@@ -183,7 +176,7 @@ const Navbar = () => {
             </Link>
             
             {/* Register Home Stay Button */}
-            <Link href="/register" className="ml-3">
+            <Link href={`${adminUsername ? `/${adminUsername}` : ""}/register`} className="ml-3">
               <button 
                 className={`bg-primary text-white px-4 py-2 rounded-md text-sm font-medium transition-all hover:bg-primary/90 whitespace-nowrap shadow-md hover:shadow-lg cursor-pointer ${
                   !hasEntered ? 'animate-entrance' : isVibrating ? 'animate-vibrate' : ''
@@ -203,7 +196,7 @@ const Navbar = () => {
                 Logout
               </button>
             ) : (
-              <Link href="/login">
+              <Link href={`${adminUsername ? `/${adminUsername}` : ""}/login`}>
                 <span className="flex items-center text-primary hover:text-primary-dark text-sm font-medium transition-colors cursor-pointer">
                   <LogIn className="h-4 w-4 mr-1" />
                   Login
@@ -234,7 +227,7 @@ const Navbar = () => {
               )}
               
               {/* Register Home Stay Button (Mobile) */}
-              <Link href="/register">
+              <Link href={`${adminUsername ? `/${adminUsername}` : ""}/register`}>
                 <button 
                   className={`bg-primary text-white px-2 py-1 rounded-md text-xs font-medium transition-all hover:bg-primary/90 whitespace-nowrap shadow-sm hover:shadow-md cursor-pointer ${
                     !hasEntered ? 'animate-entrance' : isVibrating ? 'animate-vibrate' : ''
@@ -262,54 +255,29 @@ const Navbar = () => {
       {isMenuOpen && (
         <div className="md:hidden bg-white absolute top-16 left-0 right-0 shadow-lg z-50">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-            <Link 
-              href="/" 
-              className={`block px-3 py-2 rounded-md text-base font-medium transition-all duration-200 ${
-                isActive('/') 
-                  ? 'text-primary border-l-4 border-primary bg-orange-50 pl-2' 
-                  : 'text-gray-700 hover:bg-orange-50 hover:text-primary'
-              }`}
-              onClick={toggleMenu}
-            >
-              Home
-            </Link>
-            <Link 
-              href="/news" 
-              className={`block px-3 py-2 rounded-md text-base font-medium transition-all duration-200 ${
-                isActive('/news') 
-                  ? 'text-primary border-l-4 border-primary bg-orange-50 pl-2' 
-                  : 'text-gray-700 hover:bg-orange-50 hover:text-primary'
-              }`}
-              onClick={toggleMenu}
-            >
-              News
-            </Link>
-            <Link 
-              href="/about" 
-              className={`block px-3 py-2 rounded-md text-base font-medium transition-all duration-200 ${
-                isActive('/about') 
-                  ? 'text-primary border-l-4 border-primary bg-orange-50 pl-2' 
-                  : 'text-gray-700 hover:bg-orange-50 hover:text-primary'
-              }`}
-              onClick={toggleMenu}
-            >
-              About Us
-            </Link>
-            <Link 
-              href="/contact" 
-              className={`block px-3 py-2 rounded-md text-base font-medium transition-all duration-200 ${
-                isActive('/contact') 
-                  ? 'text-primary border-l-4 border-primary bg-orange-50 pl-2' 
-                  : 'text-gray-700 hover:bg-orange-50 hover:text-primary'
-              }`}
-              onClick={toggleMenu}
-            >
-              Contact Us
-            </Link>
+            {routes.map((route) => (
+              <Link
+                key={route.path}
+                href={route.path}
+                className={`block px-3 py-2 rounded-md text-base font-medium transition-all duration-200 ${
+                  pathname === route.path 
+                    ? 'text-primary border-l-4 border-primary bg-orange-50 pl-2' 
+                    : 'text-gray-700 hover:bg-orange-50 hover:text-primary'
+                }`}
+                onClick={() => {
+                  toggleMenu();
+                  if (route.path === "/login" && !user) {
+                    router.push("/login");
+                  }
+                }}
+              >
+                {route.name}
+              </Link>
+            ))}
             
             {/* Dashboard Link in Mobile Menu */}
             <Link 
-              href={user ? "/dashboard" : "/login"}
+              href={user ? `${adminUsername ? `/${adminUsername}` : ""}/dashboard` : `${adminUsername ? `/${adminUsername}` : ""}/login`}
               className={`block px-3 py-2 rounded-md text-base font-medium transition-all duration-200 ${
                 pathname.startsWith('/dashboard') 
                   ? 'text-primary border-l-4 border-primary bg-orange-50 pl-2' 
@@ -318,7 +286,7 @@ const Navbar = () => {
               onClick={() => {
                 toggleMenu();
                 if (!user) {
-                  router.push("/login");
+                  router.push(`${adminUsername ? `/${adminUsername}` : ""}/login`);
                 }
               }}
             >
@@ -328,7 +296,7 @@ const Navbar = () => {
             {/* Register Home Stay Button in Mobile Menu */}
             <div className="mt-4 px-3">
               <Link 
-                href="/register" 
+                href={`${adminUsername ? `/${adminUsername}` : ""}/register`} 
                 className="block"
                 onClick={toggleMenu}
               >
@@ -354,7 +322,7 @@ const Navbar = () => {
                 </button>
               ) : (
                 <Link
-                  href="/login"
+                  href={`${adminUsername ? `/${adminUsername}` : ""}/login`}
                   className="block"
                   onClick={toggleMenu}
                 >

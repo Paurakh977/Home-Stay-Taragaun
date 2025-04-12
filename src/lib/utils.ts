@@ -76,3 +76,11 @@ export function hashPassword(password: string): string {
     .update(password)
     .digest('hex');
 }
+
+/**
+ * Verify a password against a stored hash
+ */
+export function verifyPassword(password: string, hashedPassword: string): boolean {
+  const hashedInput = hashPassword(password);
+  return hashedInput === hashedPassword;
+}

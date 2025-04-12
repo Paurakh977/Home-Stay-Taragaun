@@ -13,17 +13,36 @@ export async function GET(
 ) {
   try {
     const { slug } = params;
-    const filePath = join(process.cwd(), 'public', 'uploads', ...slug);
+    console.log('Image API - Requested slug:', slug);
+    
+    if (!slug || slug.length === 0) {
+      console.error('Image API - No slug provided');
+      return new NextResponse('File not found', { status: 404 });
+    }
+    
+    // Ensure there's no path traversal by removing any .. segments
+    const sanitizedSlug = slug.filter(segment => segment !== '..' && segment !== '.');
+    
+    // Join all slug parts to form the path within uploads
+    const filePath = join(process.cwd(), 'public', 'uploads', ...sanitizedSlug);
+    console.log('Image API - Attempting to serve file from:', filePath);
 
     // Security check: Ensure the path doesn't try to escape the uploads directory
     const uploadsDir = join(process.cwd(), 'public', 'uploads');
     if (!filePath.startsWith(uploadsDir)) {
+      console.error('Image API - Security check failed: path tries to escape uploads directory');
       return new NextResponse('Forbidden', { status: 403 });
     }
 
     // Check if file exists
-    const stats = statSync(filePath);
-    if (!stats.isFile()) {
+    try {
+      const stats = statSync(filePath);
+      if (!stats.isFile()) {
+        console.error('Image API - Path exists but is not a file:', filePath);
+        return new NextResponse('File not found', { status: 404 });
+      }
+    } catch (err) {
+      console.error('Image API - File does not exist:', filePath, err);
       return new NextResponse('File not found', { status: 404 });
     }
 
@@ -31,7 +50,7 @@ export async function GET(
     const stream = createReadStream(filePath);
     
     // Get file extension for content type
-    const ext = slug[slug.length - 1].split('.').pop()?.toLowerCase();
+    const ext = sanitizedSlug[sanitizedSlug.length - 1].split('.').pop()?.toLowerCase();
     const contentType = {
       'jpg': 'image/jpeg',
       'jpeg': 'image/jpeg',

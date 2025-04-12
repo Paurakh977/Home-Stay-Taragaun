@@ -10,8 +10,33 @@ export async function POST(request: NextRequest) {
   try {
     await dbConnect();
     
-    // Get the auth token
-    const token = request.cookies.get('auth_token')?.value;
+    // Get query parameters
+    const { searchParams } = new URL(request.url);
+    const adminUsername = searchParams.get("adminUsername");
+    
+    // Get the auth token - try multiple possible token names
+    let token = null;
+    
+    if (adminUsername) {
+      // Try different possible formats of admin tokens
+      const possibleTokenNames = [
+        `${adminUsername}_auth_token`,
+        `auth_token_${adminUsername}`,
+        'auth_token'  // Fallback to standard token
+      ];
+      
+      for (const tokenName of possibleTokenNames) {
+        const foundToken = request.cookies.get(tokenName)?.value;
+        if (foundToken) {
+          token = foundToken;
+          console.log(`Found token in cookie: ${tokenName}`);
+          break;
+        }
+      }
+    } else {
+      // Regular authentication
+      token = request.cookies.get('auth_token')?.value;
+    }
     
     if (!token) {
       return NextResponse.json(

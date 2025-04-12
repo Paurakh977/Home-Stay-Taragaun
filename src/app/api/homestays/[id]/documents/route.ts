@@ -19,6 +19,10 @@ export async function POST(
     await dbConnect();
     const homestayId = params.id;
 
+    // Get the adminUsername from query params if it exists
+    const { searchParams } = new URL(request.url);
+    const adminUsername = searchParams.get("adminUsername");
+
     // 1. Validate homestay exists
     const homestay = await HomestaySingle.findOne({ homestayId });
     if (!homestay) {
@@ -41,10 +45,23 @@ export async function POST(
 
     const metadataArray: DocumentMetadata[] = JSON.parse(metadataJson);
     
-    // 3. Prepare directory structure
-    const documentsDir = join(process.cwd(), "public", "uploads", homestayId, "documents");
-    if (!existsSync(documentsDir)) {
-      await mkdir(documentsDir, { recursive: true });
+    // 3. Prepare directory structure with adjusted path based on admin status
+    const baseDir = join(process.cwd(), "public", "uploads");
+    let docsPath: string;
+    let docsUrlPath: string;
+    
+    if (adminUsername) {
+      // For admin routes: /uploads/adminUsername/homestayId/documents
+      docsPath = join(baseDir, adminUsername, homestayId, "documents");
+      docsUrlPath = `/uploads/${adminUsername}/${homestayId}/documents`;
+    } else {
+      // For regular routes: /uploads/homestayId/documents
+      docsPath = join(baseDir, homestayId, "documents");
+      docsUrlPath = `/uploads/${homestayId}/documents`;
+    }
+    
+    if (!existsSync(docsPath)) {
+      await mkdir(docsPath, { recursive: true });
     }
 
     const newDocumentEntries = []; // To store data for DB update
@@ -67,8 +84,8 @@ export async function POST(
         const randomString = Math.random().toString(36).substring(2, 8);
         const fileExtension = file.name.split('.').pop() || 'bin'; // Use 'bin' if no extension
         const uniqueFilename = `${timestamp}-${randomString}.${fileExtension}`;
-        const filePathDisk = join(documentsDir, uniqueFilename);
-        const filePathDb = `/uploads/${homestayId}/documents/${uniqueFilename}`; // Relative path for DB/URL
+        const filePathDisk = join(docsPath, uniqueFilename);
+        const filePathDb = `${docsUrlPath}/${uniqueFilename}`; // Relative path for DB/URL
 
         // Prepare file info for DB
         const fileInfo = {

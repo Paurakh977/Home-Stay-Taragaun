@@ -17,7 +17,7 @@ const ENCODED_JWT_SECRET = new TextEncoder().encode(JWT_SECRET);
 
 // Regular User/Admin Paths
 const DASHBOARD_PATHS = ['/dashboard'];
-const ADMIN_UI_PATHS = ['/admin'];
+const ADMIN_UI_PATHS = ['/admin/'];
 const ADMIN_API_PATHS = ['/api/admin'];
 
 // Superadmin Paths
@@ -31,6 +31,14 @@ const SUPERADMIN_AUTH_PATHS = ['/superadmin/login', '/api/superadmin/auth']; // 
 const PUBLIC_API_PATHS = ['/api/homestays', '/api/location']; // Publicly accessible API routes
 const ASSET_REGEX = /^\/(_next\/static\/|_next\/image\/|static\/|images\/|favicon\.ico|.*\.(?:png|jpg|jpeg|gif|svg|webp))/;
 const SEED_API_PATH = '/api/seed-superadmin'; // Allow access for seeding
+
+// Regex to match admin username routes that should be public
+// Match root paths like /admin1 but not /admin1/dashboard (which requires auth)
+const ADMIN_USERNAME_REGEX = /^\/[^\/]+$/;
+
+// Regex to match nested admin username paths, specifically for any routes under an admin
+// except for the dashboard routes which require authentication
+const ADMIN_USERNAME_NESTED_REGEX = /^\/[^\/]+\/(?!dashboard).+$/;
 
 // --- Helper Functions --- 
 
@@ -78,6 +86,16 @@ export async function middleware(request: NextRequest) {
   if (ASSET_REGEX.test(pathname) || pathname === SEED_API_PATH) {
     return NextResponse.next();
   }
+  
+  // Check for admin username routes early (before other checks)
+  const isAdminUsernamePath = ADMIN_USERNAME_REGEX.test(pathname);
+  const isAdminUsernameNestedPath = ADMIN_USERNAME_NESTED_REGEX.test(pathname);
+  
+  if (isAdminUsernamePath || isAdminUsernameNestedPath) {
+    // Allow access to admin username routes without authentication
+    // (except for dashboard paths which are handled separately)
+    return NextResponse.next();
+  }
 
   // 2. Handle base /superadmin path redirection
   if (pathname === '/superadmin') {
@@ -91,12 +109,20 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/superadmin/login', request.url));
   }
 
+  // Check for admin username dashboard paths
+  const adminUsernameDashboardRegex = /^\/[^\/]+\/dashboard/;
+  const isAdminUsernameDashboardPath = adminUsernameDashboardRegex.test(pathname);
+  
   // 3. Identify Path Type
   const isSuperAdminDashboardPath = SUPERADMIN_DASHBOARD_PATHS.some(p => pathname.startsWith(p));
   const isSuperAdminAPIPath = SUPERADMIN_API_PATHS.some(p => pathname.startsWith(p)) && !SUPERADMIN_AUTH_PATHS.some(p => pathname.startsWith(p)); // Exclude auth APIs
-  const isAdminUIPath = ADMIN_UI_PATHS.some(p => pathname.startsWith(p));
+  
+  // More precise check for admin paths - ensure exact match for '/admin' or paths starting with '/admin/'
+  const isAdminUIPath = pathname === '/admin' || pathname.startsWith('/admin/');
   const isAdminAPIPath = ADMIN_API_PATHS.some(p => pathname.startsWith(p));
-  const isDashboardPath = DASHBOARD_PATHS.some(p => pathname.startsWith(p));
+  
+  // Check both standard dashboard and admin username dashboard paths
+  const isDashboardPath = DASHBOARD_PATHS.some(p => pathname.startsWith(p)) || isAdminUsernameDashboardPath;
 
   const requiresSuperAdminAuth = isSuperAdminDashboardPath || isSuperAdminAPIPath;
   const requiresAdminAuth = isAdminUIPath || isAdminAPIPath;

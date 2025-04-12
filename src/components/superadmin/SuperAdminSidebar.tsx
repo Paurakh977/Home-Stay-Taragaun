@@ -98,12 +98,23 @@ export function SuperAdminSidebar() {
 
   const handleLogout = async () => {
     try {
-      // For simplicity, just redirect - a real version would clear tokens
+      // Call the logout API
+      const response = await fetch('/api/superadmin/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Logout failed');
+      }
+
       toast.success('Signed out successfully');
       
-      // Redirect to login
+      // Use a full page redirect to ensure we clear everything
       setTimeout(() => {
-        router.push('/superadmin/login');
+        window.location.href = '/superadmin/login';
       }, 1000);
     } catch (error) {
       console.error('Logout failed', error);

@@ -37,7 +37,12 @@ export default function SuperAdminLoginPage() {
       setUsername('');
       setPassword('');
       toast.success('Login successful! Redirecting...');
-      router.push('/superadmin/dashboard');
+      
+      // Use a delay to ensure toast is visible before redirect
+      setTimeout(() => {
+        // Use window.location for a full page navigation instead of router.push
+        window.location.href = '/superadmin/dashboard';
+      }, 1000);
 
     } catch (err: any) {
       console.error('Login error:', err);

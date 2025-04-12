@@ -1,43 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
-import HomestaySingle from "@/lib/models/HomestaySingle";
-import { hashPassword } from "@/lib/utils";
+import { HomestaySingle } from "@/lib/models";
+import { verifyPassword } from "@/lib/utils";
 import jwt from "jsonwebtoken";
+import { cookies } from "next/headers";
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_for_development';
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
     await dbConnect();
     
-    // Parse request body
-    const body = await request.json();
-    const { homestayId, password } = body;
+    // Parse the request body
+    const { homestayId, password, adminUsername } = await req.json();
     
     // Validate input
     if (!homestayId || !password) {
       return NextResponse.json(
-        { success: false, error: "Homestay ID and password are required" },
+        { success: false, message: "Homestay ID and password are required" },
         { status: 400 }
       );
     }
     
-    // Find homestay by ID
-    const homestay = await HomestaySingle.findOne({ homestayId }).lean();
+    // Find the homestay
+    const homestay = await HomestaySingle.findOne({ homestayId }).select('homestayId homeStayName password adminUsername');
     
     if (!homestay) {
+      console.log(`Login failed: Homestay not found with ID ${homestayId}`);
       return NextResponse.json(
-        { success: false, error: "Homestay not found or has been deleted" },
-        { status: 404 }
+        { success: false, message: "Invalid credentials" },
+        { status: 401 }
       );
     }
     
-    // Check password - hash the provided password and compare
-    const hashedProvidedPassword = hashPassword(password);
-    
-    if (hashedProvidedPassword !== homestay.password) {
+    // If adminUsername is provided, verify that this homestay belongs to the admin
+    if (adminUsername && homestay.adminUsername !== adminUsername) {
+      console.log(`Login failed: Homestay ${homestayId} does not belong to admin ${adminUsername}`);
       return NextResponse.json(
-        { success: false, error: "Invalid credentials" },
+        { success: false, message: "This homestay is not associated with the specified admin" },
+        { status: 403 }
+      );
+    }
+    
+    // Verify password using the utility function
+    const isPasswordValid = verifyPassword(password, homestay.password);
+    
+    if (!isPasswordValid) {
+      console.log(`Login failed: Invalid password for homestay ${homestayId}`);
+      return NextResponse.json(
+        { success: false, message: "Invalid credentials" },
         { status: 401 }
       );
     }
@@ -46,47 +57,40 @@ export async function POST(request: NextRequest) {
     const token = jwt.sign(
       { 
         homestayId: homestay.homestayId,
-        id: homestay._id.toString(),
         homeStayName: homestay.homeStayName,
-        isAdmin: homestay.isAdmin
+        adminUsername: homestay.adminUsername,
+        isAdmin: true // Add isAdmin flag for middleware checks
       },
       JWT_SECRET,
-      { expiresIn: '7d' } // Token valid for 7 days
+      { expiresIn: '7d' }
     );
     
-    // Set cookie with the token
-    const response = NextResponse.json(
-      { 
-        success: true, 
-        user: {
-          homestayId: homestay.homestayId,
-          homeStayName: homestay.homeStayName,
-          isAdmin: homestay.isAdmin
-        }
-      },
-      { status: 200 }
-    );
+    // Create response with success message
+    const response = NextResponse.json({
+      success: true,
+      message: "Login successful",
+      homestayId: homestay.homestayId,
+      homeStayName: homestay.homeStayName,
+      adminUsername: homestay.adminUsername
+    });
     
-    // Set HttpOnly cookie with the token
+    // Set cookie directly on the response
     response.cookies.set({
       name: 'auth_token',
       value: token,
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 7, // 7 days in seconds
       path: '/',
-      sameSite: 'lax'  // Changed from 'strict' to 'lax' for better compatibility
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      sameSite: 'lax'
     });
     
     return response;
     
   } catch (error) {
-    console.error("Login error:", error);
+    console.error('Login error:', error);
     return NextResponse.json(
-      { 
-        success: false, 
-        error: "An error occurred during login" 
-      },
+      { success: false, message: "An error occurred during login" },
       { status: 500 }
     );
   }
