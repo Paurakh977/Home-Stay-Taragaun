@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Filter, X, MapPin, ArrowRight, Home } from 'lucide-react';
+import { toast } from 'sonner';
 
 // Add province translations
 const provinceTranslations: Record<string, string> = {
@@ -84,6 +85,25 @@ export default function AdminHomestayListPage() {
   const [availableDistricts, setAvailableDistricts] = useState<string[]>([]);
   const [availableMunicipalities, setAvailableMunicipalities] = useState<string[]>([]);
 
+  // Check authentication and fetch user data
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/admin/auth/me');
+        if (!response.ok) {
+          // Not authenticated, redirect to login
+          router.push('/admin/login');
+          return;
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        router.push('/admin/login');
+      }
+    };
+    
+    checkAuth();
+  }, [router]);
+
   // Load address data for filters
   useEffect(() => {
     const fetchAddressData = async () => {
@@ -153,7 +173,21 @@ export default function AdminHomestayListPage() {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch('/api/admin/homestays');
+        const authResponse = await fetch('/api/admin/auth/me');
+        if (!authResponse.ok) {
+          router.push('/admin/login');
+          return;
+        }
+        
+        const authData = await authResponse.json();
+        const username = authData.user?.username;
+        
+        if (!username) {
+          throw new Error('Username not found in auth data');
+        }
+        
+        // Only fetch homestays associated with this admin
+        const response = await fetch(`/api/admin/homestays?adminUsername=${username}`);
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.error || `Failed to fetch homestays: ${response.statusText}`);
@@ -161,7 +195,7 @@ export default function AdminHomestayListPage() {
         const data = await response.json();
         if (data.success) {
           // Use || [] for safety
-          const homestayData = data.data || []; 
+          const homestayData = data.homestays || []; 
           setHomestays(homestayData as Homestay[]); 
           setFilteredHomestays(homestayData as Homestay[]);
         } else {
@@ -177,9 +211,10 @@ export default function AdminHomestayListPage() {
         setLoading(false);
       }
     };
+    
     fetchHomestays();
-  }, []);
-
+  }, [router]);
+  
   // Apply filters and search
   useEffect(() => {
     let results = [...homestays];
@@ -274,156 +309,156 @@ export default function AdminHomestayListPage() {
       default: return 'bg-gray-100 text-gray-800';
     }
   };
-
+  
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Homestay Management</h1>
-          <p className="mt-2 text-sm text-gray-600">Review and manage homestay registrations</p>
-      </div>
-      
+          <p className="mt-2 text-sm text-gray-600">Review and manage your homestay registrations</p>
+        </div>
+        
         {/* Search and Filter Section */}
         <div className="bg-white rounded-xl shadow-sm mb-6">
           <div className="p-4 border-b border-gray-100">
-            <div className="flex flex-col md:flex-row gap-4">
-        {/* Search bar */}
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-              <Search size={18} className="text-gray-400" />
+          <div className="flex flex-col md:flex-row gap-4">
+          {/* Search bar */}
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                <Search size={18} className="text-gray-400" />
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name, ID, or DHSR number..."
+                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery("")}
+                  className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name, ID, or DHSR number..."
-                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
-            />
-            {searchQuery && (
-              <button 
-                onClick={() => setSearchQuery("")}
-                className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600"
-              >
-                <X size={14} />
-              </button>
-            )}
+            
+            {/* Filter button */}
+            <button 
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+            >
+              <Filter size={18} className="text-gray-500" />
+              <span>Filters</span>
+            </button>
           </div>
-          
-          {/* Filter button */}
-          <button 
-            onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
-          >
-            <Filter size={18} className="text-gray-500" />
-            <span>Filters</span>
-          </button>
-            </div>
         </div>
         
         {/* Filter options */}
         {showFilters && (
-            <div className="p-4 border-t border-gray-100">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                
-                {/* Status and Type Filters (side-by-side) */}
-                <div className="md:col-span-1 grid grid-cols-2 gap-6">
-            {/* Status filter */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-              <select
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                      className="w-full p-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
-              >
-                <option value="">All Statuses</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-              </select>
-            </div>
-            
-            {/* Homestay Type filter */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
-              <select
-                value={selectedType}
-                onChange={(e) => setSelectedType(e.target.value)}
-                      className="w-full p-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
-              >
-                <option value="">All Types</option>
-                <option value="community">Community</option>
-                <option value="private">Private</option>
-              </select>
-                  </div>
-            </div>
-            
-                {/* Location filters (grouped together) */}
-                <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-6">
-            {/* Province filter */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Province</label>
-              <select
-                value={selectedProvince}
-                onChange={(e) => setSelectedProvince(e.target.value)}
-                      className="w-full p-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
-              >
-                <option value="">All Provinces</option>
-                {addressData.allProvinces.map((province, index) => (
-                        <option key={index} value={province}>
-                          {provinceTranslations[province] || province} / {province}
-                        </option>
-                ))}
-              </select>
-            </div>
-            
-            {/* District filter */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">District</label>
-              <select
-                value={selectedDistrict}
-                onChange={(e) => setSelectedDistrict(e.target.value)}
-                      className="w-full p-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
-                disabled={!selectedProvince}
-              >
-                <option value="">All Districts</option>
-                {availableDistricts.map((district, index) => (
-                        <option key={index} value={district}>
-                          {addressData.districtTranslations[district] || district} / {district}
-                        </option>
-                ))}
-              </select>
-            </div>
-            
-            {/* Municipality filter */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Municipality</label>
-              <select
-                value={selectedMunicipality}
-                onChange={(e) => setSelectedMunicipality(e.target.value)}
-                      className="w-full p-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
-                disabled={!selectedDistrict}
-              >
-                <option value="">All Municipalities</option>
-                {availableMunicipalities.map((municipality, index) => (
-                        <option key={index} value={municipality}>
-                          {addressData.municipalityTranslations[municipality] || municipality}
-                        </option>
-                ))}
-              </select>
-                  </div>
-            </div>
-            
-                {/* Clear filters button (aligned to the bottom right area conceptually) */}
-                <div className="md:col-span-3 flex justify-start md:justify-end items-end mt-4 md:mt-0">
-              <button 
-                onClick={clearFilters}
-                    className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 flex items-center"
-              >
-                <X size={14} className="mr-1" />
-                Clear All
-              </button>
-                </div>
+          <div className="p-4 border-t border-gray-100">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              
+              {/* Status and Type Filters (side-by-side) */}
+              <div className="md:col-span-1 grid grid-cols-2 gap-6">
+              {/* Status filter */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  className="w-full p-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
+              
+              {/* Homestay Type filter */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
+                <select
+                  value={selectedType}
+                  onChange={(e) => setSelectedType(e.target.value)}
+                  className="w-full p-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                >
+                  <option value="">All Types</option>
+                  <option value="community">Community</option>
+                  <option value="private">Private</option>
+                </select>
+              </div>
+              </div>
+              
+              {/* Location filters (grouped together) */}
+              <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-6">
+              {/* Province filter */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Province</label>
+                <select
+                  value={selectedProvince}
+                  onChange={(e) => setSelectedProvince(e.target.value)}
+                  className="w-full p-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                >
+                  <option value="">All Provinces</option>
+                  {addressData.allProvinces.map((province, index) => (
+                    <option key={index} value={province}>
+                      {provinceTranslations[province] || province} / {province}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* District filter */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">District</label>
+                <select
+                  value={selectedDistrict}
+                  onChange={(e) => setSelectedDistrict(e.target.value)}
+                  className="w-full p-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                  disabled={!selectedProvince}
+                >
+                  <option value="">All Districts</option>
+                  {availableDistricts.map((district, index) => (
+                    <option key={index} value={district}>
+                      {addressData.districtTranslations[district] || district} / {district}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* Municipality filter */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Municipality</label>
+                <select
+                  value={selectedMunicipality}
+                  onChange={(e) => setSelectedMunicipality(e.target.value)}
+                  className="w-full p-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                  disabled={!selectedDistrict}
+                >
+                  <option value="">All Municipalities</option>
+                  {availableMunicipalities.map((municipality, index) => (
+                    <option key={index} value={municipality}>
+                      {addressData.municipalityTranslations[municipality] || municipality}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              </div>
+              
+              {/* Clear filters button (aligned to the bottom right area conceptually) */}
+              <div className="md:col-span-3 flex justify-start md:justify-end items-end mt-4 md:mt-0">
+                <button 
+                  onClick={clearFilters}
+                  className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 flex items-center"
+                >
+                  <X size={14} className="mr-1" />
+                  Clear All
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -434,102 +469,102 @@ export default function AdminHomestayListPage() {
           <p className="text-sm text-gray-600">
             {filteredHomestays.length} {filteredHomestays.length === 1 ? 'homestay' : 'homestays'} found
           </p>
-      </div>
-      
+        </div>
+        
       {/* Loading state */}
       {loading && (
-          <div className="bg-white rounded-xl shadow-sm p-8 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-sm text-gray-600">Loading homestays...</p>
+        <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-sm text-gray-600">Loading homestays...</p>
         </div>
       )}
 
       {/* Error state */}
       {error && (
-          <div className="bg-red-50 rounded-xl shadow-sm p-4 text-red-700">
+        <div className="bg-red-50 rounded-xl shadow-sm p-4 text-red-700">
           Error: {error}
         </div>
       )}
       
       {/* Homestay list */}
       {!loading && !error && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredHomestays.map((homestay) => (
-              <div 
-                      key={homestay._id} 
-                      onClick={() => handleRowClick(homestay.homestayId)} 
-                className="relative bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow group"
-              >
-                {/* Status badge */}
-                <div className="absolute top-3 right-3 z-10">
-                        <span className={`inline-flex text-xs px-2 py-1 rounded-full ${getStatusColor(homestay.status)}`}>
-                          {homestay.status.charAt(0).toUpperCase() + homestay.status.slice(1)}
-                        </span>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredHomestays.map((homestay) => (
+            <div 
+              key={homestay._id} 
+              onClick={() => handleRowClick(homestay.homestayId)} 
+              className="relative bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow group"
+            >
+              {/* Status badge */}
+              <div className="absolute top-3 right-3 z-10">
+                <span className={`inline-flex text-xs px-2 py-1 rounded-full ${getStatusColor(homestay.status)}`}>
+                  {homestay.status.charAt(0).toUpperCase() + homestay.status.slice(1)}
+                </span>
+              </div>
+              
+              {/* Content */}
+              <div className="p-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-1 group-hover:text-primary transition-colors">
+                  {homestay.homeStayName}
+                </h3>
+                
+                <div className="flex items-start gap-1 text-gray-500 mb-2">
+                  <MapPin size={16} className="mt-0.5 min-w-4 text-gray-400" />
+                  <span className="text-sm">{homestay.address?.formattedAddress?.en || 'N/A'}</span>
                 </div>
                 
-                {/* Content */}
-                <div className="p-4">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1 group-hover:text-primary transition-colors">
-                    {homestay.homeStayName}
-                  </h3>
-                  
-                  <div className="flex items-start gap-1 text-gray-500 mb-2">
-                    <MapPin size={16} className="mt-0.5 min-w-4 text-gray-400" />
-                    <span className="text-sm">{homestay.address?.formattedAddress?.en || 'N/A'}</span>
-                  </div>
-                  
-                  {/* DHSR Number */}
-                  {homestay.dhsrNo && (
-                    <div className="mb-3">
-                      <span className="inline-flex items-center text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded-full font-mono">
-                        DHSR: {homestay.dhsrNo}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {/* Type badge */}
+                {/* DHSR Number */}
+                {homestay.dhsrNo && (
                   <div className="mb-3">
-                    <span className={`inline-flex items-center text-xs px-2 py-1 rounded-full ${
-                      homestay.homeStayType === 'community' 
-                        ? 'bg-green-50 text-green-700' 
-                        : 'bg-blue-50 text-blue-700'
-                    }`}>
-                      {homestay.homeStayType === 'community' ? 'Community' : 'Private'} Homestay
+                    <span className="inline-flex items-center text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded-full font-mono">
+                      DHSR: {homestay.dhsrNo}
                     </span>
                   </div>
-                  
-                  {/* View button */}
-                  <div className="mt-4 pt-3 border-t border-gray-100">
-                    <div className="flex items-center justify-between text-sm text-primary">
-                      <span>View Details</span>
-                      <ArrowRight size={16} className="transform transition-transform group-hover:translate-x-1" />
-                    </div>
+                )}
+                
+                {/* Type badge */}
+                <div className="mb-3">
+                  <span className={`inline-flex items-center text-xs px-2 py-1 rounded-full ${
+                    homestay.homeStayType === 'community' 
+                      ? 'bg-green-50 text-green-700' 
+                      : 'bg-blue-50 text-blue-700'
+                  }`}>
+                    {homestay.homeStayType === 'community' ? 'Community' : 'Private'} Homestay
+                  </span>
+                </div>
+                
+                {/* View button */}
+                <div className="mt-4 pt-3 border-t border-gray-100">
+                  <div className="flex items-center justify-between text-sm text-primary">
+                    <span>View Details</span>
+                    <ArrowRight size={16} className="transform transition-transform group-hover:translate-x-1" />
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-        
-        {/* No results */}
-        {!loading && !error && filteredHomestays.length === 0 && (
-          <div className="bg-white rounded-xl shadow-sm p-8 text-center">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Home size={24} className="text-gray-400" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No homestays found</h3>
-            <p className="text-gray-600 max-w-md mx-auto mb-6">
-              We couldn't find any homestays matching your search criteria. Try adjusting your filters or search query.
-            </p>
-            <button 
-              onClick={clearFilters}
-              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
-            >
-              Clear All Filters
-            </button>
+          ))}
+        </div>
+      )}
+      
+      {/* No results */}
+      {!loading && !error && filteredHomestays.length === 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Home size={24} className="text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No homestays found</h3>
+          <p className="text-gray-600 max-w-md mx-auto mb-6">
+            We couldn't find any homestays matching your search criteria. Try adjusting your filters or search query.
+          </p>
+          <button 
+            onClick={clearFilters}
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+          >
+            Clear All Filters
+          </button>
         </div>
       )}
       </div>
     </div>
   );
-} 
+}
