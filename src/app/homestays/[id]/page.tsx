@@ -73,7 +73,7 @@ const getInitials = (name: string): string => {
 // Add helper function for constructing image URLs with adminContext support
 const getApiImageUrl = (
   imagePath: string, 
-  homestayId: string, 
+  homestayId: string | string[] | undefined, 
   adminContext?: string | null
 ): string => {
   // Add cache-busting timestamp
@@ -85,6 +85,9 @@ const getApiImageUrl = (
     console.error('No image path provided to getApiImageUrl');
     return '/images/placeholder-homestay.jpg';
   }
+  
+  // Ensure homestayId is a string
+  const idString = homestayId ? (typeof homestayId === 'string' ? homestayId : Array.isArray(homestayId) ? homestayId[0] : '') : '';
   
   if (imagePath.startsWith('/uploads/')) {
     // The image path in the database is like /uploads/admin1/homestayId/gallery/image.jpg
@@ -99,7 +102,7 @@ const getApiImageUrl = (
   
   console.log('Generated image URL:', {
     originalPath: imagePath,
-    homestayId,
+    homestayId: idString,
     adminContext,
     result
   });
