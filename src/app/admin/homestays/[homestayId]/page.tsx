@@ -117,7 +117,7 @@ export interface HomestayData {
 // --- Component Code ---
 
 interface PageProps {
-  params: Promise<{ homestayId: string }>; 
+  params: { homestayId: string }; 
 }
 
 // Helper component for displaying info sections
@@ -223,9 +223,8 @@ const EditableInfoItem: React.FC<{
   );
 };
 
-export default function AdminHomestayDetailPage({ params: paramsPromise }: PageProps) { 
-  const resolvedParams = use(paramsPromise); 
-  const { homestayId } = resolvedParams; 
+export default function AdminHomestayDetailPage({ params }: PageProps) { 
+  const { homestayId } = params; 
   const router = useRouter();
   const [homestay, setHomestay] = useState<HomestayData | null>(null);
   const [loading, setLoading] = useState(true);
