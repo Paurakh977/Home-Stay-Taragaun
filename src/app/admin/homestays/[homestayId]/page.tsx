@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, use } from 'react';
+import { useState, useEffect, useCallback, useRef, use } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 // Remove the import from '@/types/homestay' if HomestayData is defined below
 // import { HomestayData } from '@/types/homestay'; 
-import { CheckCircle, XCircle, ArrowLeft, FileText, Loader2, ExternalLink, MapPin, Phone, User, Mail, Building, Globe, Image as ImageIcon, File as FileIcon, List, Edit, Plus } from 'lucide-react';
+import { CheckCircle, XCircle, ArrowLeft, FileText, Loader2, ExternalLink, MapPin, Phone, User, Mail, Building, Globe, Image as ImageIcon, File as FileIcon, List, Edit, Plus, X, Upload, Eye, Download } from 'lucide-react';
+import { toast } from 'sonner';
 
 // --- Comprehensive Type Definition (Move to types/homestay.ts if preferred) ---
 
@@ -82,6 +83,7 @@ export interface HomestayData {
   dhsrNo?: string;
   status: 'pending' | 'approved' | 'rejected';
   description?: string;
+  adminUsername?: string; // The admin user who owns this homestay
   
   villageName?: string; // Top-level village name
   ownerName?: string;   // Top-level owner name (fallback)
@@ -223,19 +225,63 @@ const EditableInfoItem: React.FC<{
   );
 };
 
-export default function AdminHomestayDetailPage({ params }: PageProps) { 
-  const { homestayId } = params; 
+export default function AdminHomestayDetailPage() { 
+  // Get params safely from Next.js useParams hook
+  const params = useParams();
+  const homestayId = params.homestayId as string;
   const router = useRouter();
+  
   const [homestay, setHomestay] = useState<HomestayData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [updateError, setUpdateError] = useState<string | null>(null);
   
+  // Admin username from URL
+  const [adminUsername, setAdminUsername] = useState<string | null>(null);
+  
+  // Extract admin username from URL
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      console.log("Extracting adminUsername from URL:", window.location.href);
+      
+      // First try from query parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      console.log("URL search params:", urlParams.toString());
+      let username = urlParams.get('username');
+      
+      // If not found in query params, try to extract from URL path
+      if (!username) {
+        console.log("Trying to extract username from URL path");
+        const pathSegments = window.location.pathname.split('/');
+        console.log("Path segments:", pathSegments);
+        
+        // Look for admin segment in URL
+        const adminIndex = pathSegments.indexOf('admin');
+        if (adminIndex >= 0 && adminIndex + 1 < pathSegments.length) {
+          const possibleUsername = pathSegments[adminIndex + 1];
+          if (possibleUsername && possibleUsername !== 'homestays') {
+            username = possibleUsername;
+            console.log("Found username in path:", username);
+          }
+        }
+      }
+      
+      console.log("Final username value:", username);
+      
+      if (username) {
+        setAdminUsername(username);
+        console.log("Admin username set:", username);
+      } else {
+        console.warn("No username parameter found in URL");
+      }
+    }
+  }, []);
+  
   // Inline editing state
   const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [editedData, setEditedData] = useState<Partial<HomestayData>>({});
+  const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   
   // Location dropdown data
@@ -246,8 +292,53 @@ export default function AdminHomestayDetailPage({ params }: PageProps) {
   const [districtMunicipalitiesMap, setDistrictMunicipalitiesMap] = useState<Record<string, string[]>>({});
   const [locationDataLoaded, setLocationDataLoaded] = useState(false);
   
-  // Remove activeDocumentIndex state if using direct links
-  // const [activeDocumentIndex, setActiveDocumentIndex] = useState<number | null>(null);
+  // Document upload state
+  const [documentItems, setDocumentItems] = useState<Array<{id: string; title: string; description: string; files: File[]}>>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRefs = useRef<HTMLInputElement[]>([]);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewFile, setPreviewFile] = useState<{ file: File; url: string } | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    documentIndex: number;
+    isDeleting: boolean;
+  }>({
+    isOpen: false,
+    documentIndex: -1,
+    isDeleting: false
+  });
+
+  // Initialize document items
+  useEffect(() => {
+    setDocumentItems([
+      { id: crypto.randomUUID(), title: "", description: "", files: [] }
+    ]);
+
+    // Log URL parameters whenever the component mounts
+    console.log("Component mounted. URL:", window.location.href);
+    console.log("Search params:", window.location.search);
+  }, []);
+
+  // Clean up object URLs when component unmounts
+  useEffect(() => {
+    return () => {
+      if (previewFile?.url && previewFile.url.startsWith('blob:')) {
+        URL.revokeObjectURL(previewFile.url);
+      }
+    };
+  }, [previewFile]);
+
+  // Set up keyboard listeners for document preview modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && previewOpen) {
+        closePreview();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewOpen]);
 
   const fetchHomestayDetails = useCallback(async () => {
     setLoading(true);
@@ -262,6 +353,13 @@ export default function AdminHomestayDetailPage({ params }: PageProps) {
       if (data.success) {
         const fetchedData = data.data as HomestayData;
         console.log("Fetched Homestay Data:", JSON.stringify(fetchedData, null, 2)); 
+        
+        // Debug the adminUsername if available
+        if (fetchedData.adminUsername) {
+          console.log("Found adminUsername in homestay data:", fetchedData.adminUsername);
+        } else {
+          console.warn("No adminUsername found in homestay data, will need to get it from URL params");
+        }
         
         // Ensure top-level address exists if relying on it primarily
         fetchedData.address = fetchedData.address || {}; 
@@ -423,10 +521,16 @@ export default function AdminHomestayDetailPage({ params }: PageProps) {
 
   const getDocumentUrl = (filePath?: string) => {
     if (!filePath) return '#';
-    // Convert /uploads/ path to /api/documents/ path
-    return filePath.startsWith('/uploads/') 
-      ? filePath.replace('/uploads/', '/api/documents/')
-      : filePath;
+    
+    console.log("Getting URL for document path:", filePath);
+    
+    // Convert /uploads/ path to /api/images/ path (use images endpoint for all media)
+    if (filePath.startsWith('/uploads/')) {
+      const apiPath = filePath.replace('/uploads/', '/api/images/');
+      console.log("Converted document path to:", apiPath);
+      return apiPath;
+    }
+    return filePath;
   };
   
   // Handle nested field changes for address object
@@ -707,6 +811,309 @@ export default function AdminHomestayDetailPage({ params }: PageProps) {
     }
     
     return homestay?.[field];
+  };
+
+  // Document upload functions
+  const addDocumentItem = () => {
+    setDocumentItems(prevItems => [
+      ...prevItems,
+      { id: crypto.randomUUID(), title: "", description: "", files: [] }
+    ]);
+  };
+
+  const removeDocumentItem = (id: string) => {
+    if (documentItems.length === 1) {
+      toast.error("You must have at least one document item");
+      return;
+    }
+    setDocumentItems(documentItems.filter(item => item.id !== id));
+  };
+
+  const updateDocumentItem = (id: string, field: 'title' | 'description', value: string) => {
+    setDocumentItems(
+      documentItems.map(item => 
+        item.id === id ? { ...item, [field]: value } : item
+      )
+    );
+  };
+
+  const handleFileChange = (id: string, files: FileList | null) => {
+    if (!files) return;
+    
+    setDocumentItems(
+      documentItems.map(item => 
+        item.id === id 
+          ? { 
+              ...item, 
+              files: [...Array.from(files)]
+            } 
+          : item
+      )
+    );
+  };
+
+  const removeFile = (documentId: string, fileIndex: number) => {
+    setDocumentItems(
+      documentItems.map(item => 
+        item.id === documentId 
+          ? { 
+              ...item, 
+              files: item.files.filter((_, idx) => idx !== fileIndex)
+            } 
+          : item
+      )
+    );
+  };
+
+  const getFileIcon = (file: File) => {
+    const type = file.type.toLowerCase();
+    if (type.startsWith('image/')) return '🖼️';
+    if (type === 'application/pdf') return '📄';
+    if (type.startsWith('text/')) return '📝';
+    if (type.startsWith('video/')) return '🎬';
+    if (type.startsWith('audio/')) return '🎵';
+    return '📎';
+  };
+
+  const canPreviewInBrowser = (file: File): boolean => {
+    const type = file.type.toLowerCase();
+    return (
+      type.startsWith('image/') || 
+      type === 'application/pdf' || 
+      type === 'text/plain' || 
+      type === 'text/html' || 
+      type === 'text/csv'
+    );
+  };
+
+  const openPreview = (file: File) => {
+    const url = URL.createObjectURL(file);
+    setPreviewFile({ file, url });
+    setPreviewOpen(true);
+  };
+
+  const closePreview = useCallback(() => {
+    if (previewFile?.url && previewFile.url.startsWith('blob:')) {
+      URL.revokeObjectURL(previewFile.url);
+    }
+    setPreviewFile(null);
+    setPreviewOpen(false);
+  }, [previewFile, previewOpen]);
+
+  // Handle document upload
+  const handleUploadDocuments = async () => {
+    // Check if homestay and admin username are available
+    if (!homestay) {
+      toast.error("Missing homestay information for uploads");
+      return;
+    }
+
+    // Try to get admin username - with fallback for testing
+    let effectiveAdminUsername = adminUsername;
+    
+    if (!effectiveAdminUsername) {
+      console.warn("No adminUsername found in state, checking URL again");
+      
+      // Try to extract from URL again
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        effectiveAdminUsername = urlParams.get('username');
+        
+        // Last resort - try to extract from path
+        if (!effectiveAdminUsername) {
+          const pathSegments = window.location.pathname.split('/');
+          const adminIndex = pathSegments.indexOf('admin');
+          if (adminIndex >= 0 && adminIndex + 1 < pathSegments.length) {
+            const possibleUsername = pathSegments[adminIndex + 1];
+            if (possibleUsername && possibleUsername !== 'homestays') {
+              effectiveAdminUsername = possibleUsername;
+            }
+          }
+        }
+      }
+    }
+    
+    // IMPORTANT: If still no admin username, get the user who owns this homestay from the database
+    if (!effectiveAdminUsername && homestay.adminUsername) {
+      console.log("Using homestay's adminUsername:", homestay.adminUsername);
+      effectiveAdminUsername = homestay.adminUsername;
+    }
+    
+    if (!effectiveAdminUsername) {
+      toast.error("Admin username is required for uploads. Please check the URL parameters.");
+      console.error("Missing adminUsername for uploads. Current URL:", window.location.href);
+      return;
+    }
+
+    console.log("Final adminUsername for upload:", effectiveAdminUsername);
+
+    // Validate form (title and files)
+    const hasEmptyTitle = documentItems.some(item => !item.title.trim());
+    if (hasEmptyTitle) {
+      toast.error("Please provide titles for all documents");
+      return;
+    }
+
+    const hasNoFiles = documentItems.some(item => item.files.length === 0);
+    if (hasNoFiles) {
+      toast.error("Please upload at least one file for each document entry");
+      return;
+    }
+
+    setIsUploading(true);
+    console.log("Starting upload with adminUsername:", effectiveAdminUsername);
+
+    try {
+      const formData = new FormData();
+
+      // 1. Prepare metadata (titles and descriptions)
+      const metadata = documentItems.map(item => ({ 
+        title: item.title,
+        description: item.description 
+      }));
+      formData.append("metadata", JSON.stringify(metadata));
+
+      // 2. Append files with structured keys (file_{itemIndex}_{fileIndex})
+      documentItems.forEach((item, itemIndex) => {
+        item.files.forEach((file, fileIndex) => {
+          formData.append(`file_${itemIndex}_${fileIndex}`, file, file.name);
+        });
+      });
+      
+      // 3. Send the request with correct path for admin (ensuring right path)
+      const uploadUrl = `/api/homestays/${homestay.homestayId}/documents?adminUsername=${effectiveAdminUsername}`;
+      console.log("Uploading to:", uploadUrl);
+
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to upload documents');
+      }
+
+      toast.success(result.message || "Documents uploaded successfully");
+
+      // Reset form with a single empty item
+      setDocumentItems([
+        { id: crypto.randomUUID(), title: "", description: "", files: [] }
+      ]);
+      
+      // Refresh homestay data to show the newly uploaded documents
+      fetchHomestayDetails();
+    } catch (error) {
+      console.error("Error uploading documents:", error);
+      toast.error(`Upload failed: ${error instanceof Error ? error.message : 'Please try again.'}`);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Function to handle document deletion
+  const handleDeleteDocument = (index: number) => {
+    setDeleteConfirmation({
+      isOpen: true,
+      documentIndex: index,
+      isDeleting: false
+    });
+  };
+
+  const deleteDocument = async () => {
+    if (!homestay) {
+      toast.error("Homestay data is missing");
+      return;
+    }
+    
+    // Get the appropriate adminUsername
+    let effectiveAdminUsername = adminUsername;
+    
+    if (!effectiveAdminUsername) {
+      // Try URL params
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        effectiveAdminUsername = urlParams.get('username');
+        
+        // Try path segments
+        if (!effectiveAdminUsername) {
+          const pathSegments = window.location.pathname.split('/');
+          const adminIndex = pathSegments.indexOf('admin');
+          if (adminIndex >= 0 && adminIndex + 1 < pathSegments.length) {
+            const possibleUsername = pathSegments[adminIndex + 1];
+            if (possibleUsername && possibleUsername !== 'homestays') {
+              effectiveAdminUsername = possibleUsername;
+            }
+          }
+        }
+      }
+      
+      // Try the homestay data
+      if (!effectiveAdminUsername && homestay.adminUsername) {
+        console.log("Using homestay's adminUsername for delete:", homestay.adminUsername);
+        effectiveAdminUsername = homestay.adminUsername;
+      }
+      
+      if (!effectiveAdminUsername) {
+        toast.error("Admin username is required for deleting documents");
+        return;
+      }
+    }
+    
+    console.log("Final adminUsername for delete:", effectiveAdminUsername);
+    console.log("Document to delete index:", deleteConfirmation.documentIndex);
+    
+    try {
+      setDeleteConfirmation(prev => ({ ...prev, isDeleting: true }));
+      
+      // Construct the API URL with admin context
+      let apiUrl = `/api/homestays/${homestay.homestayId}/documents?adminUsername=${effectiveAdminUsername}`;
+      console.log("Deleting from:", apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          documentIndex: deleteConfirmation.documentIndex
+        })
+      });
+      
+      // Log the response for debugging
+      console.log("Delete response status:", response.status);
+      
+      const responseData = await response.json();
+      console.log("Delete response data:", responseData);
+      
+      if (!response.ok) {
+        throw new Error(responseData.error || responseData.message || 'Failed to delete document');
+      }
+      
+      // Create success message with file deletion info
+      let successMessage = 'Document deleted successfully';
+      if (responseData.filesDeletion) {
+        const { total, deleted, failed } = responseData.filesDeletion;
+        if (failed > 0) {
+          successMessage += `. Warning: ${failed} of ${total} files could not be removed from storage.`;
+        } else {
+          successMessage += `. All ${deleted} files removed from storage.`;
+        }
+      }
+      
+      toast.success(successMessage);
+      setDeleteConfirmation({isOpen: false, documentIndex: -1, isDeleting: false});
+      
+      // Refresh homestay data
+      fetchHomestayDetails();
+      
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to delete document');
+    } finally {
+      setDeleteConfirmation(prev => ({ ...prev, isDeleting: false }));
+    }
   };
 
   // --- Render Logic ---
@@ -1479,41 +1886,364 @@ export default function AdminHomestayDetailPage({ params }: PageProps) {
              )}
           </InfoSection>
 
-          {/* Documents Section - Improved Layout */}
+          {/* Documents Section - Improved Layout with Upload Functionality */}
            <InfoSection title="Documents" icon={FileIcon}>
-             {homestay.documents && homestay.documents.length > 0 ? (
+             {/* Document Upload Section */}
+             <div className="mb-6">
+               <div className="flex justify-between items-center mb-3">
+                 <h3 className="text-sm font-medium text-gray-700">Upload New Documents</h3>
+                 {isUploading && (
+                   <div className="flex items-center text-xs text-blue-600">
+                     <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                     Uploading...
+                   </div>
+                 )}
+               </div>
+               
+               {/* Document Upload Form */}
                <div className="space-y-4">
-                 {homestay.documents.map((docGroup, index) => (
-                   <div key={index}>
-                     <h4 className="text-sm font-medium text-gray-800 mb-1">{docGroup.title}</h4>
-                     {docGroup.description && <p className="text-xs text-gray-500 mb-2">{docGroup.description}</p>}
-                     <ul className="space-y-1">
-                       {docGroup.files.map((file, fileIndex) => (
-                         <li key={fileIndex} className="flex items-center justify-between bg-gray-50 hover:bg-gray-100 p-2 rounded-md text-xs">
-                           <div className="flex items-center overflow-hidden mr-2">
-                             <FileText className="h-3.5 w-3.5 mr-1.5 text-blue-600 flex-shrink-0" />
-                             <span className="truncate" title={file.originalName}>
-                               {file.originalName} 
-                             </span>
-                             <span className="ml-1 text-gray-400 flex-shrink-0">({(file.size / 1024).toFixed(1)} KB)</span>
+                 {documentItems.map((item, index) => (
+                   <div 
+                     key={item.id} 
+                     className="p-4 border border-gray-200 rounded-lg relative"
+                   >
+                     {documentItems.length > 1 && (
+                       <button
+                         type="button"
+                         onClick={() => removeDocumentItem(item.id)}
+                         className="absolute top-2 right-2 text-gray-400 hover:text-red-500 transition-colors"
+                         aria-label="Remove document"
+                       >
+                         <X size={16} />
+                       </button>
+                     )}
+                     
+                     <div className="mb-3">
+                       <label htmlFor={`title-${item.id}`} className="block text-xs font-medium text-gray-700 mb-1">
+                         Document Title <span className="text-red-500">*</span>
+                       </label>
+                       <input
+                         type="text"
+                         id={`title-${item.id}`}
+                         value={item.title}
+                         onChange={(e) => updateDocumentItem(item.id, 'title', e.target.value)}
+                         placeholder="e.g., Business Registration Certificate"
+                         className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                         required
+                       />
+                     </div>
+                     
+                     <div className="mb-3">
+                       <label htmlFor={`description-${item.id}`} className="block text-xs font-medium text-gray-700 mb-1">
+                         Document Description
+                       </label>
+                       <textarea
+                         id={`description-${item.id}`}
+                         value={item.description}
+                         onChange={(e) => updateDocumentItem(item.id, 'description', e.target.value)}
+                         placeholder="Briefly describe this document"
+                         className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary h-16 resize-none"
+                       />
+                     </div>
+                     
+                     <div>
+                       <label className="block text-xs font-medium text-gray-700 mb-1">
+                         Upload Files <span className="text-red-500">*</span>
+                       </label>
+                       
+                       <div 
+                         onClick={() => fileInputRefs.current[index]?.click()}
+                         className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:bg-gray-50 transition-colors"
+                       >
+                         <input
+                           type="file"
+                           ref={(el) => {
+                             if (el) fileInputRefs.current[index] = el;
+                           }}
+                           onChange={(e) => handleFileChange(item.id, e.target.files)}
+                           className="hidden"
+                           multiple
+                           accept="*/*"
+                         />
+                         
+                         {item.files.length === 0 ? (
+                           <div className="flex flex-col items-center py-2">
+                             <Upload className="h-8 w-8 text-gray-400 mb-1" />
+                             <p className="text-xs text-gray-500">
+                               Click to browse files
+                             </p>
                            </div>
-                           <a 
-                             href={getDocumentUrl(file.filePath)} 
-                             target="_blank" 
-                             rel="noopener noreferrer" 
-                             className="p-1 text-primary hover:text-primary/80 flex-shrink-0"
-                             title="Open document in new tab"
-                           >
-                             <ExternalLink className="h-3.5 w-3.5" />
-                           </a>
-                         </li>
-                       ))}
-                     </ul>
+                         ) : (
+                           <div className="flex flex-col items-center py-1">
+                             <CheckCircle className="h-6 w-6 text-green-500 mb-1" />
+                             <p className="text-xs font-medium text-gray-700">
+                               {item.files.length} {item.files.length === 1 ? 'file' : 'files'} selected
+                             </p>
+                           </div>
+                         )}
+                       </div>
+                     </div>
+                     
+                     {/* Selected Files List with Preview */}
+                     {item.files.length > 0 && (
+                       <div className="mt-3">
+                         <h4 className="text-xs font-medium text-gray-700 mb-1">Selected Files:</h4>
+                         <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
+                           {item.files.map((file, fileIndex) => (
+                             <div 
+                               key={fileIndex}
+                               className="flex items-center justify-between bg-gray-50 p-2 rounded-md"
+                             >
+                               <div className="flex items-center">
+                                 <span className="text-sm mr-2">{getFileIcon(file)}</span>
+                                 <div>
+                                   <p className="text-xs text-gray-700 font-medium truncate max-w-[180px]">
+                                     {file.name}
+                                   </p>
+                                   <p className="text-[10px] text-gray-500">
+                                     {(file.size / 1024 / 1024).toFixed(2)} MB
+                                   </p>
+                                 </div>
+                               </div>
+                               <div className="flex items-center gap-1">
+                                 {canPreviewInBrowser(file) && (
+                                   <button
+                                     type="button"
+                                     onClick={() => openPreview(file)}
+                                     className="text-blue-500 hover:text-blue-700 p-1"
+                                     aria-label="Preview file"
+                                   >
+                                     <Eye size={14} />
+                                   </button>
+                                 )}
+                                 <button
+                                   type="button"
+                                   onClick={() => removeFile(item.id, fileIndex)}
+                                   className="text-gray-400 hover:text-red-500 p-1"
+                                   aria-label="Remove file"
+                                 >
+                                   <X size={14} />
+                                 </button>
+                               </div>
+                             </div>
+                           ))}
+                         </div>
+                       </div>
+                     )}
                    </div>
                  ))}
+                 
+                 <div className="flex justify-between gap-2">
+                   <button
+                     type="button"
+                     onClick={addDocumentItem}
+                     className="flex items-center justify-center px-3 py-1.5 border border-gray-300 rounded-md text-xs text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                     disabled={isUploading}
+                   >
+                     <Plus className="h-3 w-3 mr-1" />
+                     Add Another Document
+                   </button>
+                   
+                   <button
+                     type="button"
+                     onClick={handleUploadDocuments}
+                     className="flex items-center justify-center px-4 py-1.5 bg-primary text-white rounded-md text-xs hover:bg-primary/90 transition-colors disabled:opacity-70"
+                     disabled={isUploading}
+                   >
+                     {isUploading ? (
+                       <>
+                         <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                         Uploading...
+                       </>
+                     ) : (
+                       <>
+                         <Upload className="h-3 w-3 mr-1" />
+                         Upload Documents
+                       </>
+                     )}
+                   </button>
+                 </div>
                </div>
-             ) : (
-               <p className="text-gray-500 italic">No documents uploaded.</p>
+             </div>
+
+             {/* Existing Documents List */}
+             <div className="border-t border-gray-200 pt-4 mt-4">
+               <h3 className="text-sm font-medium text-gray-700 mb-3">Uploaded Documents</h3>
+               {homestay.documents && homestay.documents.length > 0 ? (
+                 <div className="space-y-4">
+                   {homestay.documents.map((docGroup, index) => (
+                     <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
+                       <div className="bg-gray-50 p-2 border-b border-gray-200 flex justify-between items-center">
+                         <div>
+                           <h4 className="text-sm font-medium text-gray-800">{docGroup.title}</h4>
+                           {docGroup.description && <p className="text-xs text-gray-500">{docGroup.description}</p>}
+                         </div>
+                         <button 
+                           onClick={() => handleDeleteDocument(index)}
+                           className="p-1 text-red-500 hover:bg-red-50 rounded"
+                           title="Delete document"
+                         >
+                           <X size={16} />
+                         </button>
+                       </div>
+                       <ul className="divide-y divide-gray-100">
+                         {docGroup.files.map((file, fileIndex) => (
+                           <li key={fileIndex} className="flex items-center justify-between p-2 hover:bg-gray-50">
+                             <div className="flex items-center overflow-hidden mr-2">
+                               <FileText className="h-3.5 w-3.5 mr-1.5 text-blue-600 flex-shrink-0" />
+                               <span className="truncate text-xs" title={file.originalName}>
+                                 {file.originalName} 
+                               </span>
+                               <span className="ml-1 text-xs text-gray-400 flex-shrink-0">
+                                 ({(file.size / 1024).toFixed(1)} KB)
+                               </span>
+                             </div>
+                             <div className="flex items-center gap-1">
+                               <a 
+                                 href={getDocumentUrl(file.filePath)} 
+                                 target="_blank" 
+                                 rel="noopener noreferrer" 
+                                 className="p-1 text-blue-600 hover:text-blue-800"
+                                 title="View"
+                               >
+                                 <ExternalLink className="h-3.5 w-3.5" />
+                               </a>
+                               <a 
+                                 href={`${getDocumentUrl(file.filePath)}?download=true`}
+                                 className="p-1 text-green-600 hover:text-green-800"
+                                 title="Download"
+                               >
+                                 <Download className="h-3.5 w-3.5" />
+                               </a>
+                             </div>
+                           </li>
+                         ))}
+                       </ul>
+                     </div>
+                   ))}
+                 </div>
+               ) : (
+                 <p className="text-xs text-gray-500 italic">No documents uploaded yet.</p>
+               )}
+             </div>
+             
+             {/* File Preview Modal */}
+             {previewOpen && previewFile && (
+               <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+                    onClick={closePreview}>
+                 <div className="relative bg-white rounded-lg max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+                      onClick={e => e.stopPropagation()}>
+                   {/* Modal Header */}
+                   <div className="flex justify-between items-center p-3 border-b border-gray-200">
+                     <h3 className="text-sm font-semibold text-gray-900 truncate max-w-[calc(100%-6rem)]">
+                       {previewFile.file.name}
+                     </h3>
+                     <div className="flex items-center gap-1">
+                       <a 
+                         href={previewFile.url} 
+                         download={previewFile.file.name}
+                         target="_blank"
+                         rel="noopener noreferrer"
+                         className="text-gray-500 hover:text-gray-700 p-1"
+                         title="Download"
+                       >
+                         <Download size={16} />
+                       </a>
+                       <button
+                         type="button"
+                         onClick={closePreview}
+                         className="text-gray-500 hover:text-gray-700 p-1"
+                         title="Close"
+                       >
+                         <X size={16} />
+                       </button>
+                     </div>
+                   </div>
+                   
+                   {/* Modal Body */}
+                   <div className="flex-1 overflow-auto bg-gray-100 min-h-[300px]">
+                     {previewFile.file.type.startsWith('image/') ? (
+                       <div className="flex items-center justify-center h-full p-4">
+                         <img
+                           src={previewFile.url}
+                           alt={previewFile.file.name}
+                           className="max-w-full max-h-full object-contain"
+                         />
+                       </div>
+                     ) : previewFile.file.type === 'application/pdf' ? (
+                       <iframe
+                         src={`${previewFile.url}#toolbar=1&navpanes=1`}
+                         className="w-full h-[85vh]" 
+                         title={previewFile.file.name}
+                         style={{minHeight: "800px"}}
+                       ></iframe>
+                     ) : previewFile.file.type.startsWith('text/') ? (
+                       <div className="p-4 h-full">
+                         <div className="bg-white p-4 rounded border border-gray-200 h-full overflow-auto">
+                           <pre className="whitespace-pre-wrap break-all text-sm">
+                             Loading text content...
+                           </pre>
+                         </div>
+                       </div>
+                     ) : (
+                       <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                         <FileText className="h-16 w-16 text-gray-300 mb-4" />
+                         <h4 className="text-sm font-medium text-gray-700 mb-2">Preview not available</h4>
+                         <p className="text-xs text-gray-500 max-w-md">
+                           This file type cannot be previewed in the browser.
+                         </p>
+                         <a
+                           href={previewFile.url}
+                           download={previewFile.file.name}
+                           className="mt-4 flex items-center gap-2 px-3 py-1.5 bg-primary text-white rounded-md hover:bg-primary/90 text-sm"
+                         >
+                           <Download size={14} />
+                           Download File
+                         </a>
+                       </div>
+                     )}
+                   </div>
+                 </div>
+               </div>
+             )}
+             
+             {/* Delete Confirmation Modal */}
+             {deleteConfirmation.isOpen && (
+               <div 
+                 className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+                 onClick={() => setDeleteConfirmation({isOpen: false, documentIndex: -1, isDeleting: false})}
+               >
+                 <div 
+                   className="bg-white rounded-lg p-4 max-w-md w-full" 
+                   onClick={e => e.stopPropagation()}
+                 >
+                   <h3 className="text-lg font-medium text-gray-900 mb-2">Delete Document</h3>
+                   <p className="text-sm text-gray-600 mb-4">
+                     Are you sure you want to delete this document? This action cannot be undone.
+                   </p>
+                   <div className="flex justify-end gap-2">
+                     <button
+                       onClick={() => setDeleteConfirmation({isOpen: false, documentIndex: -1, isDeleting: false})}
+                       className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md text-sm"
+                       disabled={deleteConfirmation.isDeleting}
+                     >
+                       Cancel
+                     </button>
+                     <button
+                       onClick={deleteDocument}
+                       className="px-3 py-1.5 bg-red-600 text-white rounded-md text-sm flex items-center"
+                       disabled={deleteConfirmation.isDeleting}
+                     >
+                       {deleteConfirmation.isDeleting ? (
+                         <>
+                           <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                           Deleting...
+                         </>
+                       ) : "Delete"}
+                     </button>
+                   </div>
+                 </div>
+               </div>
              )}
            </InfoSection>
 

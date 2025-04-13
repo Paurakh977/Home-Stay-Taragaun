@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import HomestaySingle from "@/lib/models/HomestaySingle";
 import { join } from "path";
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, writeFile, rm } from "fs/promises";
 import { existsSync } from "fs";
 
 // Interface for the structure of metadata expected from the frontend
@@ -22,13 +22,43 @@ export async function POST(
     // Get the adminUsername from query params if it exists
     const { searchParams } = new URL(request.url);
     const adminUsername = searchParams.get("adminUsername");
+    
+    console.log("Document Upload Request:", {
+      homestayId,
+      adminUsername,
+      requestUrl: request.url
+    });
 
     // 1. Validate homestay exists
     const homestay = await HomestaySingle.findOne({ homestayId });
     if (!homestay) {
+      console.error("Homestay not found:", homestayId);
       return NextResponse.json(
         { error: "Homestay not found" },
         { status: 404 }
+      );
+    }
+    
+    // Log the found homestay details
+    console.log("Found homestay:", {
+      id: homestay._id,
+      homestayId: homestay.homestayId,
+      homeStayName: homestay.homeStayName,
+      adminUsername: homestay.adminUsername // This field might not exist in the model
+    });
+
+    // If no adminUsername provided in URL, try to get it from the homestay record
+    let effectiveAdminUsername = adminUsername;
+    if (!effectiveAdminUsername && homestay.adminUsername) {
+      effectiveAdminUsername = homestay.adminUsername;
+      console.log("Using adminUsername from homestay record:", effectiveAdminUsername);
+    }
+    
+    if (!effectiveAdminUsername) {
+      console.error("No adminUsername available for upload path");
+      return NextResponse.json(
+        { error: "Admin username is required for document uploads" },
+        { status: 400 }
       );
     }
 
@@ -50,10 +80,10 @@ export async function POST(
     let docsPath: string;
     let docsUrlPath: string;
     
-    if (adminUsername) {
+    if (effectiveAdminUsername) {
       // For admin routes: /uploads/adminUsername/homestayId/documents
-      docsPath = join(baseDir, adminUsername, homestayId, "documents");
-      docsUrlPath = `/uploads/${adminUsername}/${homestayId}/documents`;
+      docsPath = join(baseDir, effectiveAdminUsername, homestayId, "documents");
+      docsUrlPath = `/uploads/${effectiveAdminUsername}/${homestayId}/documents`;
     } else {
       // For regular routes: /uploads/homestayId/documents
       docsPath = join(baseDir, homestayId, "documents");
@@ -160,6 +190,169 @@ export async function POST(
     }
     return NextResponse.json(
       { error: "Failed to upload documents", message: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await dbConnect();
+    const homestayId = params.id;
+    const { searchParams } = new URL(request.url);
+    const adminUsername = searchParams.get("adminUsername");
+    
+    console.log("Document Delete Request:", {
+      homestayId,
+      adminUsername,
+      requestUrl: request.url
+    });
+
+    const body = await request.json();
+    const { documentIndex } = body;
+
+    if (documentIndex === undefined) {
+      return NextResponse.json(
+        { error: "Document index is required" },
+        { status: 400 }
+      );
+    }
+
+    const homestay = await HomestaySingle.findOne({ homestayId });
+    if (!homestay) {
+      return NextResponse.json(
+        { error: "Homestay not found" },
+        { status: 404 }
+      );
+    }
+    
+    // Log the found homestay details
+    console.log("Found homestay for delete:", {
+      id: homestay._id,
+      homestayId: homestay.homestayId,
+      adminUsername: homestay.adminUsername // This field might not exist in the model
+    });
+
+    // If no adminUsername provided in URL, try to get it from the homestay record
+    let effectiveAdminUsername = adminUsername;
+    if (!effectiveAdminUsername && homestay.adminUsername) {
+      effectiveAdminUsername = homestay.adminUsername;
+      console.log("Using adminUsername from homestay record for delete:", effectiveAdminUsername);
+    }
+
+    if (!homestay.documents || !Array.isArray(homestay.documents) || documentIndex >= homestay.documents.length) {
+      return NextResponse.json(
+        { error: "Document not found" },
+        { status: 404 }
+      );
+    }
+
+    const documentToDelete = homestay.documents[documentIndex];
+    if (!documentToDelete) {
+      return NextResponse.json(
+        { error: "Document not found at specified index" },
+        { status: 404 }
+      );
+    }
+    
+    // Delete files from filesystem
+    let deletedFiles = 0;
+    let failedFiles = 0;
+    
+    if (documentToDelete.files && documentToDelete.files.length > 0) {
+      console.log(`Attempting to delete ${documentToDelete.files.length} files`);
+      
+      for (const file of documentToDelete.files) {
+        try {
+          // Get the file path relative to 'public' directory
+          let publicFilePath = file.filePath;
+          
+          // Ensure the path starts with /uploads/
+          if (!publicFilePath.startsWith('/uploads/')) {
+            console.warn(`File path doesn't start with /uploads/: ${publicFilePath}`);
+            publicFilePath = `/uploads/${publicFilePath.replace(/^\/+/, '')}`;
+          }
+          
+          // Construct the absolute path by joining process.cwd() with 'public' and the relative path
+          const basePath = process.cwd();
+          const publicDir = join(basePath, 'public');
+          
+          // Remove the leading slash for joining
+          const relativeFilePath = publicFilePath.replace(/^\/+/, '');
+          const absoluteFilePath = join(publicDir, relativeFilePath);
+          
+          console.log("File deletion info:", {
+            originalPath: file.filePath,
+            publicFilePath,
+            absoluteFilePath
+          });
+          
+          // Check if the file exists before attempting to delete
+          if (existsSync(absoluteFilePath)) {
+            await rm(absoluteFilePath, { force: true });
+            console.log("Successfully deleted file:", absoluteFilePath);
+            deletedFiles++;
+          } else {
+            // Try alternative path construction as fallback
+            const alternativePath = join(basePath, file.filePath);
+            if (existsSync(alternativePath)) {
+              await rm(alternativePath, { force: true });
+              console.log("Successfully deleted file (alternative path):", alternativePath);
+              deletedFiles++;
+            } else {
+              console.warn(`File not found for deletion: ${absoluteFilePath}`);
+              failedFiles++;
+            }
+          }
+        } catch (deleteError) {
+          console.error(`Error deleting file ${file.filePath}:`, deleteError);
+          failedFiles++;
+        }
+      }
+    }
+    
+    console.log(`File deletion summary: ${deletedFiles} deleted, ${failedFiles} failed`);
+
+    // 7. Update database
+    try {
+      // Approach 1: If the document has an _id, use that (with type safety)
+      if (documentToDelete && typeof documentToDelete === 'object' && '_id' in documentToDelete && documentToDelete._id) {
+        await HomestaySingle.updateOne(
+          { homestayId },
+          { $pull: { documents: { _id: documentToDelete._id } } }
+        );
+        console.log(`Removed document with _id: ${documentToDelete._id}`);
+      } else {
+        // Approach 2: Direct array manipulation using the index
+        homestay.documents.splice(documentIndex, 1);
+        await homestay.save();
+        console.log(`Removed document at index: ${documentIndex}`);
+      }
+    } catch (dbError) {
+      console.error("Error in database update:", dbError);
+      // Fallback approach
+      homestay.documents = homestay.documents.filter((_, idx) => idx !== documentIndex);
+      await homestay.save();
+      console.log(`Removed document using filter method at index: ${documentIndex}`);
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Document deleted successfully",
+      filesDeletion: {
+        total: documentToDelete.files ? documentToDelete.files.length : 0,
+        deleted: deletedFiles,
+        failed: failedFiles
+      }
+    });
+
+  } catch (error) {
+    console.error("Error deleting document:", error);
+    return NextResponse.json(
+      { error: "Failed to delete document", message: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
