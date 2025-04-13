@@ -89,6 +89,19 @@ export default function AdminHomestayListPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // Get the adminUsername from the URL query if present (for superadmin access)
+        const urlParams = new URLSearchParams(window.location.search);
+        const adminUsername = urlParams.get('username');
+        
+        // First try to check if there's a superadmin token
+        const superadminResponse = await fetch('/api/superadmin/auth/me');
+        if (superadminResponse.ok) {
+          // User is a superadmin - proceed without further authentication
+          console.log('Authenticated as superadmin');
+          return;
+        }
+        
+        // Not a superadmin, check for admin authentication
         const response = await fetch('/api/admin/auth/me');
         if (!response.ok) {
           // Not authenticated, redirect to login
@@ -173,25 +186,46 @@ export default function AdminHomestayListPage() {
       setLoading(true);
       setError(null);
       try {
-        const authResponse = await fetch('/api/admin/auth/me');
-        if (!authResponse.ok) {
-          router.push('/admin/login');
-          return;
+        // Get the adminUsername from URL query if present (for superadmin access)
+        const urlParams = new URLSearchParams(window.location.search);
+        const queryUsername = urlParams.get('username');
+        
+        let username = null;
+        let isSuperadmin = false;
+        
+        // First check if user is a superadmin
+        const superadminResponse = await fetch('/api/superadmin/auth/me');
+        if (superadminResponse.ok) {
+          // Superadmin access
+          isSuperadmin = true;
+          username = queryUsername; // Use the username from query parameter
+          
+          if (!username) {
+            throw new Error('Admin username required in URL for superadmin access');
+          }
+        } else {
+          // Regular admin access - get username from auth data
+          const authResponse = await fetch('/api/admin/auth/me');
+          if (!authResponse.ok) {
+            router.push('/admin/login');
+            return;
+          }
+          
+          const authData = await authResponse.json();
+          username = authData.user?.username;
+          
+          if (!username) {
+            throw new Error('Username not found in auth data');
+          }
         }
         
-        const authData = await authResponse.json();
-        const username = authData.user?.username;
-        
-        if (!username) {
-          throw new Error('Username not found in auth data');
-        }
-        
-        // Only fetch homestays associated with this admin
+        // Fetch homestays for the specified admin
         const response = await fetch(`/api/admin/homestays?adminUsername=${username}`);
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.error || `Failed to fetch homestays: ${response.statusText}`);
         }
+        
         const data = await response.json();
         if (data.success) {
           // Use || [] for safety

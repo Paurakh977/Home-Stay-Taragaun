@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash2, UserCog, AlertTriangle, Loader2 } from "lucide-react";
+import { Edit, Trash2, UserCog, AlertTriangle, Loader2, ExternalLink } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -191,6 +191,19 @@ export function UserTable() {
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
+                      {user.role === 'admin' && (
+                        <Link href={`/admin?username=${user.username}`}>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="h-8 px-2 text-blue-600 border-blue-300 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-1"
+                            title="Access this admin's panel"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            <span>Admin Panel</span>
+                          </Button>
+                        </Link>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

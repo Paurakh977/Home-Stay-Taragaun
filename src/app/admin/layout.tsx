@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Toaster } from 'sonner';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { Menu, X } from 'lucide-react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 export default function AdminLayout({
   children,
@@ -13,6 +13,8 @@ export default function AdminLayout({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const adminUsername = searchParams.get('username');
   
   // Don't show sidebar on login page
   const isLoginPage = pathname === '/admin/login';

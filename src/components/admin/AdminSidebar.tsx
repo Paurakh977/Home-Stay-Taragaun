@@ -1,9 +1,10 @@
 "use client";
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Hotel, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
+import { useEffect, useState } from 'react';
 
 const sidebarNavItems = [
   {
@@ -17,9 +18,33 @@ const sidebarNavItems = [
 export function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
+  const adminUsername = searchParams.get('username');
+
+  // Check if user is a superadmin
+  useEffect(() => {
+    const checkSuperadmin = async () => {
+      try {
+        const response = await fetch('/api/superadmin/auth/me');
+        setIsSuperadmin(response.ok);
+      } catch (error) {
+        console.error('Error checking superadmin status:', error);
+      }
+    };
+    
+    checkSuperadmin();
+  }, []);
 
   const handleLogout = async () => {
     try {
+      // For superadmins, just go back to superadmin dashboard
+      if (isSuperadmin) {
+        router.push('/superadmin/dashboard');
+        return;
+      }
+      
+      // Regular admin logout
       const response = await fetch("/api/admin/auth/logout", {
         method: "POST",
       });
@@ -39,8 +64,13 @@ export function AdminSidebar() {
   return (
     <aside className="h-full bg-white border-r border-gray-200 flex flex-col">
       <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-        <Link href="/admin" className="flex items-center">
+        <Link href={adminUsername ? `/admin?username=${adminUsername}` : "/admin"} className="flex items-center">
            <span className="font-medium text-gray-900">Admin Dashboard</span>
+           {isSuperadmin && adminUsername && (
+             <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full">
+               {adminUsername}
+             </span>
+           )}
         </Link>
         {/* Logout button for mobile/top position */}
         <button
@@ -55,10 +85,12 @@ export function AdminSidebar() {
       <nav className="p-2 flex-1">
         {sidebarNavItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href);
+          const href = adminUsername ? `${item.href}?username=${adminUsername}` : item.href;
+          
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={href}
               className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm my-1 transition-colors ${
                 isActive
                   ? "bg-gray-100 text-gray-900 font-medium"
@@ -79,7 +111,7 @@ export function AdminSidebar() {
           className="flex items-center justify-center space-x-2 px-4 py-3 rounded-md text-sm w-full bg-red-600 text-white hover:bg-red-700 transition-colors shadow-sm"
         >
           <LogOut className="h-5 w-5" />
-          <span className="font-medium">Logout</span>
+          <span className="font-medium">{isSuperadmin ? "Back to Superadmin" : "Logout"}</span>
         </button>
       </div>
     </aside>

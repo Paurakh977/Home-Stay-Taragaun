@@ -12,6 +12,29 @@ export async function GET(request: NextRequest) {
   try {
     await dbConnect();
     
+    // First check if this is a superadmin
+    const superadminToken = request.cookies.get('superadmin_token')?.value;
+    if (superadminToken) {
+      try {
+        // Verify the token
+        const { payload } = await jwtVerify(superadminToken, secret);
+        
+        if (payload && payload.role === 'superadmin') {
+          // Return superadmin info
+          return NextResponse.json({
+            success: true,
+            user: {
+              role: 'superadmin',
+              isSuperAdmin: true
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Error verifying superadmin token:', error);
+        // Continue with regular admin auth if superadmin token is invalid
+      }
+    }
+    
     // Get the auth token from cookies - properly await
     const cookieStore = cookies();
     const token = cookieStore.get('auth_token')?.value;
