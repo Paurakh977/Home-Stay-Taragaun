@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, use } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 // Remove the import from '@/types/homestay' if HomestayData is defined below
 // import { HomestayData } from '@/types/homestay'; 
-import { CheckCircle, XCircle, ArrowLeft, FileText, Loader2, ExternalLink, MapPin, Phone, User, Mail, Building, Globe, Image as ImageIcon, File as FileIcon, List, Edit, Plus, X, Upload, Eye, Download } from 'lucide-react';
+import { CheckCircle, XCircle, ArrowLeft, FileText, Loader2, ExternalLink, MapPin, Phone, User, Mail, Building, Globe, Image as ImageIcon, File as FileIcon, List, Edit, Plus, X, Upload, Eye, Download, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 // --- Comprehensive Type Definition (Move to types/homestay.ts if preferred) ---
@@ -354,6 +354,13 @@ export default function AdminHomestayDetailPage() {
         const fetchedData = data.data as HomestayData;
         console.log("Fetched Homestay Data:", JSON.stringify(fetchedData, null, 2)); 
         
+        // Debug gallery images if present
+        if (fetchedData.galleryImages && fetchedData.galleryImages.length > 0) {
+          console.log(`Found ${fetchedData.galleryImages.length} gallery images:`, fetchedData.galleryImages);
+        } else {
+          console.log("No gallery images found in homestay data");
+        }
+        
         // Debug the adminUsername if available
         if (fetchedData.adminUsername) {
           console.log("Found adminUsername in homestay data:", fetchedData.adminUsername);
@@ -367,6 +374,8 @@ export default function AdminHomestayDetailPage() {
         fetchedData.contacts = fetchedData.contacts || [];
         fetchedData.features = fetchedData.features || {};
         fetchedData.documents = fetchedData.documents || [];
+        // Initialize galleryImages as empty array if not present
+        fetchedData.galleryImages = fetchedData.galleryImages || [];
         // No need to initialize location if not primarily used
 
         setHomestay(fetchedData);
@@ -513,10 +522,27 @@ export default function AdminHomestayDetailPage() {
   // --- Helper Functions ---
   const getImageUrl = (filePath?: string) => {
     if (!filePath) return '/placeholder.png';
+    
+    // Add a cache-busting timestamp to prevent browsers from showing stale images
+    const timestamp = `?t=${new Date().getTime()}`;
+    
+    // If it's already an API URL, just return it
+    if (filePath.startsWith('/api/images/')) {
+      return `${filePath}${timestamp}`;
+    }
+    
     // Convert /uploads/ path to /api/images/ path
-    return filePath.startsWith('/uploads/') 
-      ? filePath.replace('/uploads/', '/api/images/')
-      : filePath;
+    if (filePath.startsWith('/uploads/')) {
+      return `${filePath.replace('/uploads/', '/api/images/')}${timestamp}`;
+    }
+    
+    // If it's a relative URL without a leading slash, add one
+    if (!filePath.startsWith('/') && !filePath.startsWith('http')) {
+      return `/api/images/${filePath}${timestamp}`;
+    }
+    
+    // For absolute URLs (http/https), return as is
+    return filePath;
   };
 
   const getDocumentUrl = (filePath?: string) => {
@@ -1115,6 +1141,209 @@ export default function AdminHomestayDetailPage() {
       setDeleteConfirmation(prev => ({ ...prev, isDeleting: false }));
     }
   };
+
+  // ... existing code ...
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const multipleImagesInputRef = useRef<HTMLInputElement>(null);
+
+  // Function to handle a single gallery image upload
+  const handleGalleryImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0] || !homestay) return;
+    
+    try {
+      setUploadingImage(true);
+      
+      const file = e.target.files[0];
+      console.log("Uploading gallery image:", {
+        filename: file.name,
+        type: file.type,
+        size: file.size,
+        homestayId: homestay.homestayId
+      });
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Get the appropriate adminUsername
+      let effectiveAdminUsername = adminUsername;
+      
+      if (!effectiveAdminUsername && homestay.adminUsername) {
+        console.log("Using homestay's adminUsername for upload:", homestay.adminUsername);
+        effectiveAdminUsername = homestay.adminUsername;
+      }
+      
+      if (!effectiveAdminUsername) {
+        toast.error("Admin username is required for uploading images");
+        return;
+      }
+      
+      // Construct the API URL with admin context
+      let apiUrl = `/api/homestays/${homestay.homestayId}/images?adminUsername=${effectiveAdminUsername}`;
+      
+      console.log("Uploading to API URL:", apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      console.log("Upload response status:", response.status);
+      
+      const responseData = await response.json();
+      console.log("Upload response data:", responseData);
+      
+      if (!response.ok) {
+        throw new Error(responseData.error || 'Failed to upload gallery image');
+      }
+      
+      toast.success('Image uploaded successfully');
+      
+      // Refresh homestay data to show the newly uploaded image
+      fetchHomestayDetails();
+      
+    } catch (error) {
+      console.error('Error uploading gallery image:', error);
+      toast.error(`Upload failed: ${error instanceof Error ? error.message : 'Please try again.'}`);
+    } finally {
+      setUploadingImage(false);
+      // Clear input
+      e.target.value = '';
+    }
+  };
+
+  // Function to handle multiple gallery images upload
+  const handleMultipleImagesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0 || !homestay) return;
+    
+    try {
+      setUploadingImage(true);
+      
+      const files = Array.from(e.target.files);
+      let uploadedCount = 0;
+      let failedCount = 0;
+      
+      // Get the appropriate adminUsername
+      let effectiveAdminUsername = adminUsername;
+      
+      if (!effectiveAdminUsername && homestay.adminUsername) {
+        console.log("Using homestay's adminUsername for multiple uploads:", homestay.adminUsername);
+        effectiveAdminUsername = homestay.adminUsername;
+      }
+      
+      if (!effectiveAdminUsername) {
+        toast.error("Admin username is required for uploading images");
+        return;
+      }
+      
+      // Construct the API URL with admin context
+      const apiUrl = `/api/homestays/${homestay.homestayId}/images?adminUsername=${effectiveAdminUsername}`;
+      
+      // Create upload promises for each file
+      const uploadPromises = files.map(file => {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        return fetch(apiUrl, {
+          method: 'POST',
+          body: formData,
+        })
+        .then(response => {
+          if (!response.ok) {
+            failedCount++;
+            return { success: false };
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (data.success) {
+            uploadedCount++;
+            return data.imageUrl;
+          }
+          failedCount++;
+          return null;
+        })
+        .catch(() => {
+          failedCount++;
+          return null;
+        });
+      });
+      
+      // Wait for all uploads to complete
+      await Promise.all(uploadPromises);
+      
+      // Show success message with counts
+      if (uploadedCount > 0) {
+        toast.success(`${uploadedCount} images uploaded successfully${failedCount > 0 ? `, ${failedCount} failed` : ''}`);
+      } else {
+        toast.error('Failed to upload images');
+      }
+      
+      // Refresh homestay data to show the newly uploaded images
+      fetchHomestayDetails();
+      
+    } catch (error) {
+      console.error('Error uploading multiple images:', error);
+      toast.error(`Upload failed: ${error instanceof Error ? error.message : 'Please try again.'}`);
+    } finally {
+      setUploadingImage(false);
+      // Clear input
+      if (multipleImagesInputRef.current) {
+        multipleImagesInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Function to delete a gallery image
+  const handleDeleteGalleryImage = async (imagePath: string) => {
+    if (!homestay) {
+      toast.error("Homestay data is missing");
+      return;
+    }
+    
+    // Get the appropriate adminUsername
+    let effectiveAdminUsername = adminUsername;
+    
+    if (!effectiveAdminUsername && homestay.adminUsername) {
+      effectiveAdminUsername = homestay.adminUsername;
+    }
+    
+    console.log("Image to delete:", imagePath);
+    
+    if (confirm("Are you sure you want to delete this image? This action cannot be undone.")) {
+      try {
+        // Construct API URL with admin context and image path
+        let apiUrl = `/api/homestays/${homestay.homestayId}/images?imagePath=${encodeURIComponent(imagePath)}`;
+        if (effectiveAdminUsername) {
+          apiUrl += `&adminUsername=${effectiveAdminUsername}`;
+        }
+        
+        console.log("Deleting image from:", apiUrl);
+        
+        const response = await fetch(apiUrl, {
+          method: 'DELETE',
+        });
+        
+        console.log("Delete response status:", response.status);
+        
+        const responseData = await response.json();
+        console.log("Delete response data:", responseData);
+        
+        if (!response.ok) {
+          throw new Error(responseData.error || 'Failed to delete image');
+        }
+        
+        toast.success('Image deleted successfully');
+        
+        // Refresh homestay data
+        fetchHomestayDetails();
+        
+      } catch (error) {
+        console.error('Error deleting gallery image:', error);
+        toast.error(`Deletion failed: ${error instanceof Error ? error.message : 'Please try again.'}`);
+      }
+    }
+  };
+  // ... existing code ...
 
   // --- Render Logic ---
 
@@ -2069,9 +2298,9 @@ export default function AdminHomestayDetailPage() {
              {/* Existing Documents List */}
              <div className="border-t border-gray-200 pt-4 mt-4">
                <h3 className="text-sm font-medium text-gray-700 mb-3">Uploaded Documents</h3>
-               {homestay.documents && homestay.documents.length > 0 ? (
-                 <div className="space-y-4">
-                   {homestay.documents.map((docGroup, index) => (
+             {homestay.documents && homestay.documents.length > 0 ? (
+               <div className="space-y-4">
+                 {homestay.documents.map((docGroup, index) => (
                      <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
                        <div className="bg-gray-50 p-2 border-b border-gray-200 flex justify-between items-center">
                          <div>
@@ -2087,27 +2316,27 @@ export default function AdminHomestayDetailPage() {
                          </button>
                        </div>
                        <ul className="divide-y divide-gray-100">
-                         {docGroup.files.map((file, fileIndex) => (
+                       {docGroup.files.map((file, fileIndex) => (
                            <li key={fileIndex} className="flex items-center justify-between p-2 hover:bg-gray-50">
-                             <div className="flex items-center overflow-hidden mr-2">
-                               <FileText className="h-3.5 w-3.5 mr-1.5 text-blue-600 flex-shrink-0" />
+                           <div className="flex items-center overflow-hidden mr-2">
+                             <FileText className="h-3.5 w-3.5 mr-1.5 text-blue-600 flex-shrink-0" />
                                <span className="truncate text-xs" title={file.originalName}>
-                                 {file.originalName} 
-                               </span>
+                               {file.originalName} 
+                             </span>
                                <span className="ml-1 text-xs text-gray-400 flex-shrink-0">
                                  ({(file.size / 1024).toFixed(1)} KB)
                                </span>
-                             </div>
+                           </div>
                              <div className="flex items-center gap-1">
-                               <a 
-                                 href={getDocumentUrl(file.filePath)} 
-                                 target="_blank" 
-                                 rel="noopener noreferrer" 
+                           <a 
+                             href={getDocumentUrl(file.filePath)} 
+                             target="_blank" 
+                             rel="noopener noreferrer" 
                                  className="p-1 text-blue-600 hover:text-blue-800"
                                  title="View"
-                               >
-                                 <ExternalLink className="h-3.5 w-3.5" />
-                               </a>
+                           >
+                             <ExternalLink className="h-3.5 w-3.5" />
+                           </a>
                                <a 
                                  href={`${getDocumentUrl(file.filePath)}?download=true`}
                                  className="p-1 text-green-600 hover:text-green-800"
@@ -2116,13 +2345,13 @@ export default function AdminHomestayDetailPage() {
                                  <Download className="h-3.5 w-3.5" />
                                </a>
                              </div>
-                           </li>
-                         ))}
-                       </ul>
-                     </div>
-                   ))}
-                 </div>
-               ) : (
+                         </li>
+                       ))}
+                     </ul>
+                   </div>
+                 ))}
+               </div>
+             ) : (
                  <p className="text-xs text-gray-500 italic">No documents uploaded yet.</p>
                )}
              </div>
@@ -2246,6 +2475,124 @@ export default function AdminHomestayDetailPage() {
                </div>
              )}
            </InfoSection>
+
+          {/* Gallery Section */}
+          <InfoSection title="Gallery Images" icon={ImageIcon}>
+            <div className="space-y-6">
+              {/* Gallery Image Upload */}
+              <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">Upload Gallery Images</h3>
+                
+                <div className="flex flex-wrap gap-3 mb-4">
+                  {/* Single Upload Button */}
+                  <label className="h-20 w-20 rounded-md border-2 border-dashed border-gray-300 hover:border-primary flex flex-col items-center justify-center cursor-pointer text-gray-500 hover:text-primary transition-all relative">
+                    {uploadingImage ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : (
+                      <Plus className="h-6 w-6" />
+                    )}
+                    <span className="text-xs mt-1">Add Image</span>
+                    <input 
+                      type="file" 
+                      accept="image/jpeg, image/png, image/webp, image/gif"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      onChange={handleGalleryImageUpload}
+                      disabled={uploadingImage}
+                    />
+                  </label>
+                  
+                  {/* Multiple Upload Button */}
+                  <button 
+                    onClick={() => multipleImagesInputRef.current?.click()}
+                    className="h-20 w-20 rounded-md border-2 border-dashed border-gray-300 hover:border-primary flex flex-col items-center justify-center cursor-pointer text-gray-500 hover:text-primary transition-all relative"
+                    disabled={uploadingImage}
+                  >
+                    {uploadingImage ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : (
+                      <Upload className="h-6 w-6" />
+                    )}
+                    <span className="text-xs mt-1">Bulk Upload</span>
+                  </button>
+                </div>
+                
+                {/* Hidden input for multiple files */}
+                <input 
+                  type="file" 
+                  accept="image/jpeg, image/png, image/webp, image/gif"
+                  className="hidden" 
+                  multiple
+                  ref={multipleImagesInputRef}
+                  onChange={handleMultipleImagesUpload}
+                  disabled={uploadingImage}
+                />
+                
+                <div className="text-xs text-gray-500">
+                  <p>• Upload high-quality images to showcase the homestay</p>
+                  <p>• Recommended size: 1200×800 pixels or larger</p>
+                  <p>• Supported formats: JPEG, PNG, WebP, GIF</p>
+                </div>
+              </div>
+              
+              {/* Gallery Image Grid */}
+              <div className="border-t border-gray-200 pt-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">Gallery Images ({homestay?.galleryImages?.length || 0})</h3>
+                
+                {loading ? (
+                  <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+                    <Loader2 className="h-12 w-12 text-gray-300 mx-auto mb-3 animate-spin" />
+                    <p className="text-gray-500 text-sm">Loading gallery images...</p>
+                  </div>
+                ) : homestay?.galleryImages && homestay.galleryImages.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                    {homestay.galleryImages.map((imagePath, index) => (
+                      <div key={index} className="relative group">
+                        <div className="aspect-square overflow-hidden rounded-md border border-gray-200 bg-gray-100 relative">
+                          <img
+                            src={getImageUrl(imagePath)}
+                            alt={`Gallery image ${index + 1}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              console.error("Failed to load gallery image:", imagePath);
+                              e.currentTarget.src = '/images/placeholder-homestay.jpg';
+                            }}
+                          />
+                          
+                          {/* Image actions overlay */}
+                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex gap-2">
+                              <a 
+                                href={getImageUrl(imagePath)} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="p-1.5 bg-blue-500 text-white rounded-full hover:bg-blue-600"
+                                title="View full size"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </a>
+                              <button
+                                onClick={() => handleDeleteGalleryImage(imagePath)}
+                                className="p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600"
+                                title="Delete image"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+                    <ImageIcon className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500 text-sm">No gallery images uploaded yet.</p>
+                    <p className="text-gray-400 text-xs mt-1">Upload images to showcase this homestay.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </InfoSection>
 
         </div>
       </div>
