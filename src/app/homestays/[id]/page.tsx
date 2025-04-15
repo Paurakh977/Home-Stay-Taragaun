@@ -36,6 +36,20 @@ interface HomestayData {
   galleryImages?: string[];
   description?: string;
   dhsrNo?: string;
+  customFields?: {
+    definitions: {
+      fieldId: string;
+      label: string;
+      type: 'text' | 'number' | 'date' | 'boolean' | 'select';
+      options?: string[];
+      required: boolean;
+      addedBy: string;
+      addedAt: string;
+    }[];
+    values: {
+      [fieldId: string]: any;
+    };
+  };
 }
 
 interface ContactData {
@@ -471,88 +485,102 @@ export default function HomestayPortalPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Left Column - Details */}
           <div className="md:col-span-2 space-y-8">
-            {/* Description */}
-              <section className="bg-white p-6 rounded-lg shadow-sm">
-                <h2 className="text-xl font-semibold mb-4 pb-2 border-b border-gray-100">About this Homestay</h2>
-              <div className="prose prose-sm max-w-none">
-                {homestay.description ? (
-                    <p className="text-gray-700 leading-relaxed">{homestay.description}</p>
-                ) : (
-                  <p className="text-gray-500 italic">No description provided</p>
-                )}
-              </div>
-            </section>
-            
-            {/* Features Section */}
-              <section className="bg-white p-6 rounded-lg shadow-sm">
-                <h2 className="text-xl font-semibold mb-4 pb-2 border-b border-gray-100">Features & Attractions</h2>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {/* Local attractions */}
-                  <div className="bg-blue-50 p-5 rounded-lg">
-                    <h3 className="font-medium mb-3 text-blue-700 flex items-center">
-                      <span className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-2">
-                        <MapPin className="h-4 w-4 text-blue-700" />
-                      </span>
-                      Local Attractions
-                    </h3>
-                  {homestay.features.localAttractions.length > 0 ? (
-                    <ul className="space-y-2">
-                      {homestay.features.localAttractions.map((attraction, index) => (
-                        <li key={index} className="flex items-start">
-                            <span className="inline-block h-2 w-2 rounded-full bg-blue-400 mt-1.5 mr-2"></span>
-                            <span className="text-gray-700">{attraction}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-gray-500 italic">No local attractions listed</p>
-                  )}
-                </div>
+            {/* Features & Descriptions */}
+            <div className="bg-white rounded-lg shadow-md mb-8">
+              <div className="p-6">
+                <h2 className="text-2xl font-bold mb-4">About {homestay.homeStayName}</h2>
+                <p className="text-gray-700 mb-6">{homestay.description || 'No description available.'}</p>
                 
-                {/* Tourism services */}
-                  <div className="bg-green-50 p-5 rounded-lg">
-                    <h3 className="font-medium mb-3 text-green-700 flex items-center">
-                      <span className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center mr-2">
-                        <Users className="h-4 w-4 text-green-700" />
-                      </span>
-                      Tourism Services
-                    </h3>
-                  {homestay.features.tourismServices.length > 0 ? (
-                    <ul className="space-y-2">
-                      {homestay.features.tourismServices.map((service, index) => (
-                        <li key={index} className="flex items-start">
-                            <span className="inline-block h-2 w-2 rounded-full bg-green-400 mt-1.5 mr-2"></span>
-                            <span className="text-gray-700">{service}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-gray-500 italic">No tourism services listed</p>
+                {/* Add custom fields section here */}
+                {homestay.customFields?.definitions && homestay.customFields.definitions.length > 0 && (
+                  <div className="mb-8">
+                    <h3 className="text-xl font-semibold mb-4">Additional Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {homestay.customFields.definitions.map(field => {
+                        // Get the value for this field
+                        const fieldValue = homestay.customFields?.values?.[field.fieldId];
+                        
+                        // Skip if no value and field is not required
+                        if (fieldValue === undefined && !field.required) return null;
+                        
+                        // Format the value based on field type
+                        let displayValue: React.ReactNode = 'Not specified';
+                        
+                        if (fieldValue !== undefined) {
+                          switch (field.type) {
+                            case 'boolean':
+                              displayValue = fieldValue === true ? 'Yes' : 'No';
+                              break;
+                            case 'date':
+                              displayValue = new Date(fieldValue).toLocaleDateString();
+                              break;
+                            case 'select':
+                              displayValue = fieldValue;
+                              break;
+                            default:
+                              displayValue = fieldValue;
+                          }
+                        }
+                        
+                        return (
+                          <div key={field.fieldId} className="bg-gray-50 p-3 rounded-md">
+                            <div className="font-medium text-gray-700">{field.label}</div>
+                            <div className="mt-1 text-gray-900">{displayValue}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Features */}
+                <div>
+                  <h3 className="text-xl font-semibold mb-4">Features</h3>
+                  
+                  {/* Local Attractions */}
+                  {homestay.features?.localAttractions && homestay.features.localAttractions.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="font-medium text-gray-800 mb-2">Local Attractions</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {homestay.features.localAttractions.map((item, index) => (
+                          <span key={index} className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm">
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tourism services */}
+                  {homestay.features?.tourismServices && homestay.features.tourismServices.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="font-medium text-gray-800 mb-2">Tourism Services</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {homestay.features.tourismServices.map((item, index) => (
+                          <span key={index} className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm">
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Infrastructure */}
+                  {homestay.features?.infrastructure && homestay.features.infrastructure.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="font-medium text-gray-800 mb-2">Infrastructure</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {homestay.features.infrastructure.map((item, index) => (
+                          <span key={index} className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm">
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
-              
-              {/* Infrastructure */}
-              {homestay.features.infrastructure.length > 0 && (
-                  <div className="mt-6 bg-amber-50 p-5 rounded-lg">
-                    <h3 className="font-medium mb-3 text-amber-700 flex items-center">
-                      <span className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center mr-2">
-                        <Home className="h-4 w-4 text-amber-700" />
-                      </span>
-                      Infrastructure
-                    </h3>
-                  <ul className="space-y-2">
-                    {homestay.features.infrastructure.map((item, index) => (
-                      <li key={index} className="flex items-start">
-                          <span className="inline-block h-2 w-2 rounded-full bg-amber-400 mt-1.5 mr-2"></span>
-                          <span className="text-gray-700">{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </section>
+            </div>
             
             {/* Directions */}
             {homestay.directions && (

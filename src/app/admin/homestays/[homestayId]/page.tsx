@@ -7,7 +7,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 // Remove the import from '@/types/homestay' if HomestayData is defined below
 // import { HomestayData } from '@/types/homestay'; 
-import { CheckCircle, XCircle, ArrowLeft, FileText, Loader2, ExternalLink, MapPin, Phone, User, Mail, Building, Globe, Image as ImageIcon, File as FileIcon, List, Edit, Plus, X, Upload, Eye, Download, Trash2 } from 'lucide-react';
+import { CheckCircle, XCircle, ArrowLeft, FileText, Loader2, ExternalLink, MapPin, Phone, User, Mail, Building, Globe, Image as ImageIcon, File as FileIcon, List, Edit, Plus, X, Upload, Eye, Download, Trash2, AlertCircle } from 'lucide-react';
 
 // --- Comprehensive Type Definition (Move to types/homestay.ts if preferred) ---
 
@@ -116,6 +116,26 @@ export interface HomestayData {
   location?: LocationData; // Joined location data (may have less info)
   officials?: OfficialData[]; // Array of officials with updated fields
   contacts?: ContactData[]; // Array of contacts with updated fields
+  
+  // Custom fields
+  customFields?: {
+    definitions: Array<{
+      fieldId: string;
+      label: string;
+      type: 'text' | 'number' | 'date' | 'boolean' | 'select';
+      options?: string[];
+      required: boolean;
+      addedBy: string;
+      addedAt: string;
+    }>;
+    values: {
+      [fieldId: string]: any;
+      lastUpdated?: string;
+      reviewed?: boolean;
+      reviewedBy?: string;
+      reviewedAt?: string;
+    };
+  };
 }
 
 // --- Component Code ---
@@ -1731,6 +1751,62 @@ export default function AdminHomestayDetailPage() {
                </>
              )}
           </InfoSection>
+
+          {/* Custom Fields Section - Only show if there are custom fields with values */}
+          {homestay.customFields?.definitions && homestay.customFields.definitions.length > 0 && (
+            <InfoSection title="Additional Information" icon={FileText}>
+              {homestay.customFields.definitions.map(field => {
+                const fieldValue = homestay.customFields?.values?.[field.fieldId];
+                if (fieldValue === undefined || fieldValue === null || fieldValue === '') return null;
+                
+                let displayValue: React.ReactNode = fieldValue;
+                
+                // Format value based on field type
+                if (field.type === 'boolean') {
+                  displayValue = fieldValue === true ? 'Yes' : 'No';
+                } else if (field.type === 'date' && fieldValue) {
+                  try {
+                    displayValue = new Date(fieldValue).toLocaleDateString();
+                  } catch (e) {
+                    displayValue = fieldValue;
+                  }
+                }
+                
+                return (
+                  <InfoItem 
+                    key={field.fieldId} 
+                    label={field.label} 
+                    value={typeof displayValue === 'string' || typeof displayValue === 'number' ? displayValue : undefined}
+                  >
+                    {typeof displayValue !== 'string' && typeof displayValue !== 'number' ? displayValue : null}
+                  </InfoItem>
+                );
+              })}
+              
+              {/* Show review status */}
+              {homestay.customFields?.values?.lastUpdated && (
+                <div className="mt-4 text-sm">
+                  <div className="flex items-center">
+                    <span className="text-gray-500">Last updated:</span>
+                    <span className="ml-2 font-medium">
+                      {new Date(homestay.customFields.values.lastUpdated).toLocaleString()}
+                    </span>
+                  </div>
+                  {homestay.customFields.values.reviewed ? (
+                    <div className="flex items-center text-green-600 mt-1">
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      <span>Reviewed by {homestay.customFields.values.reviewedBy || 'Admin'}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center text-amber-600 mt-1">
+                      <AlertCircle className="h-4 w-4 mr-1" />
+                      <span>Pending review</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </InfoSection>
+          )}
 
           {/* Contact Person Section - Accessing contacts array with correct fields */}
            <InfoSection title="Contact Person" icon={User}>

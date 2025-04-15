@@ -5,6 +5,35 @@ import { Upload, Image as ImageIcon, X, Plus, Camera, Save, Eye, ChevronLeft, Ch
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
+import { CalendarIcon } from "@radix-ui/react-icons";
+import { format } from 'date-fns';
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Textarea
+} from "@/components/ui/textarea";
+import {
+  Button
+} from "@/components/ui/button";
+import {
+  Label
+} from "@/components/ui/label";
+import {
+  Input
+} from "@/components/ui/input";
 
 interface UserInfo {
   homestayId: string;
@@ -50,6 +79,24 @@ interface HomestayData {
     chat?: boolean;
     updateInfo?: boolean;
   };
+  customFields?: {
+    definitions: Array<{
+      fieldId: string;
+      label: string;
+      type: 'text' | 'number' | 'date' | 'boolean' | 'select';
+      options?: string[];
+      required: boolean;
+      addedBy: string;
+      addedAt: string;
+    }>;
+    values: {
+      [fieldId: string]: any;
+      lastUpdated?: string;
+      reviewed?: boolean;
+      reviewedBy?: string;
+      reviewedAt?: string;
+    };
+  };
 }
 
 // Add adminUsername to the props interface
@@ -84,6 +131,11 @@ export default function PortalPage({ adminUsername }: PortalPageProps) {
   const multipleFileInputRef = useRef<HTMLInputElement>(null);
   const sliderInterval = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
+
+  // Add state for custom fields
+  const [customFieldValues, setCustomFieldValues] = useState<{[fieldId: string]: any}>({});
+  const [savingCustomFields, setSavingCustomFields] = useState(false);
+  const [customFieldsChanged, setCustomFieldsChanged] = useState(false);
 
   // Load user data and profile info
   useEffect(() => {
@@ -120,6 +172,11 @@ export default function PortalPage({ adminUsername }: PortalPageProps) {
       
       // Set gallery images from homestay data or empty array
       setGalleryImages(data.homestay.galleryImages || []);
+      
+      // Initialize custom field values
+      if (data.homestay.customFields?.values) {
+        setCustomFieldValues(data.homestay.customFields.values);
+      }
       
       setLoading(false);
     } catch (err) {
@@ -665,6 +722,197 @@ export default function PortalPage({ adminUsername }: PortalPageProps) {
     return () => clearInterval(interval);
   }, [user?.homestayId, adminUsername]);
 
+  // Handle custom field change
+  const handleCustomFieldChange = (fieldId: string, value: any) => {
+    setCustomFieldValues(prev => ({ ...prev, [fieldId]: value }));
+    setCustomFieldsChanged(true);
+  };
+  
+  // Save custom field values
+  const saveCustomFieldValues = async () => {
+    if (!user || !homestay) return;
+    
+    try {
+      setSavingCustomFields(true);
+      
+      const saveUrl = adminUsername 
+        ? `/api/superadmin/custom-fields/values?adminUsername=${adminUsername}`
+        : `/api/superadmin/custom-fields/values`;
+      
+      // Save each field individually to avoid sending the entire object
+      for (const fieldId in customFieldValues) {
+        const value = customFieldValues[fieldId];
+        
+        const response = await fetch(saveUrl, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            homestayId: user.homestayId,
+            fieldId,
+            value
+          })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to save custom field values');
+        }
+      }
+      
+      // After saving all fields, update the lastUpdated timestamp
+      const updatedAt = new Date().toISOString();
+      
+      // Create a proper update for the homestay state that preserves the right types
+      setHomestay((prev) => {
+        if (!prev) return prev;
+        
+        // Create a new values object with the updated values and timestamp
+        const updatedValues = {
+          ...customFieldValues,
+          lastUpdated: updatedAt
+        };
+        
+        // Return the updated homestay with properly structured customFields
+        return {
+          ...prev,
+          customFields: {
+            definitions: prev.customFields?.definitions || [],
+            values: updatedValues
+          }
+        };
+      });
+      
+      toast.success('Custom field values saved successfully');
+      setCustomFieldsChanged(false);
+    } catch (err) {
+      console.error('Error saving custom field values:', err);
+      toast.error('Error saving custom field values: ' + err);
+    } finally {
+      setSavingCustomFields(false);
+    }
+  };
+  
+  // Render custom fields
+  const renderCustomFields = () => {
+    if (!homestay?.customFields?.definitions || homestay.customFields.definitions.length === 0) {
+      return null;
+    }
+    
+    return (
+      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Additional Information</h2>
+          {customFieldsChanged && (
+            <Button 
+              variant="default" 
+              size="sm"
+              onClick={saveCustomFieldValues}
+              disabled={savingCustomFields}
+            >
+              {savingCustomFields ? 
+                <div className="flex items-center">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </div> : 
+                'Save Changes'
+              }
+            </Button>
+          )}
+        </div>
+        
+        <div className="space-y-4">
+          {homestay.customFields.definitions.map(field => (
+            <div key={field.fieldId} className="grid gap-2">
+              <Label htmlFor={field.fieldId}>
+                {field.label}
+                {field.required && <span className="text-red-500 ml-1">*</span>}
+              </Label>
+              
+              {field.type === 'text' && (
+                <Textarea
+                  id={field.fieldId}
+                  value={customFieldValues[field.fieldId] || ''}
+                  onChange={e => handleCustomFieldChange(field.fieldId, e.target.value)}
+                  placeholder={`Enter ${field.label.toLowerCase()}`}
+                  required={field.required}
+                />
+              )}
+              
+              {field.type === 'number' && (
+                <Input
+                  id={field.fieldId}
+                  type="number"
+                  value={customFieldValues[field.fieldId] || ''}
+                  onChange={e => handleCustomFieldChange(field.fieldId, e.target.value)}
+                  placeholder={`Enter ${field.label.toLowerCase()}`}
+                  required={field.required}
+                />
+              )}
+              
+              {field.type === 'date' && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !customFieldValues[field.fieldId] && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customFieldValues[field.fieldId] ? format(new Date(customFieldValues[field.fieldId]), "PPP") : `Select ${field.label.toLowerCase()}`}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={customFieldValues[field.fieldId] ? new Date(customFieldValues[field.fieldId]) : undefined}
+                      onSelect={date => handleCustomFieldChange(field.fieldId, date?.toISOString())}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
+              
+              {field.type === 'boolean' && (
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id={field.fieldId}
+                    checked={!!customFieldValues[field.fieldId]}
+                    onCheckedChange={checked => handleCustomFieldChange(field.fieldId, checked)}
+                  />
+                  <Label htmlFor={field.fieldId}>
+                    {customFieldValues[field.fieldId] ? 'Yes' : 'No'}
+                  </Label>
+                </div>
+              )}
+              
+              {field.type === 'select' && field.options && (
+                <Select
+                  value={customFieldValues[field.fieldId] || ''}
+                  onValueChange={value => handleCustomFieldChange(field.fieldId, value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {field.options.map(option => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
@@ -1096,6 +1344,9 @@ export default function PortalPage({ adminUsername }: PortalPageProps) {
           </div>
         </div>
       )}
+
+      {/* Custom Fields Section */}
+      {renderCustomFields()}
     </div>
   );
 } 

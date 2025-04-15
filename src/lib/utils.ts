@@ -1,80 +1,62 @@
-import { type ClassValue, clsx } from "clsx";
+import { ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import crypto from 'crypto';
+import { createHash } from 'crypto';
 
 /**
- * Combines class names with tailwind-merge to prevent conflicts
+ * Combines class names (className) with Tailwind CSS classes
+ * @param inputs - Class names to combine
+ * @returns Combined class names
  */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 /**
- * Generates a unique homestay ID based on the homestay name
- * Format: lowercase name (without spaces) + random 3-digit number
- * Example: "Dhampus Homestay" -> "dhampus981"
+ * Generates a homestay ID based on the homestay name
+ * @param homeStayName - The name of the homestay
+ * @returns A unique homestay ID
  */
-export function generateHomestayId(homestayName: string): string {
-  // Remove spaces, special characters, and convert to lowercase
-  const baseId = homestayName
+export function generateHomestayId(homeStayName: string): string {
+  // Clean the homestay name, remove spaces and special characters
+  const cleanName = homeStayName
     .toLowerCase()
-    .replace(/[^a-z0-9]/g, '')
-    .slice(0, 12); // Limit to 12 chars max
+    .trim()
+    .replace(/[^a-z0-9]/gi, '');
   
-  // Add random 3-digit number
-  const randomNum = Math.floor(Math.random() * 900) + 100; // 100-999
+  // Take the first 8 characters of the cleaned name
+  const namePrefix = cleanName.substring(0, 8);
   
-  return `${baseId}${randomNum}`;
+  // Generate a timestamp suffix (last 6 characters of milliseconds)
+  const timestamp = Date.now().toString().slice(-6);
+  
+  // Combine with a separator
+  return `${namePrefix}-${timestamp}`;
 }
 
 /**
- * Generates a cryptographically secure random password
- * Creates a strong password with uppercase, lowercase, numbers and symbols
+ * Generates a secure password for new homestays
+ * @returns A secure random password
  */
-export function generateSecurePassword(length: number = 12): string {
-  const uppercaseChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // Removed similar-looking chars
-  const lowercaseChars = 'abcdefghijkmnopqrstuvwxyz'; // Removed similar-looking chars
-  const numberChars = '23456789'; // Removed 0 and 1 (look like O and l)
-  const specialChars = '@#$%^&*!';
-  
-  const allChars = uppercaseChars + lowercaseChars + numberChars + specialChars;
-  
-  // Generate random bytes and convert to string
-  const getRandomChar = (charSet: string) => {
-    const randomIndex = crypto.randomInt(0, charSet.length);
-    return charSet.charAt(randomIndex);
-  };
-  
-  // Ensure password contains at least one of each char type
+export function generateSecurePassword(): string {
+  const length = 10;
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let password = '';
-  password += getRandomChar(uppercaseChars);
-  password += getRandomChar(lowercaseChars);
-  password += getRandomChar(numberChars);
-  password += getRandomChar(specialChars);
   
-  // Fill the rest with random chars
-  for (let i = password.length; i < length; i++) {
-    password += getRandomChar(allChars);
+  for (let i = 0; i < length; i++) {
+    const randomIndex = Math.floor(Math.random() * charset.length);
+    password += charset[randomIndex];
   }
   
-  // Shuffle the password (Fisher-Yates algorithm)
-  const passwordArray = password.split('');
-  for (let i = passwordArray.length - 1; i > 0; i--) {
-    const j = crypto.randomInt(0, i + 1);
-    [passwordArray[i], passwordArray[j]] = [passwordArray[j], passwordArray[i]];
-  }
-  
-  return passwordArray.join('');
+  return password;
 }
 
 /**
- * Securely hash a password for storage
+ * Hashes a password using SHA-256
+ * @param password - The password to hash
+ * @returns Hashed password
  */
 export function hashPassword(password: string): string {
-  return crypto
-    .createHash('sha256')
-    .update(password)
-    .digest('hex');
+  return createHash('sha256').update(password).digest('hex');
 }
 
 /**

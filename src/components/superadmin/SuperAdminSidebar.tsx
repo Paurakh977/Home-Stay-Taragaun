@@ -60,7 +60,8 @@ const menuItems: MenuSection[] = [
     items: [
       { href: '/superadmin/dashboard/analytics', label: 'Analytics', icon: LineChart },
       { href: '/superadmin/dashboard/reports', label: 'Reports', icon: FileText, badge: '3', badgeColor: 'bg-amber-500' },
-      { href: '/superadmin/dashboard/homestays', label: 'Homestays', icon: Mountain, badge: '12', badgeColor: 'bg-blue-500' }
+      { href: '/superadmin/dashboard/homestays', label: 'Homestays', icon: Mountain, badge: '12', badgeColor: 'bg-blue-500' },
+      { href: '/superadmin/dashboard/custom-fields', label: 'Custom Fields', icon: CircleDashed }
     ]
   },
   {
@@ -84,6 +85,7 @@ export function SuperAdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
   
   // Initialize based on URL path
   useEffect(() => {
@@ -91,6 +93,30 @@ export function SuperAdminSidebar() {
       setUserMenuOpen(true);
     }
   }, [pathname]);
+
+  // Fetch notification count on load and periodically
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const response = await fetch('/api/superadmin/notifications');
+        if (response.ok) {
+          const data = await response.json();
+          setNotificationCount(data.count || 0);
+        }
+      } catch (error) {
+        console.error('Failed to fetch notifications:', error);
+      }
+    };
+    
+    // Fetch immediately on load
+    fetchNotifications();
+    
+    // Then fetch every 60 seconds
+    const interval = setInterval(fetchNotifications, 60000);
+    
+    // Clean up interval on unmount
+    return () => clearInterval(interval);
+  }, []);
 
   const toggleUserMenu = () => {
     setUserMenuOpen(!userMenuOpen);
@@ -139,15 +165,24 @@ export function SuperAdminSidebar() {
             <span className="font-semibold tracking-tight">Admin Hub</span>
           </Link>
           <div className="ml-auto flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Link 
+              href="/superadmin/dashboard/notifications" 
               className="relative"
-              aria-label="Notifications"
+              aria-label={`Notifications: ${notificationCount} unread`}
             >
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500"></span>
-            </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="relative"
+              >
+                <Bell className="h-5 w-5" />
+                {notificationCount > 0 && (
+                  <span className="absolute top-1 right-1 h-5 w-5 rounded-full bg-red-500 flex items-center justify-center text-[10px] text-white font-bold">
+                    {notificationCount > 99 ? '99+' : notificationCount}
+                  </span>
+                )}
+              </Button>
+            </Link>
           </div>
         </div>
 

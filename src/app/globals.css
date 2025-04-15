@@ -119,6 +119,25 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Calendar styles for react-day-picker */
+  .rdp {
+    --rdp-cell-size: 40px;
+    --rdp-accent-color: 14 165 233;
+    --rdp-background-color: 14 165 233;
+    --rdp-accent-color-dark: 255 255 255;
+    --rdp-background-color-dark: 14 165 233;
+    --rdp-outline: 2px solid var(--rdp-accent-color);
+    --rdp-outline-selected: 2px solid var(--rdp-accent-color);
+    margin: 1rem;
+  }
+
+  .rdp-day_selected,
+  .rdp-day_selected:focus-visible,
+  .rdp-day_selected:hover {
+    background-color: rgb(var(--rdp-accent-color));
+    color: rgb(var(--rdp-accent-color-dark));
+  }
 }
 
 @keyframes smooth-entrance {
@@ -162,4 +181,31 @@
 
 .animate-slideUp {
   animation: slideUp 0.5s ease-out forwards;
+}
+
+/* Animation for accordion components */
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+.animate-accordion-down {
+  animation: accordion-down 0.2s ease-out;
+}
+
+.animate-accordion-up {
+  animation: accordion-up 0.2s ease-out;
 }

@@ -40,6 +40,25 @@ export interface DocumentEntryData {
   files: DocumentFileData[];
 }
 
+// Custom fields type definitions
+export interface CustomFieldDefinition {
+  fieldId: string;
+  label: string;
+  type: 'text' | 'number' | 'date' | 'boolean' | 'select';
+  options?: string[]; // For select type
+  required: boolean;
+  addedBy: string;
+  addedAt: string | Date;
+}
+
+export interface CustomFieldValues {
+  [fieldId: string]: any;
+  lastUpdated?: string | Date;
+  reviewed?: boolean;
+  reviewedBy?: string;
+  reviewedAt?: string | Date;
+}
+
 // Main Homestay Data Type
 export interface HomestayData {
   _id: string; // Typically included from MongoDB
@@ -109,4 +128,10 @@ export interface HomestayData {
   };
   documents?: DocumentEntryData[];
   isAdmin?: boolean;
+  
+  // Custom fields
+  customFields?: {
+    definitions: CustomFieldDefinition[];
+    values: CustomFieldValues;
+  };
 } 

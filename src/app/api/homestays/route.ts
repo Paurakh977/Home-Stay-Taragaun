@@ -387,7 +387,11 @@ export async function POST(req: NextRequest) {
       },
       status: 'pending',
       officialIds: [],
-      contactIds: []
+      contactIds: [],
+      customFields: {
+        definitions: [],
+        values: {}
+      }
     };
     
     // Create homestay record - No transaction
@@ -470,17 +474,18 @@ export async function POST(req: NextRequest) {
       console.log(`Created ${officialIds.length} officials and ${contactIds.length} contacts`);
       
       // Update homestay with official and contact IDs
-      if (officialIds.length > 0 || contactIds.length > 0) {
-        await HomestaySingle.findByIdAndUpdate(
-          createdHomestay._id,
-          { 
-            $set: { 
-              officialIds, 
-              contactIds 
-            } 
-          }
-        );
-      }
+      await HomestaySingle.findByIdAndUpdate(
+        createdHomestay._id,
+        { 
+          $set: { 
+            officialIds, 
+            contactIds 
+          } 
+        }
+      );
+      
+      // Apply any existing custom field definitions
+      await applyExistingCustomFields(createdHomestay);
       
       console.log(`Registration completed successfully for ${homestayId}`);
       
@@ -589,4 +594,58 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}
+
+// Apply any existing custom field definitions matching the new homestay's criteria
+const applyExistingCustomFields = async (homestay: any) => {
+  try {
+    // Find any global or region-specific custom field definitions
+    const customFieldDefinitions = await HomestaySingle.aggregate([
+      {
+        $match: {
+          // Find homestays that have custom fields defined
+          'customFields.definitions': { $exists: true, $not: { $size: 0 } }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          customFields: 1
+        }
+      }
+    ]);
+    
+    // Extract all unique custom field definitions
+    const allDefinitions = new Set();
+    
+    customFieldDefinitions.forEach((doc: any) => {
+      if (doc.customFields && Array.isArray(doc.customFields.definitions)) {
+        doc.customFields.definitions.forEach((def: any) => {
+          // Only add if it's not already in the set
+          if (!allDefinitions.has(def.fieldId)) {
+            allDefinitions.add(JSON.stringify(def));
+          }
+        });
+      }
+    });
+    
+    // If there are any definitions, add them to the new homestay
+    if (allDefinitions.size > 0) {
+      const definitions = Array.from(allDefinitions).map(defStr => JSON.parse(defStr as string));
+      
+      await HomestaySingle.findByIdAndUpdate(
+        homestay._id,
+        {
+          $set: {
+            'customFields.definitions': definitions
+          }
+        }
+      );
+      
+      console.log(`Applied ${definitions.length} existing custom field definitions`);
+    }
+  } catch (error) {
+    console.error('Error applying custom field definitions:', error);
+    // Don't throw - this is a non-critical operation
+  }
+}; 

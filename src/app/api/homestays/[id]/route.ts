@@ -134,7 +134,7 @@ export async function GET(
       query.adminUsername = adminUsername;
     }
     
-    // Find homestay 
+    // Find homestay and make sure to select customFields
     const homestay = await HomestaySingle.findOne(query).select("-password");
 
     if (!homestay) {
@@ -165,6 +165,12 @@ export async function GET(
     ]);
 
     console.log(`Successfully retrieved homestay: ${homestayId}`);
+    
+    // Log if custom fields were found
+    if (homestay.customFields && homestay.customFields.definitions) {
+      console.log(`Found ${homestay.customFields.definitions.length} custom fields for homestay ${homestayId}`);
+    }
+    
     return NextResponse.json({
       homestay,
       officials,

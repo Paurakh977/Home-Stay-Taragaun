@@ -148,6 +148,26 @@ export interface IHomestaySingle extends Document {
   };
   documents?: IDocumentEntry[];
   isAdmin?: boolean;
+  
+  // Custom fields defined by superadmin
+  customFields?: {
+    definitions: {
+      fieldId: string;
+      label: string;
+      type: 'text' | 'number' | 'date' | 'boolean' | 'select';
+      options?: string[]; // For select type
+      required: boolean;
+      addedBy: string; // superadmin username
+      addedAt: Date;
+    }[];
+    values: {
+      [fieldId: string]: any; // Dynamic values for the custom fields
+      lastUpdated?: Date;
+      reviewed?: boolean;
+      reviewedBy?: string;
+      reviewedAt?: Date;
+    };
+  };
 }
 
 // Define the homestay schema
@@ -312,6 +332,28 @@ const homestaySchema = new Schema<IHomestaySingle>(
     isAdmin: {
       type: Boolean,
       default: false
+    },
+    
+    // Custom fields
+    customFields: {
+      definitions: [{
+        fieldId: { type: String, required: true },
+        label: { type: String, required: true },
+        type: { 
+          type: String, 
+          required: true,
+          enum: ['text', 'number', 'date', 'boolean', 'select']
+        },
+        options: [String], // For select type
+        required: { type: Boolean, default: false },
+        addedBy: { type: String, required: true },
+        addedAt: { type: Date, default: Date.now }
+      }],
+      values: {
+        type: Map,
+        of: Schema.Types.Mixed,
+        default: () => new Map()
+      }
     },
   },
   {
