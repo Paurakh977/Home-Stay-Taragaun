@@ -13,14 +13,18 @@ function LoadingFallback() {
   );
 }
 
-export default function AdminHomestayListPage({
+export default async function AdminHomestayListPage({
   searchParams,
 }: {
   searchParams: { username?: string };
 }) {
+  // Properly await the entire searchParams object before accessing properties
+  const params = await Promise.resolve(searchParams);
+  const username = params.username;
+  
   return (
     <Suspense fallback={<LoadingFallback />}>
-      <AdminHomestayClient username={searchParams.username} />
+      <AdminHomestayClient username={username} />
     </Suspense>
   );
 }

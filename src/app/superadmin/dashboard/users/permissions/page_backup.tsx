@@ -111,11 +111,10 @@ export default function PermissionsPage() {
     updateInfo: 'Update Information',
   };
 
-  // Simplify state management (replace multiple selection arrays with single string values)
+  // Geographic filter states
   const [selectedProvince, setSelectedProvince] = useState<string>('all');
   const [selectedDistrict, setSelectedDistrict] = useState<string>('all');
   const [selectedMunicipality, setSelectedMunicipality] = useState<string>('all');
-  const [selectedType, setSelectedType] = useState<string>('all');
   const [availableDistricts, setAvailableDistricts] = useState<string[]>([]);
   const [availableMunicipalities, setAvailableMunicipalities] = useState<string[]>([]);
 
@@ -133,6 +132,9 @@ export default function PermissionsPage() {
     districtTranslations: {},
     municipalityTranslations: {}
   });
+
+  // Add to the homestay filter states
+  const [selectedType, setSelectedType] = useState<string>('all');
 
   // Fetch users
   useEffect(() => {
@@ -175,64 +177,28 @@ export default function PermissionsPage() {
     const fetchHomestays = async () => {
       try {
         setHomestayLoading(true);
+        // We need to create this API endpoint to get all homestays for the superadmin
         const response = await fetch('/api/superadmin/homestays');
         const data = await response.json();
         
         if (data.homestays) {
-          // Debug types
-          console.log('Raw homestay data sample:', data.homestays[0]);
-          
-          // Normalize the data with proper type handling
-          const normalizedHomestays = data.homestays.map((homestay: any) => {
-            // Safely get the type - we use 'any' temporarily to avoid type errors
-            let typeValue = 'private'; // Default value
-            
-            // Check for different property names that might exist
-            if (typeof homestay.homeStayType === 'string') {
-              typeValue = homestay.homeStayType;
-            } else if (typeof homestay.homestayType === 'string') {
-              typeValue = homestay.homestayType;
-            } else if (typeof homestay.type === 'string') {
-              typeValue = homestay.type;
+          // Add default feature access if not present
+          const homestaysWithFeatures = data.homestays.map((homestay: HomeStay) => ({
+            ...homestay,
+            featureAccess: homestay.featureAccess || {
+              dashboard: false,
+              profile: false,
+              portal: false,
+              documents: false,
+              imageUpload: false,
+              settings: false,
+              chat: false,
+              updateInfo: false
             }
-            
-            // Special case: if homestay has ID "first578" (from your screenshot)
-            // This ensures the one we know is Community displays correctly
-            if (homestay.homestayId === "first578") {
-              console.log("Found first578 homestay, setting type to Community");
-              typeValue = "Community";
-            }
-            
-            // First, log the actual value we found for debugging
-            console.log(`Original type value for ${homestay.homestayId || 'unknown'}: "${typeValue}"`);
-            
-            const normalizedType = typeValue.toLowerCase().includes('community') ? 'community' : 'private';
-            
-            // Log after normalization
-            console.log(`Normalized type for ${homestay.homestayId || 'unknown'}: "${normalizedType}"`);
-            
-            // Create the normalized homestay object
-            return {
-              ...homestay,
-              homeStayType: normalizedType, // Ensure consistent property name and value
-              featureAccess: homestay.featureAccess || {
-                dashboard: false,
-                profile: false,
-                portal: false,
-                documents: false,
-                imageUpload: false,
-                settings: false,
-                chat: false,
-                updateInfo: false
-              }
-            };
-          });
+          }));
           
-          // Log a sample of normalized data
-          console.log('Normalized homestay data sample:', normalizedHomestays[0]);
-          
-          setHomestays(normalizedHomestays);
-          setFilteredHomestays(normalizedHomestays);
+          setHomestays(homestaysWithFeatures);
+          setFilteredHomestays(homestaysWithFeatures);
         }
       } catch (error) {
         console.error('Error fetching homestays:', error);
@@ -270,15 +236,6 @@ export default function PermissionsPage() {
   useEffect(() => {
     let results = [...homestays];
     
-    // Log sample data for debugging
-    if (homestays.length > 0) {
-      console.log('Filtering with sample homestay:', {
-        id: homestays[0].homestayId,
-        type: homestays[0].homeStayType,
-        status: homestays[0].status
-      });
-    }
-    
     // Apply search filter
     if (homestaySearchQuery) {
       const query = homestaySearchQuery.toLowerCase();
@@ -301,7 +258,7 @@ export default function PermissionsPage() {
     }
     
     // Apply province filter
-    if (selectedProvince !== 'all') {
+    if (selectedProvince && selectedProvince !== 'all') {
       results = results.filter(homestay => {
         const province = homestay.address?.province;
         if (!province) return false;
@@ -314,7 +271,7 @@ export default function PermissionsPage() {
     }
     
     // Apply district filter
-    if (selectedDistrict !== 'all') {
+    if (selectedDistrict && selectedDistrict !== 'all') {
       results = results.filter(homestay => {
         const district = homestay.address?.district;
         if (!district) return false;
@@ -327,7 +284,7 @@ export default function PermissionsPage() {
     }
     
     // Apply municipality filter
-    if (selectedMunicipality !== 'all') {
+    if (selectedMunicipality && selectedMunicipality !== 'all') {
       results = results.filter(homestay => {
         const municipality = homestay.address?.municipality;
         if (!municipality) return false;
@@ -339,24 +296,9 @@ export default function PermissionsPage() {
       });
     }
     
-    // Apply homestay type filter with robust error handling
-    if (selectedType !== 'all') {
-      // Log before filtering
-      console.log(`Filtering by type: "${selectedType}"`);
-      
-      // Count types for debugging
-      const typeCount = {
-        private: results.filter(h => h.homeStayType === 'private').length,
-        community: results.filter(h => h.homeStayType === 'community').length,
-        undefined: results.filter(h => !h.homeStayType).length,
-        other: results.filter(h => h.homeStayType && h.homeStayType !== 'private' && h.homeStayType !== 'community').length
-      };
-      console.log('Type distribution before filtering:', typeCount);
-      
-      // Apply the filter with clean, simple logic since we've normalized the data already
+    // Apply homestay type filter
+    if (selectedType && selectedType !== 'all') {
       results = results.filter(homestay => homestay.homeStayType === selectedType);
-      
-      console.log(`After type filter: ${results.length} results`);
     }
     
     setFilteredHomestays(results);
@@ -411,29 +353,19 @@ export default function PermissionsPage() {
   };
 
   // Toggle bulk user permission
-  const toggleBulkUserPermission = (permission: keyof UserPermissions, value?: boolean) => {
-    console.log(`Toggle permission ${permission} to ${value === undefined ? 'undefined (reset)' : value}`);
-    
+  const toggleBulkUserPermission = (permission: keyof UserPermissions) => {
     setUserBulkPermissions(prev => {
-      if (value === undefined) {
-        // Clear the permission from the bulk update (no change)
-        const newPermissions = { ...prev };
-        delete newPermissions[permission];
-        return newPermissions;
-      } else {
-        // Set to the explicit value (true or false)
-        return { ...prev, [permission]: value };
-      }
+      const newValue = prev[permission] === undefined ? true : 
+                       prev[permission] === true ? false : true;
+      return { ...prev, [permission]: newValue };
     });
   };
 
-  // Toggle bulk homestay feature - fix to handle the trash button correctly
+  // Toggle bulk homestay feature
   const toggleBulkHomestayFeature = (feature: keyof HomeStayFeatureAccess, value?: boolean) => {
-    console.log(`Toggle feature ${feature} to ${value === undefined ? 'undefined (reset)' : value}`);
-    
     setHomestayBulkFeatures(prev => {
       if (value === undefined) {
-        // Clear the feature from the bulk update (triggered by trash button)
+        // Remove the feature from the update object (no change)
         const newFeatures = { ...prev };
         delete newFeatures[feature];
         return newFeatures;
@@ -613,37 +545,37 @@ export default function PermissionsPage() {
 
   // Update available districts when province changes
   useEffect(() => {
-    if (selectedProvince && selectedProvince !== 'all' && addressData.provinceDistrictsMap) {
+    if (selectedProvince && addressData.provinceDistrictsMap) {
       const districts = addressData.provinceDistrictsMap[selectedProvince] || [];
       setAvailableDistricts(districts);
       
       // Reset district if it's no longer valid
-      if (selectedDistrict !== 'all' && !districts.includes(selectedDistrict)) {
-        setSelectedDistrict('all');
-        setSelectedMunicipality('all');
+      if (selectedDistrict && !districts.includes(selectedDistrict)) {
+        setSelectedDistrict("");
+        setSelectedMunicipality("");
         setAvailableMunicipalities([]);
       }
     } else {
       setAvailableDistricts([]);
-      setSelectedDistrict('all');
-      setSelectedMunicipality('all');
+      setSelectedDistrict("");
+      setSelectedMunicipality("");
       setAvailableMunicipalities([]);
     }
   }, [selectedProvince, addressData.provinceDistrictsMap, selectedDistrict]);
 
   // Update available municipalities when district changes
   useEffect(() => {
-    if (selectedDistrict && selectedDistrict !== 'all' && addressData.districtMunicipalitiesMap) {
+    if (selectedDistrict && addressData.districtMunicipalitiesMap) {
       const municipalities = addressData.districtMunicipalitiesMap[selectedDistrict] || [];
       setAvailableMunicipalities(municipalities);
       
       // Reset municipality if it's no longer valid
-      if (selectedMunicipality !== 'all' && !municipalities.includes(selectedMunicipality)) {
-        setSelectedMunicipality('all');
+      if (selectedMunicipality && !municipalities.includes(selectedMunicipality)) {
+        setSelectedMunicipality("");
       }
     } else {
       setAvailableMunicipalities([]);
-      setSelectedMunicipality('all');
+      setSelectedMunicipality("");
     }
   }, [selectedDistrict, addressData.districtMunicipalitiesMap, selectedMunicipality]);
 
@@ -688,68 +620,20 @@ export default function PermissionsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="pb-2">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
             {Object.entries(userPermissionLabels).map(([key, label]) => (
-              <div key={key} className="flex flex-col space-y-1">
-                <label className="text-sm font-medium">{label}</label>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    size="sm"
-                    variant={userBulkPermissions[key as keyof UserPermissions] === true ? "default" : "outline"}
-                    className="px-2 py-0 h-8 text-xs"
-                    onClick={() => toggleBulkUserPermission(key as keyof UserPermissions, true)}
-                  >
-                    <CircleCheck className="h-3.5 w-3.5 mr-1" />
-                    Allow
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={userBulkPermissions[key as keyof UserPermissions] === false ? "destructive" : "outline"}
-                    className="px-2 py-0 h-8 text-xs"
-                    onClick={() => toggleBulkUserPermission(key as keyof UserPermissions, false)}
-                  >
-                    <CircleX className="h-3.5 w-3.5 mr-1" />
-                    Deny
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="px-1 h-8 ml-auto"
-                    onClick={() => toggleBulkUserPermission(key as keyof UserPermissions, undefined)}
-                    title="Clear selection"
-                  >
-                    <Trash className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {userBulkPermissions[key as keyof UserPermissions] === true && 
-                    <span className="text-green-600">Allow access</span>
-                  }
-                  {userBulkPermissions[key as keyof UserPermissions] === false && 
-                    <span className="text-red-600">Deny access</span>
-                  }
-                  {userBulkPermissions[key as keyof UserPermissions] === undefined && 
-                    <span>No change</span>
-                  }
-                </div>
+              <div key={key} className="flex items-center space-x-2">
+                <Checkbox 
+                  id={`bulk-${key}`} 
+                  checked={userBulkPermissions[key as keyof UserPermissions] === true}
+                  indeterminate={userBulkPermissions[key as keyof UserPermissions] === false}
+                  onCheckedChange={() => toggleBulkUserPermission(key as keyof UserPermissions)}
+                />
+                <label htmlFor={`bulk-${key}`} className="text-sm">
+                  {label}
+                </label>
               </div>
             ))}
-          </div>
-          <div className="text-xs text-muted-foreground mt-2">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1">
-                <div className="h-3 w-3 rounded-sm bg-green-500"></div>
-                <span>Allow access</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="h-3 w-3 rounded-sm bg-red-500"></div>
-                <span>Deny access</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="h-3 w-3 rounded-sm border"></div>
-                <span>No change</span>
-              </div>
-            </div>
           </div>
         </CardContent>
         <CardFooter className="flex justify-between py-3">
@@ -828,10 +712,7 @@ export default function PermissionsPage() {
                     </Badge>
                   </TableCell>
                   {Object.keys(userPermissionLabels).map((permission) => (
-                    <TableCell
-                      key={permission}
-                      className="text-center"
-                    >
+                    <TableCell key={permission} className="text-center">
                       {user.role === 'superadmin' ? (
                         <Check className="h-4 w-4 text-green-500 mx-auto opacity-50" />
                       ) : user.permissions?.[permission as keyof UserPermissions] ? (
@@ -855,83 +736,6 @@ export default function PermissionsPage() {
             )}
           </TableBody>
         </Table>
-      </div>
-    </div>
-  );
-
-  // Replace the custom dropdowns with standard select elements in the Geographic Filters section
-  const renderGeographicFilters = () => (
-    <div className="flex flex-col gap-3 mb-4 p-3 border rounded-md bg-muted/20">
-      <div className="text-sm font-medium mb-1 w-full">Geographic Filters</div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full">
-        <div className="space-y-1">
-          <label className="block text-xs font-medium mb-1">Province</label>
-          <select
-            value={selectedProvince}
-            onChange={(e) => setSelectedProvince(e.target.value)}
-            className="w-full p-2 rounded-md border border-input bg-background text-sm"
-          >
-            <option value="all">All Provinces</option>
-            {addressData.allProvinces
-              .filter(province => province && province.trim() !== '')
-              .map((province) => (
-                <option key={province} value={province}>
-                  {province}
-                </option>
-              ))}
-          </select>
-        </div>
-        
-        <div className="space-y-1">
-          <label className="block text-xs font-medium mb-1">District</label>
-          <select
-            value={selectedDistrict}
-            onChange={(e) => setSelectedDistrict(e.target.value)}
-            className="w-full p-2 rounded-md border border-input bg-background text-sm"
-            disabled={selectedProvince === 'all'}
-          >
-            <option value="all">All Districts</option>
-            {availableDistricts
-              .filter(district => district && district.trim() !== '')
-              .map((district) => (
-                <option key={district} value={district}>
-                  {district}
-                </option>
-              ))}
-          </select>
-        </div>
-        
-        <div className="space-y-1">
-          <label className="block text-xs font-medium mb-1">Municipality</label>
-          <select
-            value={selectedMunicipality}
-            onChange={(e) => setSelectedMunicipality(e.target.value)}
-            className="w-full p-2 rounded-md border border-input bg-background text-sm"
-            disabled={selectedDistrict === 'all'}
-          >
-            <option value="all">All Municipalities</option>
-            {availableMunicipalities
-              .filter(municipality => municipality && municipality.trim() !== '')
-              .map((municipality) => (
-                <option key={municipality} value={municipality}>
-                  {municipality}
-                </option>
-              ))}
-          </select>
-        </div>
-        
-        <div className="space-y-1 md:col-span-3">
-          <label className="block text-xs font-medium mb-1">Homestay Type</label>
-          <select
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value)}
-            className="w-full p-2 rounded-md border border-input bg-background text-sm"
-          >
-            <option value="all">All Types</option>
-            <option value="private">Private</option>
-            <option value="community">Community</option>
-          </select>
-        </div>
       </div>
     </div>
   );
@@ -975,6 +779,17 @@ export default function PermissionsPage() {
           </SelectContent>
         </Select>
         
+        <Select value={selectedType} onValueChange={setSelectedType}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Homestay Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="private">Private</SelectItem>
+            <SelectItem value="community">Community</SelectItem>
+          </SelectContent>
+        </Select>
+        
         <Button variant="outline" size="sm" onClick={resetHomestayFilters} className="whitespace-nowrap">
           <RefreshCw className="mr-2 h-4 w-4" />
           Reset Filters
@@ -982,7 +797,69 @@ export default function PermissionsPage() {
       </div>
       
       {/* Enhanced geographic filters */}
-      {renderGeographicFilters()}
+      <div className="flex flex-col md:flex-row flex-wrap gap-3 mb-4 p-3 border rounded-md bg-muted/20">
+        <div className="text-sm font-medium mb-1 w-full">Geographic Filters</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full">
+          <div className="space-y-1">
+            <label className="block text-xs font-medium mb-1">Province</label>
+            <Select value={selectedProvince} onValueChange={setSelectedProvince}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select Province" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Provinces</SelectItem>
+                {addressData.allProvinces.filter(province => province && province.trim() !== '').map((province) => (
+                  <SelectItem key={province} value={province}>
+                    {province}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="space-y-1">
+            <label className="block text-xs font-medium mb-1">District</label>
+            <Select 
+              value={selectedDistrict} 
+              onValueChange={setSelectedDistrict}
+              disabled={!selectedProvince}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select District" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Districts</SelectItem>
+                {availableDistricts.filter(district => district && district.trim() !== '').map((district) => (
+                  <SelectItem key={district} value={district}>
+                    {district}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="space-y-1">
+            <label className="block text-xs font-medium mb-1">Municipality</label>
+            <Select 
+              value={selectedMunicipality} 
+              onValueChange={setSelectedMunicipality}
+              disabled={!selectedDistrict}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select Municipality" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Municipalities</SelectItem>
+                {availableMunicipalities.filter(municipality => municipality && municipality.trim() !== '').map((municipality) => (
+                  <SelectItem key={municipality} value={municipality}>
+                    {municipality}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
       
       {/* Bulk actions */}
       <Card className="shadow-sm bg-muted/30">
@@ -996,42 +873,33 @@ export default function PermissionsPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
             {Object.entries(featureAccessLabels).map(([key, label]) => (
               <div key={key} className="flex flex-col space-y-1">
-                <label className="text-sm font-medium">{label}</label>
                 <div className="flex items-center space-x-2">
-                  <Button
-                    size="sm"
-                    variant={homestayBulkFeatures[key as keyof HomeStayFeatureAccess] === true ? "default" : "outline"}
-                    className="px-2 py-0 h-8 text-xs"
-                    onClick={() => toggleBulkHomestayFeature(key as keyof HomeStayFeatureAccess, true)}
-                  >
-                    <CircleCheck className="h-3.5 w-3.5 mr-1" />
-                    Allow
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={homestayBulkFeatures[key as keyof HomeStayFeatureAccess] === false ? "destructive" : "outline"}
-                    className="px-2 py-0 h-8 text-xs"
-                    onClick={() => toggleBulkHomestayFeature(key as keyof HomeStayFeatureAccess, false)}
-                  >
-                    <CircleX className="h-3.5 w-3.5 mr-1" />
-                    Deny
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="px-1 h-8 ml-auto"
-                    onClick={() => toggleBulkHomestayFeature(key as keyof HomeStayFeatureAccess, undefined)}
-                    title="Clear selection"
-                  >
-                    <Trash className="h-3.5 w-3.5" />
-                  </Button>
+                  <Checkbox 
+                    id={`bulk-feature-${key}`} 
+                    checked={homestayBulkFeatures[key as keyof HomeStayFeatureAccess] === true}
+                    onCheckedChange={(checked) => {
+                      // If already true, set to false (explicit deny)
+                      // If false or undefined, set to true (allow)
+                      const newValue = checked === 'indeterminate' 
+                        ? undefined 
+                        : Boolean(checked);
+                      
+                      toggleBulkHomestayFeature(key as keyof HomeStayFeatureAccess, newValue);
+                    }}
+                    className={homestayBulkFeatures[key as keyof HomeStayFeatureAccess] === false 
+                      ? "bg-red-100 border-red-500 data-[state=checked]:bg-red-500 data-[state=checked]:text-white" 
+                      : ""}
+                  />
+                  <label htmlFor={`bulk-feature-${key}`} className="text-sm">
+                    {label}
+                  </label>
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-xs ml-6 text-muted-foreground">
                   {homestayBulkFeatures[key as keyof HomeStayFeatureAccess] === true && 
-                    <span className="text-green-600">Allow access</span>
+                    <span className="text-green-600">Allow</span>
                   }
                   {homestayBulkFeatures[key as keyof HomeStayFeatureAccess] === false && 
-                    <span className="text-red-600">Deny access</span>
+                    <span className="text-red-600">Deny</span>
                   }
                   {homestayBulkFeatures[key as keyof HomeStayFeatureAccess] === undefined && 
                     <span>No change</span>

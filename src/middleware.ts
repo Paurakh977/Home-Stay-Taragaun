@@ -1,6 +1,16 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { jwtVerify, type JWTPayload } from 'jose';
 
+// Extended JWT payload interface with our custom properties
+interface ExtendedJWTPayload extends JWTPayload {
+  userId?: string;
+  username?: string;
+  role?: string;
+  isAdmin?: boolean;
+  homestayId?: string;
+  permissions?: AdminPermissions;
+}
+
 // --- Configuration --- 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -40,17 +50,44 @@ const ADMIN_USERNAME_REGEX = /^\/[^\/]+$/;
 // except for the dashboard routes which require authentication
 const ADMIN_USERNAME_NESTED_REGEX = /^\/[^\/]+\/(?!dashboard).+$/;
 
+// For any admin-specific action routes (like editing, deleting, etc.)
+const ADMIN_EDIT_PATH = /^\/admin\/homestays\/[^\/]+\/edit/;
+const ADMIN_DELETE_PATH = /^\/admin\/homestays\/[^\/]+\/delete/;
+const ADMIN_DOCUMENT_PATH = /^\/admin\/homestays\/[^\/]+\/documents/;
+const ADMIN_IMAGE_PATH = /^\/admin\/homestays\/[^\/]+\/images/;
+
+// Define permission types for type safety
+interface AdminPermissions {
+  adminDashboardAccess?: boolean;
+  homestayApproval?: boolean;
+  homestayEdit?: boolean;
+  homestayDelete?: boolean;
+  documentUpload?: boolean;
+  imageUpload?: boolean;
+  [key: string]: boolean | undefined;
+}
+
+// Define a type for objects that may have Map-like behavior
+interface MapLikePermissions {
+  get(key: string): boolean | undefined;
+}
+
+// Type guard to check if object has Map-like behavior
+function isMapLike(obj: any): obj is MapLikePermissions {
+  return obj && typeof obj === 'object' && 'get' in obj && typeof obj.get === 'function';
+}
+
 // --- Helper Functions --- 
 
 /**
  * Verifies a JWT token using jose.
  * Returns the payload if valid, otherwise null.
  */
-async function verifyToken(token: string | undefined): Promise<JWTPayload | null> {
+async function verifyToken(token: string | undefined): Promise<ExtendedJWTPayload | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, ENCODED_JWT_SECRET);
-    return payload;
+    return payload as ExtendedJWTPayload;
   } catch (error) {
     console.warn('Token verification failed:', error instanceof Error ? error.message : error);
     return null;
@@ -194,6 +231,63 @@ export async function middleware(request: NextRequest) {
 
   if (isPublicPath || isAuthPath || isSuperAdminAuthPath || isPublicAPI) {
       return NextResponse.next();
+  }
+
+  // Check for admin action paths
+  const isAdminEditPath = ADMIN_EDIT_PATH.test(pathname);
+  const isAdminDeletePath = ADMIN_DELETE_PATH.test(pathname);
+  const isAdminDocumentPath = ADMIN_DOCUMENT_PATH.test(pathname);
+  const isAdminImagePath = ADMIN_IMAGE_PATH.test(pathname);
+
+  // If it's a permission-specific admin path, perform deeper authorization
+  if (isAdminEditPath || isAdminDeletePath || isAdminDocumentPath || isAdminImagePath) {
+    const token = request.cookies.get('auth_token')?.value;
+    const payload = await verifyToken(token);
+    
+    if (!payload) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    
+    // Check permissions from the token if available
+    try {
+      const requiredPermission = isAdminEditPath ? 'homestayEdit' : 
+                               isAdminDeletePath ? 'homestayDelete' : 
+                               isAdminDocumentPath ? 'documentUpload' :
+                               'imageUpload';
+      
+      // Enhanced permission check to handle different permission formats
+      let hasPermission = true; // Default to true if we can't find the permission
+      
+      if (payload.permissions) {
+        // Case 1: Direct property access (standard object)
+        if (typeof payload.permissions === 'object' && !isMapLike(payload.permissions)) {
+          // Type assertion to help TypeScript understand the structure
+          const permissions = payload.permissions as AdminPermissions;
+          if (requiredPermission in permissions) {
+            hasPermission = permissions[requiredPermission] === true;
+          }
+        }
+        // Case 2: Map-style get method 
+        else if (isMapLike(payload.permissions)) {
+          const permissionsMap = payload.permissions;
+          const permValue = permissionsMap.get(requiredPermission);
+          hasPermission = permValue === true;
+        }
+        
+        // If permission is explicitly false, block access
+        if (hasPermission === false) {
+          console.log(`Permission denied: ${requiredPermission} not granted for path ${pathname}`);
+          return NextResponse.json({ 
+            message: `Forbidden: You don't have '${requiredPermission}' permission` 
+          }, { status: 403 });
+        }
+      }
+      
+      // Allow access if permission is true or not found
+      console.log(`Permission check passed for ${requiredPermission} on path ${pathname}`);
+    } catch (error) {
+      console.error('Permission check error:', error);
+    }
   }
 
   // 8. Default Deny (Optional but Recommended)

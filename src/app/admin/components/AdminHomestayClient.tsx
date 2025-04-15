@@ -54,6 +54,16 @@ interface AdminHomestayClientProps {
   username?: string;
 }
 
+// Define permissions type
+interface UserPermissions {
+  adminDashboardAccess: boolean;
+  homestayApproval: boolean;
+  homestayEdit: boolean;
+  homestayDelete: boolean;
+  documentUpload: boolean;
+  imageUpload: boolean;
+}
+
 export default function AdminHomestayClient({ username: propUsername }: AdminHomestayClientProps) {
   const [homestays, setHomestays] = useState<Homestay[]>([]);
   const [filteredHomestays, setFilteredHomestays] = useState<Homestay[]>([]);
@@ -89,27 +99,123 @@ export default function AdminHomestayClient({ username: propUsername }: AdminHom
   const [availableDistricts, setAvailableDistricts] = useState<string[]>([]);
   const [availableMunicipalities, setAvailableMunicipalities] = useState<string[]>([]);
 
+  // State to store user permissions
+  const [userPermissions, setUserPermissions] = useState<UserPermissions | null>(null);
+
   // Check authentication and fetch user data
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        console.log("Client: Starting authentication check");
+
         // First try to check if there's a superadmin token
         const superadminResponse = await fetch('/api/superadmin/auth/me');
         if (superadminResponse.ok) {
           // User is a superadmin - proceed without further authentication
-          console.log('Authenticated as superadmin');
+          console.log('Client: Authenticated as superadmin');
+          
+          // Superadmins have all permissions
+          setUserPermissions({
+            adminDashboardAccess: true,
+            homestayApproval: true,
+            homestayEdit: true,
+            homestayDelete: true,
+            documentUpload: true,
+            imageUpload: true
+          });
+          
           return;
         }
         
         // Not a superadmin, check for admin authentication
+        console.log("Client: Not a superadmin, checking admin authentication");
         const response = await fetch('/api/admin/auth/me');
+        
+        // Check if response is successful
         if (!response.ok) {
-          // Not authenticated, redirect to login
+          console.error('Client: Authentication failed with status', response.status);
+          toast.error("Authentication failed. Please log in.");
           router.push('/admin/login');
           return;
         }
+        
+        // Parse user data
+        const userData = await response.json();
+        console.log("Client: Received user data:", userData);
+        
+        // Check if user data is valid and user is authenticated
+        if (!userData.success || !userData.user) {
+          console.error('Client: Invalid user data structure');
+          toast.error("Authentication failed. Please log in.");
+          router.push('/admin/login');
+          return;
+        }
+        
+        // Check if user has admin role
+        if (userData.user.role !== 'admin') {
+          console.error('Client: User is not an admin, role:', userData.user.role);
+          toast.error("You don't have admin privileges.");
+          router.push('/admin/login');
+          return;
+        }
+
+        // Create fallback permissions if missing
+        const permissions = userData.user.permissions || {
+          adminDashboardAccess: false,
+          homestayApproval: false,
+          homestayEdit: false,
+          homestayDelete: false,
+          documentUpload: false,
+          imageUpload: false
+        };
+        
+        // Store the permissions for later use
+        setUserPermissions(permissions);
+        
+        console.log("Client: User permissions:", permissions);
+
+        // Check if user has admin dashboard access permission
+        if (permissions.adminDashboardAccess !== true) {
+          console.error('Client: User lacks dashboard access permission');
+          toast.error("You don't have permission to access the admin dashboard");
+          
+          // Show access denied screen with functional logout button
+          document.body.innerHTML = `
+            <div class="fixed inset-0 bg-white flex flex-col items-center justify-center z-50">
+              <div class="rounded-full bg-red-100 p-4 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m0 0v2m0-2h2m-2 0H9m3-3a3 3 0 100-6 3 3 0 000 6z" />
+                </svg>
+              </div>
+              <h1 class="text-2xl font-bold mb-2">Access Denied</h1>
+              <p class="text-gray-600 mb-6">You don't have permission to access this feature.</p>
+              <div class="flex gap-4">
+                <button id="goBackBtn" class="px-4 py-2 bg-gray-700 text-white rounded-lg">Go Back</button>
+                <button id="logoutBtn" class="px-4 py-2 bg-red-600 text-white rounded-lg">Logout</button>
+              </div>
+            </div>
+          `;
+          
+          // Add event listeners
+          setTimeout(() => {
+            document.getElementById('goBackBtn')?.addEventListener('click', () => {
+              window.location.href = '/admin/login';
+            });
+            
+            document.getElementById('logoutBtn')?.addEventListener('click', () => {
+              // Clear the cookie client-side for immediate effect
+              document.cookie = "auth_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+              window.location.href = '/admin/login';
+            });
+          }, 100);
+          
+          return;
+        }
+        
+        console.log('Client: Admin authentication successful with dashboard access');
       } catch (error) {
-        console.error('Auth check error:', error);
+        console.error('Client: Auth check error:', error);
+        toast.error("Authentication check failed. Please try again.");
         router.push('/admin/login');
       }
     };
@@ -321,7 +427,11 @@ export default function AdminHomestayClient({ username: propUsername }: AdminHom
   }, [homestays, searchQuery, selectedStatus, selectedProvince, selectedDistrict, selectedMunicipality, selectedType, addressData]);
 
   const handleRowClick = (homestayId: string) => {
-    router.push(`/admin/homestays/${homestayId}`);
+    if (hasPermission('homestayEdit')) {
+      router.push(`/admin/homestays/${homestayId}`);
+    } else {
+      toast.error("You don't have permission to edit homestay details");
+    }
   };
 
   // Clear all filters
@@ -343,13 +453,161 @@ export default function AdminHomestayClient({ username: propUsername }: AdminHom
     }
   };
   
+  // Logout function
+  const handleLogout = async () => {
+    try {
+      console.log('Client: Logging out...');
+      // Call the logout API endpoint
+      const response = await fetch('/api/admin/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        console.log('Client: Logout successful');
+        toast.success("Logged out successfully");
+        
+        // Clear the cookie client-side too for immediate effect
+        document.cookie = "auth_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        
+        // Redirect to login
+        router.push('/admin/login');
+      } else {
+        console.error('Client: Logout failed');
+        toast.error("Logout failed");
+      }
+    } catch (error) {
+      console.error('Client: Logout error:', error);
+      toast.error("Error during logout");
+    }
+  };
+
+  // Check if current user has a specific permission
+  const hasPermission = (permission: keyof UserPermissions): boolean => {
+    // If we don't know the user's permissions yet, default to false
+    if (!userPermissions) return false;
+    return userPermissions[permission] === true;
+  };
+
+  // Handle edit functionality
+  const handleEdit = (homestayId: string) => {
+    // Check for edit permission before allowing
+    if (!hasPermission('homestayEdit')) {
+      toast.error("You don't have permission to edit homestay details");
+      return;
+    }
+    
+    router.push(`/admin/homestays/${homestayId}`);
+  };
+  
+  // Handle delete functionality
+  const handleDelete = async (homestayId: string) => {
+    // Check for delete permission before allowing
+    if (!hasPermission('homestayDelete')) {
+      toast.error("You don't have permission to delete homestays");
+      return;
+    }
+    
+    // Delete logic would go here
+    toast.success("Delete functionality would be implemented here");
+  };
+  
+  // Handle document upload
+  const handleDocumentUpload = (homestayId: string) => {
+    // Check for document upload permission before allowing
+    if (!hasPermission('documentUpload')) {
+      toast.error("You don't have permission to upload documents");
+      return;
+    }
+    
+    // Document upload logic would go here
+    toast.success("Document upload functionality would be implemented here");
+  };
+  
+  // Handle image upload
+  const handleImageUpload = (homestayId: string) => {
+    // Check for image upload permission before allowing
+    if (!hasPermission('imageUpload')) {
+      toast.error("You don't have permission to upload images");
+      return;
+    }
+    
+    // Image upload logic would go here
+    toast.success("Image upload functionality would be implemented here");
+  };
+
+  // Render action buttons with permission checks
+  const renderActionButtons = (homestay: Homestay) => (
+    <div className="flex space-x-2">
+      {hasPermission('homestayEdit') && (
+        <button 
+          onClick={() => handleEdit(homestay.homestayId)}
+          className="p-1 text-blue-600 hover:text-blue-800"
+          title="Edit homestay"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+        </button>
+      )}
+      
+      {hasPermission('homestayDelete') && (
+        <button 
+          onClick={() => handleDelete(homestay.homestayId)}
+          className="p-1 text-red-600 hover:text-red-800"
+          title="Delete homestay"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
+      )}
+      
+      {hasPermission('documentUpload') && (
+        <button 
+          onClick={() => handleDocumentUpload(homestay.homestayId)}
+          className="p-1 text-green-600 hover:text-green-800"
+          title="Upload documents"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </button>
+      )}
+      
+      {hasPermission('imageUpload') && (
+        <button 
+          onClick={() => handleImageUpload(homestay.homestayId)}
+          className="p-1 text-purple-600 hover:text-purple-800"
+          title="Upload images"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Homestay Management</h1>
-          <p className="mt-2 text-sm text-gray-600">Review and manage your homestay registrations</p>
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Homestay Management</h1>
+            <p className="mt-2 text-sm text-gray-600">Review and manage your homestay registrations</p>
+          </div>
+          
+          {/* Logout button */}
+          <button 
+            onClick={handleLogout}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Logout
+          </button>
         </div>
         
         {/* Search and Filter Section */}
@@ -566,11 +824,17 @@ export default function AdminHomestayClient({ username: propUsername }: AdminHom
                   </span>
                 </div>
                 
-                {/* View button */}
-                <div className="mt-4 pt-3 border-t border-gray-100">
-                  <div className="flex items-center justify-between text-sm text-primary">
+                {/* Action buttons with permission checks */}
+                <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">
+                  {/* View button - always visible, doesn't need permission */}
+                  <div className="flex items-center text-sm text-primary">
                     <span>View Details</span>
-                    <ArrowRight size={16} className="transform transition-transform group-hover:translate-x-1" />
+                    <ArrowRight size={16} className="ml-1 transform transition-transform group-hover:translate-x-1" />
+                  </div>
+                  
+                  {/* Action buttons based on permissions */}
+                  <div onClick={(e) => { e.stopPropagation(); /* Prevent card click */ }}>
+                    {renderActionButtons(homestay)}
                   </div>
                 </div>
               </div>

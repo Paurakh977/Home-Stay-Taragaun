@@ -164,13 +164,13 @@ const Navbar = ({ adminUsername }: NavbarProps) => {
               href={user ? `${adminUsername ? `/${adminUsername}` : ""}/dashboard` : `${adminUsername ? `/${adminUsername}` : ""}/login`}
               onClick={handleDashboardClick}
               className={`group font-medium px-3 py-5 transition-all duration-300 ease-in-out ${
-                pathname.startsWith('/dashboard') ? 'text-primary' : 'text-gray-700'
+                pathname.includes('/dashboard') ? 'text-primary' : 'text-gray-700'
               }`}
             >
               <div className="relative">
                 <span className="group-hover:text-primary">Dashboard</span>
                 <span className={`absolute bottom-0 left-0 w-full h-[2px] bg-primary transform transition-transform duration-300 ease-in-out ${
-                  pathname.startsWith('/dashboard') ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
+                  pathname.includes('/dashboard') ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
                 }`}></span>
               </div>
             </Link>
@@ -217,7 +217,7 @@ const Navbar = ({ adminUsername }: NavbarProps) => {
                   <LogOut className="h-4 w-4" />
                 </button>
               ) : (
-                <Link href="/login">
+                <Link href={`${adminUsername ? `/${adminUsername}` : ""}/login`}>
                   <button
                     className="text-primary px-2 py-1 rounded-md text-xs font-medium hover:bg-primary/10 whitespace-nowrap"
                   >
@@ -279,7 +279,7 @@ const Navbar = ({ adminUsername }: NavbarProps) => {
             <Link 
               href={user ? `${adminUsername ? `/${adminUsername}` : ""}/dashboard` : `${adminUsername ? `/${adminUsername}` : ""}/login`}
               className={`block px-3 py-2 rounded-md text-base font-medium transition-all duration-200 ${
-                pathname.startsWith('/dashboard') 
+                pathname.includes('/dashboard') 
                   ? 'text-primary border-l-4 border-primary bg-orange-50 pl-2' 
                   : 'text-gray-700 hover:bg-orange-50 hover:text-primary'
               }`}

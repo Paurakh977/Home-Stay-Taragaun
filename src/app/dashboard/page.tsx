@@ -15,11 +15,31 @@ interface HomeStay {
   homeStayType: string;
   status: string;
   createdAt: string;
+  featureAccess?: {
+    dashboard?: boolean;
+    profile?: boolean;
+    portal?: boolean;
+    documents?: boolean;
+    imageUpload?: boolean;
+    settings?: boolean;
+    chat?: boolean;
+    updateInfo?: boolean;
+  };
 }
 
 interface UserInfo {
   homestayId: string;
   homeStayName: string;
+  featureAccess?: {
+    dashboard?: boolean;
+    profile?: boolean;
+    portal?: boolean;
+    documents?: boolean;
+    imageUpload?: boolean;
+    settings?: boolean;
+    chat?: boolean;
+    updateInfo?: boolean;
+  };
 }
 
 interface DashboardPageProps {
@@ -30,6 +50,7 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
   const [homestays, setHomestays] = useState<HomeStay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<UserInfo | null>(null);
   const [stats, setStats] = useState({
     totalBookings: 0,
     totalVisits: 0,
@@ -37,6 +58,22 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
     pendingInquiries: 0
   });
   const router = useRouter();
+
+  // Load user data from localStorage
+  useEffect(() => {
+    try {
+      const userJson = localStorage.getItem('user');
+      if (userJson) {
+        const userData = JSON.parse(userJson);
+        setUser(userData);
+      } else {
+        router.push(adminUsername ? `/${adminUsername}/login` : '/login');
+      }
+    } catch (err) {
+      console.error('Error loading user data:', err);
+      router.push(adminUsername ? `/${adminUsername}/login` : '/login');
+    }
+  }, [router, adminUsername]);
 
   // Fetch homestay data
   useEffect(() => {
@@ -71,6 +108,20 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
         
         const data = await response.json();
         setHomestays(data.data?.slice(0, 5) || []); // Only take first 5
+        
+        // If we have the first homestay data, update the user's feature access from it
+        if (data.data && data.data.length > 0 && data.data[0].featureAccess) {
+          // Get the first homestay to extract featureAccess
+          const firstHomestay = data.data[0];
+          // Update the user data with feature access
+          const updatedUser = {
+            ...user,
+            featureAccess: firstHomestay.featureAccess
+          };
+          setUser(updatedUser);
+          // Update in localStorage too
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+        }
         
         // Set mock stats (would come from real API in production)
         setStats({
@@ -305,19 +356,21 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
               </div>
             </Link>
             
-            <Link href={adminUsername ? `/${adminUsername}/dashboard/update-info` : "/dashboard/update-info"}>
-              <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
-                <div className="flex items-center">
-                  <div className="p-2 bg-green-100 rounded-md">
-                    <Building2Icon className="h-5 w-5 text-green-600" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-900">Update Homestay</p>
-                    <p className="text-xs text-gray-500">Edit your homestay information</p>
+            {user?.featureAccess?.updateInfo && (
+              <Link href={adminUsername ? `/${adminUsername}/dashboard/update-info` : "/dashboard/update-info"}>
+                <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
+                  <div className="flex items-center">
+                    <div className="p-2 bg-green-100 rounded-md">
+                      <Building2Icon className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-900">Update Homestay</p>
+                      <p className="text-xs text-gray-500">Edit your homestay information</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Link>
+              </Link>
+            )}
             
             <Link href={adminUsername ? `/${adminUsername}/dashboard/settings` : "/dashboard/settings"}>
               <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">

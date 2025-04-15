@@ -23,6 +23,16 @@ import {
 interface UserInfo {
   homestayId: string;
   homeStayName: string;
+  featureAccess?: {
+    dashboard?: boolean;
+    profile?: boolean;
+    portal?: boolean;
+    documents?: boolean;
+    imageUpload?: boolean;
+    settings?: boolean;
+    chat?: boolean;
+    updateInfo?: boolean;
+  };
 }
 
 // Helper function to generate initials
@@ -91,10 +101,24 @@ export default function DashboardLayout({
         return;
       }
       
-      // User exists, fetch profile image
+      // User exists, fetch profile image and feature access
       const data = await response.json();
       console.log("[Layout Fetch] Received profileImage from API:", data?.homestay?.profileImage);
       setProfileImage(data?.homestay?.profileImage || null);
+      
+      // Update user with feature access data
+      if (data?.homestay?.featureAccess && user) {
+        const updatedUser: UserInfo = {
+          homestayId: user.homestayId,
+          homeStayName: user.homeStayName,
+          featureAccess: data.homestay.featureAccess
+        };
+        setUser(updatedUser);
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+      }
+      
+      // Check if current path is allowed by feature access
+      checkFeatureAccess(data?.homestay?.featureAccess);
       
     } catch (err) {
       console.error("Error verifying user:", err);
@@ -223,6 +247,54 @@ export default function DashboardLayout({
   const basePath = isAdminRoute 
     ? `/${pathname.split('/')[1]}/dashboard` // Extract adminUsername and create path
     : '/dashboard';
+
+  // Add feature access check function
+  const checkFeatureAccess = (featureAccess: UserInfo['featureAccess']) => {
+    if (!featureAccess) return; // No feature access info
+    
+    const pathSegments = pathname.split('/');
+    const lastSegment = pathSegments[pathSegments.length - 1];
+    const secondLastSegment = pathSegments.length > 2 ? pathSegments[pathSegments.length - 2] : null;
+    
+    // Default dashboard access
+    if (pathname.endsWith('/dashboard') && !featureAccess.dashboard) {
+      router.push('/access-denied');
+      return;
+    }
+    
+    // Check specific features
+    if (lastSegment === 'profile' && !featureAccess.profile) {
+      router.push('/access-denied');
+      return;
+    }
+    
+    if (lastSegment === 'portal' && !featureAccess.portal) {
+      router.push('/access-denied');
+      return;
+    }
+    
+    if (lastSegment === 'documents' && !featureAccess.documents) {
+      router.push('/access-denied');
+      return;
+    }
+    
+    if (lastSegment === 'settings' && !featureAccess.settings) {
+      router.push('/access-denied');
+      return;
+    }
+    
+    if (lastSegment === 'update-info' && !featureAccess.updateInfo) {
+      router.push('/access-denied');
+      return;
+    }
+  };
+
+  // Update useEffect to check current path whenever user data changes
+  useEffect(() => {
+    if (user?.featureAccess) {
+      checkFeatureAccess(user.featureAccess);
+    }
+  }, [pathname, user?.featureAccess]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -417,24 +489,24 @@ export default function DashboardLayout({
               </Link>
               <Link
                 href={`${basePath}/documents`}
-                className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("/documents")}`}
                 onClick={() => setIsMobileMenuOpen(false)}
+                className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("/documents")}`}
               >
                 <FileText className="h-5 w-5 mr-3" />
                 Upload Documents
               </Link>
               <Link
                 href={`${basePath}/update-info`}
-                className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("/update-info")}`}
                 onClick={() => setIsMobileMenuOpen(false)}
+                className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("/update-info")}`}
               >
                 <PencilLine className="h-5 w-5 mr-3" />
                 Update Information
               </Link>
               <Link
                 href={`${basePath}/settings`}
-                className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("/settings")}`}
                 onClick={() => setIsMobileMenuOpen(false)}
+                className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("/settings")}`}
               >
                 <Settings className="h-5 w-5 mr-3" />
                 Settings

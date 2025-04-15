@@ -416,7 +416,7 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
           
           <div className="flex justify-center mt-6">
             <Link
-              href="/login"
+              href={adminUsername ? `/${adminUsername}/login` : "/login"}
               className="inline-flex items-center px-4 py-2 rounded-md bg-primary text-white hover:bg-primary-dark transition-colors"
             >
               <LogIn className="h-4 w-4 mr-2" />

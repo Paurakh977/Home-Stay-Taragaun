@@ -40,6 +40,16 @@ interface HomestayData {
   galleryImages?: string[];
   description?: string;
   dhsrNo?: string;
+  featureAccess?: {
+    dashboard?: boolean;
+    profile?: boolean;
+    portal?: boolean;
+    documents?: boolean;
+    imageUpload?: boolean;
+    settings?: boolean;
+    chat?: boolean;
+    updateInfo?: boolean;
+  };
 }
 
 // Add adminUsername to the props interface
@@ -152,6 +162,14 @@ export default function PortalPage({ adminUsername }: PortalPageProps) {
   const handleProfileImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0] || !user) return;
     
+    // Check for image upload permission
+    const homestayData = await checkImageUploadPermission();
+    if (!homestayData) {
+      toast.error("You don't have permission to upload images");
+      e.target.value = ''; // Clear input
+      return;
+    }
+    
     try {
       setUploadingProfile(true);
       
@@ -191,45 +209,98 @@ export default function PortalPage({ adminUsername }: PortalPageProps) {
     }
   };
 
+  // Check if user has imageUpload permission
+  const checkImageUploadPermission = async (): Promise<HomestayData | null> => {
+    if (!user) return null;
+    
+    try {
+      const fetchUrl = adminUsername 
+        ? `/api/homestays/${user.homestayId}?adminUsername=${adminUsername}`
+        : `/api/homestays/${user.homestayId}`;
+      
+      const response = await fetch(fetchUrl);
+      if (!response.ok) {
+        console.error('Failed to fetch homestay data for permission check');
+        return null;
+      }
+      
+      const data = await response.json();
+      if (!data.homestay?.featureAccess?.imageUpload) {
+        console.warn('User does not have imageUpload permission');
+        return null;
+      }
+      
+      return data.homestay;
+    } catch (error) {
+      console.error('Error checking imageUpload permission:', error);
+      return null;
+    }
+  };
+
   // Remove gallery image and trigger save
   const removeGalleryImage = async (imageUrlToRemove: string) => {
     if (!user || !imageUrlToRemove) return;
+
+    // Check for image upload permission
+    const homestayData = await checkImageUploadPermission();
+    if (!homestayData) {
+      toast.error("You don't have permission to delete images");
+      return;
+    }
 
     try {
       // First update the UI optimistically
       const updatedImages = galleryImages.filter(img => img !== imageUrlToRemove);
       setGalleryImages(updatedImages);
       
-      // Call the DELETE endpoint to remove the image
+      // Then save the changes
+      await savePortalData(description, updatedImages);
+      
+      // Now delete the image file from storage
+      const deletePath = imageUrlToRemove.split('/').pop(); // Extract filename from path
+      if (!deletePath) {
+        console.error('Could not extract filename from path:', imageUrlToRemove);
+        toast.error('Failed to delete image file');
+        return;
+      }
+      
       const deleteUrl = adminUsername 
-        ? `/api/homestays/${user.homestayId}/images?imagePath=${encodeURIComponent(imageUrlToRemove)}&adminUsername=${adminUsername}`
-        : `/api/homestays/${user.homestayId}/images?imagePath=${encodeURIComponent(imageUrlToRemove)}`;
+        ? `/api/homestays/${user.homestayId}/images/${deletePath}?adminUsername=${adminUsername}`
+        : `/api/homestays/${user.homestayId}/images/${deletePath}`;
       
       const response = await fetch(deleteUrl, {
-        method: 'DELETE'
+        method: 'DELETE',
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete image');
+        console.error('Delete image response:', response.status);
+        // Toast error only if the API call fails, not on any state updates
+        toast.error('Failed to delete image from storage');
+      } else {
+        toast.success('Image deleted successfully');
       }
       
-      // Show success toast
-      toast.success("Image deleted successfully");
-      
-      // Refresh data after deletion
-      fetchHomestayData(user.homestayId);
-    } catch (error) {
-      console.error('Error deleting image:', error);
-      toast.error("Failed to delete image");
-      // Revert the optimistic update if the API call fails
-      fetchHomestayData(user.homestayId);
+    } catch (err) {
+      console.error('Error removing gallery image:', err);
+      toast.error('Failed to remove image');
+      // Refresh data to restore original state
+      if (user) {
+        fetchHomestayData(user.homestayId);
+      }
     }
   };
 
   // Handle single gallery image upload
   const handleGalleryImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0] || !user) return;
+    
+    // Check for image upload permission
+    const homestayData = await checkImageUploadPermission();
+    if (!homestayData) {
+      toast.error("You don't have permission to upload images");
+      e.target.value = ''; // Clear input
+      return;
+    }
     
     let newImageUrl: string | null = null;
     try {
@@ -284,6 +355,14 @@ export default function PortalPage({ adminUsername }: PortalPageProps) {
   // Handle multiple gallery images upload
   const handleMultipleImagesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0 || !user) return;
+    
+    // Check for image upload permission
+    const homestayData = await checkImageUploadPermission();
+    if (!homestayData) {
+      toast.error("You don't have permission to upload images");
+      e.target.value = ''; // Clear input
+      return;
+    }
     
     let successfullyUploadedUrls: string[] = [];
     try {
@@ -861,13 +940,15 @@ export default function PortalPage({ adminUsername }: PortalPageProps) {
               <h2 className="text-xl font-semibold text-gray-800">
                 <span className="inline-block mr-2">🏡</span> Homestay Details
               </h2>
-            <Link 
-              href="/dashboard/update-info"
+            {homestay?.featureAccess?.updateInfo && (
+              <Link 
+                href={adminUsername ? `/${adminUsername}/dashboard/update-info` : "/dashboard/update-info"}
                 className="inline-flex items-center px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200 transition-colors"
-            >
+              >
                 <Edit3 className="h-4 w-4 mr-1.5" />
                 Update
-            </Link>
+              </Link>
+            )}
           </div>
           
             {/* Status indicator */}

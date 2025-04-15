@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, use } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import { toast } from 'react-hot-toast';
+import Image from 'next/image';
+import Link from 'next/link';
 // Remove the import from '@/types/homestay' if HomestayData is defined below
 // import { HomestayData } from '@/types/homestay'; 
 import { CheckCircle, XCircle, ArrowLeft, FileText, Loader2, ExternalLink, MapPin, Phone, User, Mail, Building, Globe, Image as ImageIcon, File as FileIcon, List, Edit, Plus, X, Upload, Eye, Download, Trash2 } from 'lucide-react';
-import { toast } from 'sonner';
 
 // --- Comprehensive Type Definition (Move to types/homestay.ts if preferred) ---
 
@@ -237,46 +239,60 @@ export default function AdminHomestayDetailPage() {
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [updateError, setUpdateError] = useState<string | null>(null);
   
+  // Permission state
+  const [userPermissions, setUserPermissions] = useState<Record<string, boolean>>({});
+  const [permissionChecked, setPermissionChecked] = useState(false);
+  
   // Admin username from URL
   const [adminUsername, setAdminUsername] = useState<string | null>(null);
   
-  // Extract admin username from URL
+  // Check permissions on page load
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      console.log("Extracting adminUsername from URL:", window.location.href);
-      
-      // First try from query parameters
-      const urlParams = new URLSearchParams(window.location.search);
-      console.log("URL search params:", urlParams.toString());
-      let username = urlParams.get('username');
-      
-      // If not found in query params, try to extract from URL path
-      if (!username) {
-        console.log("Trying to extract username from URL path");
-        const pathSegments = window.location.pathname.split('/');
-        console.log("Path segments:", pathSegments);
-        
-        // Look for admin segment in URL
-        const adminIndex = pathSegments.indexOf('admin');
-        if (adminIndex >= 0 && adminIndex + 1 < pathSegments.length) {
-          const possibleUsername = pathSegments[adminIndex + 1];
-          if (possibleUsername && possibleUsername !== 'homestays') {
-            username = possibleUsername;
-            console.log("Found username in path:", username);
-          }
+    const checkPermissions = async () => {
+      try {
+        // Check if user has permission to edit homestays
+        const response = await fetch('/api/admin/auth/me');
+        if (!response.ok) {
+          toast.error("Authentication failed. Please log in again.");
+          router.push('/admin/login');
+          return;
         }
+        
+        const data = await response.json();
+        if (!data.success || !data.user) {
+          toast.error("Failed to fetch user data");
+          router.push('/admin/login');
+          return;
+        }
+        
+        // Store all permissions for checking different actions
+        const permissions = data.user.permissions || {};
+        setUserPermissions(permissions);
+        
+        // Check for edit permission - required to view this page
+        const canEdit = permissions.homestayEdit === true;
+        if (!canEdit) {
+          toast.error("You don't have permission to edit homestay details");
+          router.push('/admin');
+          return;
+        }
+        
+        // Mark permissions as checked
+        setPermissionChecked(true);
+      } catch (error) {
+        console.error("Permission check error:", error);
+        toast.error("Failed to verify permissions");
+        router.push('/admin');
       }
-      
-      console.log("Final username value:", username);
-      
-      if (username) {
-        setAdminUsername(username);
-        console.log("Admin username set:", username);
-      } else {
-        console.warn("No username parameter found in URL");
-      }
-    }
-  }, []);
+    };
+    
+    checkPermissions();
+  }, [router]);
+  
+  // Helper function to check permissions
+  const hasPermission = (permission: string): boolean => {
+    return userPermissions[permission] === true;
+  };
   
   // Inline editing state
   const [isEditing, setIsEditing] = useState(false);
@@ -482,6 +498,12 @@ export default function AdminHomestayDetailPage() {
   }, [editedData.address?.district?.ne, districtMunicipalitiesMap, homestay?.address?.district?.ne]);
   
   const handleStatusUpdate = async (newStatus: 'approved' | 'rejected') => {
+    // Check permission before proceeding
+    if (!hasPermission('homestayApproval')) {
+      toast.error("You don't have permission to change homestay approval status");
+      return;
+    }
+    
     setUpdateStatus('loading');
     setUpdateError(null);
     try {
@@ -928,6 +950,12 @@ export default function AdminHomestayDetailPage() {
 
   // Handle document upload
   const handleUploadDocuments = async () => {
+    // Check for document upload permission
+    if (!hasPermission('documentUpload')) {
+      toast.error("You don't have permission to upload documents");
+      return;
+    }
+
     // Check if homestay and admin username are available
     if (!homestay) {
       toast.error("Missing homestay information for uploads");
@@ -1040,6 +1068,12 @@ export default function AdminHomestayDetailPage() {
 
   // Function to handle document deletion
   const handleDeleteDocument = (index: number) => {
+    // Check for document upload permission (needed for deleting too)
+    if (!hasPermission('documentUpload')) {
+      toast.error("You don't have permission to delete documents");
+      return;
+    }
+
     setDeleteConfirmation({
       isOpen: true,
       documentIndex: index,
@@ -1148,6 +1182,13 @@ export default function AdminHomestayDetailPage() {
 
   // Function to handle a single gallery image upload
   const handleGalleryImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Check for image upload permission
+    if (!hasPermission('imageUpload')) {
+      toast.error("You don't have permission to upload images");
+      e.target.value = ''; // Clear input
+      return;
+    }
+
     if (!e.target.files || !e.target.files[0] || !homestay) return;
     
     try {
@@ -1213,6 +1254,13 @@ export default function AdminHomestayDetailPage() {
 
   // Function to handle multiple gallery images upload
   const handleMultipleImagesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Check for image upload permission
+    if (!hasPermission('imageUpload')) {
+      toast.error("You don't have permission to upload images");
+      e.target.value = ''; // Clear input
+      return;
+    }
+
     if (!e.target.files || e.target.files.length === 0 || !homestay) return;
     
     try {
@@ -1295,6 +1343,12 @@ export default function AdminHomestayDetailPage() {
 
   // Function to delete a gallery image
   const handleDeleteGalleryImage = async (imagePath: string) => {
+    // Check for image upload permission (needed for deleting too)
+    if (!hasPermission('imageUpload')) {
+      toast.error("You don't have permission to delete images");
+      return;
+    }
+
     if (!homestay) {
       toast.error("Homestay data is missing");
       return;
@@ -1347,36 +1401,51 @@ export default function AdminHomestayDetailPage() {
 
   // --- Render Logic ---
 
+  // Render loading state or error if necessary
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      <div className="p-8 flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="max-w-4xl mx-auto p-4">
-        <button onClick={() => router.back()} className="mb-4 text-sm flex items-center text-gray-600 hover:text-gray-900">
-          <ArrowLeft className="h-4 w-4 mr-1" /> Back
+      <div className="p-8 text-center">
+        <h2 className="text-2xl font-bold text-red-600 mb-4">Error</h2>
+        <p className="text-gray-700">{error}</p>
+        <button
+          onClick={() => router.push('/admin')}
+          className="mt-4 px-4 py-2 bg-primary text-white rounded hover:bg-primary/80 transition-colors"
+        >
+          Return to Dashboard
         </button>
-        <div className="bg-red-100 border border-red-200 p-4 rounded-lg text-red-700">
-          Error: {error}
-        </div>
       </div>
     );
   }
 
+  // Don't render content until permissions are checked
+  if (!permissionChecked) {
+    return (
+      <div className="p-8 flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // No homestay data
   if (!homestay) {
     return (
-      <div className="max-w-4xl mx-auto p-4">
-        <button onClick={() => router.back()} className="mb-4 text-sm flex items-center text-gray-600 hover:text-gray-900">
-          <ArrowLeft className="h-4 w-4 mr-1" /> Back
+      <div className="p-8 text-center">
+        <h2 className="text-2xl font-bold text-red-600 mb-4">Homestay Not Found</h2>
+        <p className="text-gray-700">The requested homestay could not be found.</p>
+        <button
+          onClick={() => router.push('/admin')}
+          className="mt-4 px-4 py-2 bg-primary text-white rounded hover:bg-primary/80 transition-colors"
+        >
+          Return to Dashboard
         </button>
-        <div className="bg-gray-100 border border-gray-200 p-4 rounded-lg text-gray-700">
-          Homestay not found.
-        </div>
       </div>
     );
   }
@@ -2042,7 +2111,7 @@ export default function AdminHomestayDetailPage() {
                   {/* Status Update Buttons - Only show when not editing */}
                   {!isEditing && (
                     <>
-                      {homestay.status !== 'approved' && (
+                      {homestay.status !== 'approved' && hasPermission('homestayApproval') && (
                         <button 
                           onClick={() => handleStatusUpdate('approved')} 
                           disabled={updateStatus === 'loading'}
@@ -2057,7 +2126,7 @@ export default function AdminHomestayDetailPage() {
                         </button>
                       )}
                       
-                      {homestay.status !== 'rejected' && (
+                      {homestay.status !== 'rejected' && hasPermission('homestayApproval') && (
                         <button 
                           onClick={() => handleStatusUpdate('rejected')} 
                           disabled={updateStatus === 'loading'}
@@ -2117,7 +2186,8 @@ export default function AdminHomestayDetailPage() {
 
           {/* Documents Section - Improved Layout with Upload Functionality */}
            <InfoSection title="Documents" icon={FileIcon}>
-             {/* Document Upload Section */}
+             {/* Document Upload Section - Only show if user has documentUpload permission */}
+             {hasPermission('documentUpload') && (
              <div className="mb-6">
                <div className="flex justify-between items-center mb-3">
                  <h3 className="text-sm font-medium text-gray-700">Upload New Documents</h3>
@@ -2294,9 +2364,10 @@ export default function AdminHomestayDetailPage() {
                  </div>
                </div>
              </div>
+             )}
 
              {/* Existing Documents List */}
-             <div className="border-t border-gray-200 pt-4 mt-4">
+             <div className={`${hasPermission('documentUpload') ? 'border-t border-gray-200 pt-4 mt-4' : ''}`}>
                <h3 className="text-sm font-medium text-gray-700 mb-3">Uploaded Documents</h3>
              {homestay.documents && homestay.documents.length > 0 ? (
                <div className="space-y-4">
@@ -2307,6 +2378,8 @@ export default function AdminHomestayDetailPage() {
                            <h4 className="text-sm font-medium text-gray-800">{docGroup.title}</h4>
                            {docGroup.description && <p className="text-xs text-gray-500">{docGroup.description}</p>}
                          </div>
+                         {/* Only show delete button if user has documentUpload permission */}
+                         {hasPermission('documentUpload') && (
                          <button 
                            onClick={() => handleDeleteDocument(index)}
                            className="p-1 text-red-500 hover:bg-red-50 rounded"
@@ -2314,6 +2387,7 @@ export default function AdminHomestayDetailPage() {
                          >
                            <X size={16} />
                          </button>
+                         )}
                        </div>
                        <ul className="divide-y divide-gray-100">
                        {docGroup.files.map((file, fileIndex) => (
@@ -2479,7 +2553,8 @@ export default function AdminHomestayDetailPage() {
           {/* Gallery Section */}
           <InfoSection title="Gallery Images" icon={ImageIcon}>
             <div className="space-y-6">
-              {/* Gallery Image Upload */}
+              {/* Gallery Image Upload - Only show if user has imageUpload permission */}
+              {hasPermission('imageUpload') && (
               <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
                 <h3 className="text-sm font-medium text-gray-700 mb-3">Upload Gallery Images</h3>
                 
@@ -2533,9 +2608,10 @@ export default function AdminHomestayDetailPage() {
                   <p>• Supported formats: JPEG, PNG, WebP, GIF</p>
                 </div>
               </div>
+              )}
               
-              {/* Gallery Image Grid */}
-              <div className="border-t border-gray-200 pt-4">
+              {/* Gallery Image Grid - Always visible */}
+              <div className={`${hasPermission('imageUpload') ? 'border-t border-gray-200 pt-4' : ''}`}>
                 <h3 className="text-sm font-medium text-gray-700 mb-3">Gallery Images ({homestay?.galleryImages?.length || 0})</h3>
                 
                 {loading ? (
@@ -2570,6 +2646,8 @@ export default function AdminHomestayDetailPage() {
                               >
                                 <Eye className="h-4 w-4" />
                               </a>
+                              {/* Only show delete button if user has imageUpload permission */}
+                              {hasPermission('imageUpload') && (
                               <button
                                 onClick={() => handleDeleteGalleryImage(imagePath)}
                                 className="p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600"
@@ -2577,6 +2655,7 @@ export default function AdminHomestayDetailPage() {
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
+                              )}
                             </div>
                           </div>
                         </div>

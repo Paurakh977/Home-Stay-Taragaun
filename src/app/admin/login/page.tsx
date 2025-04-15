@@ -3,14 +3,13 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff, ShieldCheck, Building } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminLoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   
@@ -34,20 +33,19 @@ export default function AdminLoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
     
     if (!username || !password) {
-      setError("Username and password are required");
+      toast.error('Please enter both username and password');
       return;
     }
     
     setLoading(true);
     
     try {
-      const response = await fetch("/api/admin/auth/login", {
-        method: "POST",
+      const response = await fetch('/api/admin/auth/login', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           username,
@@ -57,94 +55,170 @@ export default function AdminLoginPage() {
       
       const data = await response.json();
       
-      if (!response.ok) {
-        throw new Error(data.message || "Login failed");
+      if (data.success) {
+        toast.success('Login successful!');
+        router.push('/admin');
+      } else {
+        // Handle different error scenarios with appropriate messages
+        if (response.status === 401) {
+          toast.error('Invalid username or password');
+        } else if (response.status === 403) {
+          if (data.message.includes('permission')) {
+            toast.error('You do not have permission to access the admin dashboard');
+          } else {
+            toast.error('You must be an admin to access this area');
+          }
+        } else {
+          toast.error(data.message || 'Login failed');
+        }
       }
-      
-      toast.success("Login successful");
-      router.push("/admin");
     } catch (error) {
-      console.error("Login error:", error);
-      setError(error instanceof Error ? error.message : "Login failed. Please try again.");
+      console.error('Login error:', error);
+      toast.error('An error occurred during login. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
+  // Special debug function to fix permissions
+  const fixAdminPermissions = async () => {
+    try {
+      toast.info("Attempting to fix admin permissions...");
+      
+      const response = await fetch('/api/debug/fix-admin1', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        toast.success('Admin permissions fixed successfully!');
+      } else {
+        toast.error(data.message || 'Failed to fix permissions');
+      }
+    } catch (error) {
+      console.error('Debug error:', error);
+      toast.error('An error occurred. Please check console.');
+    }
   };
 
   return (
-    <div className="w-full max-w-md bg-white rounded-md shadow-sm p-6">
-      <h1 className="text-2xl font-semibold text-center mb-6">Admin Login</h1>
-      
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
-          {error}
-        </div>
-      )}
-      
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
-            Username
-          </label>
-          <input
-            id="username"
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
-            placeholder="Enter your username"
-            disabled={loading}
-          />
-        </div>
-        
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-            Password
-          </label>
-          <div className="relative">
-            <input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
-              placeholder="Enter your password"
-              disabled={loading}
-            />
-            <button
-              type="button"
-              onClick={togglePasswordVisibility}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex flex-col items-center justify-center p-4 sm:p-6">
+      <div className="w-full max-w-md">
+        {/* Card container with improved shadow */}
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+          {/* Header with brand color */}
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-8 text-white text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm mb-4">
+              <ShieldCheck className="h-8 w-8" />
+            </div>
+            <h1 className="text-2xl font-bold">Admin Portal</h1>
+            <p className="mt-1 text-blue-100 text-sm">Homestay Management System</p>
           </div>
+          
+          {/* Login Form */}
+          <div className="p-6">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label htmlFor="username" className="block text-gray-700 text-sm font-medium mb-1.5">
+                  Username
+                </label>
+                <div className="relative">
+                  <input
+                    id="username"
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors"
+                    placeholder="Enter your username"
+                    required
+                  />
+                  <Building className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                </div>
+              </div>
+              
+              <div>
+                <label htmlFor="password" className="block text-gray-700 text-sm font-medium mb-1.5">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors"
+                    placeholder="Enter your password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+              
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-2 disabled:opacity-70 flex items-center justify-center"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                    Signing in...
+                  </>
+                ) : (
+                  'Sign In'
+                )}
+              </button>
+            </form>
+          </div>
+          
+          {/* Footer with debug options */}
+          {process.env.NODE_ENV !== 'production' && (
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 text-center">
+              <p className="text-xs font-medium text-gray-500 mb-2">Developer Actions</p>
+              <div className="flex justify-center space-x-3">
+                <button
+                  onClick={fixAdminPermissions}
+                  className="text-xs bg-orange-100 text-orange-800 px-3 py-1.5 rounded-md hover:bg-orange-200 font-medium transition-colors"
+                >
+                  Fix Permissions
+                </button>
+                <button
+                  onClick={() => {
+                    document.cookie = "auth_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+                    toast.success("Auth cookie cleared");
+                  }}
+                  className="text-xs bg-blue-100 text-blue-800 px-3 py-1.5 rounded-md hover:bg-blue-200 font-medium transition-colors"
+                >
+                  Clear Cookie
+                </button>
+              </div>
+            </div>
+          )}
         </div>
         
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-primary hover:bg-primary/90 text-white font-medium py-2 px-4 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed"
-        >
-          {loading ? (
-            <span className="flex items-center justify-center">
-              <Loader2 className="animate-spin h-4 w-4 mr-2" />
-              Logging in...
-            </span>
-          ) : (
-            "Login"
-          )}
-        </button>
-      </form>
-      
-      <div className="mt-4 text-center text-sm text-gray-600">
-        <Link href="/" className="text-primary hover:underline">
-          Back to homepage
-        </Link>
+        {/* Back link */}
+        <div className="text-center mt-6">
+          <Link 
+            href="/"
+            className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
+          >
+            Return to Homepage
+          </Link>
+        </div>
       </div>
     </div>
   );

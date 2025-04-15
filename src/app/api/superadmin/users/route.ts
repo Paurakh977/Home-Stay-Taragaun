@@ -96,6 +96,14 @@ export async function POST(request: Request) {
       email: email.toLowerCase(),
       contactNumber: contactNumber.toString().trim(), // Ensure it's a string and trimmed
       role: role,
+      permissions: {
+        adminDashboardAccess: false,
+        homestayApproval: false,
+        homestayEdit: false,
+        homestayDelete: false,
+        documentUpload: false,
+        imageUpload: false
+      }
     };
 
     // Log the document being saved

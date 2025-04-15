@@ -8,6 +8,16 @@ export interface IUser extends Document {
   email: string; // Added email field
   contactNumber: string; // Added contact number field
   role: 'superadmin' | 'admin' | 'officer' | string; // Updated to include officer role
+  permissions?: {
+    // Admin Panel Permissions
+    adminDashboardAccess?: boolean;
+    homestayApproval?: boolean;
+    homestayEdit?: boolean;
+    homestayDelete?: boolean;
+    documentUpload?: boolean;
+    imageUpload?: boolean;
+    // Any other permissions
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -45,6 +55,21 @@ const userSchema = new Schema<IUser>(
       required: [true, 'Role is required'],
       enum: ['superadmin', 'admin', 'officer'], // Updated to include officer role
       default: 'admin', // Default role
+    },
+    permissions: {
+      type: Map,
+      of: Boolean,
+      default: function() {
+        // Return a new object every time to ensure clean defaults
+        return {
+          adminDashboardAccess: false,
+          homestayApproval: false,
+          homestayEdit: false,
+          homestayDelete: false,
+          documentUpload: false,
+          imageUpload: false
+        };
+      }
     },
   },
   {

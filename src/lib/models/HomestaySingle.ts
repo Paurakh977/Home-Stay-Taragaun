@@ -54,6 +54,18 @@ export interface IHomestaySingle extends Document {
   bedCount: number;
   homeStayType: 'community' | 'private';
   
+  // Feature access permissions
+  featureAccess?: {
+    dashboard?: boolean;
+    profile?: boolean;
+    portal?: boolean;
+    documents?: boolean;
+    imageUpload?: boolean;
+    settings?: boolean;
+    chat?: boolean;
+    updateInfo?: boolean;
+  };
+  
   // Images
   profileImage?: string;
   galleryImages?: string[];
@@ -157,6 +169,25 @@ const homestaySchema = new Schema<IHomestaySingle>(
       required: true,
       index: true, // Add index for faster filtering by admin
       trim: true
+    },
+    
+    // Feature access permissions
+    featureAccess: {
+      type: Map,
+      of: Boolean,
+      default: function() {
+        // Return a new object every time to ensure clean defaults
+        return {
+          dashboard: false,
+          profile: false,
+          portal: false,
+          documents: false,
+          imageUpload: false,
+          settings: false,
+          chat: false,
+          updateInfo: false
+        };
+      }
     },
     
     // Digital Homestay Registration Number

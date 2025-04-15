@@ -346,6 +346,16 @@ export async function POST(req: NextRequest) {
       bedCount: body.bedCount,
       homeStayType: body.homeStayType,
       directions: body.directions || "",
+      featureAccess: {
+        dashboard: false,
+        profile: false,
+        portal: false,
+        documents: false,
+        imageUpload: false,
+        settings: false,
+        chat: false,
+        updateInfo: false
+      },
       address: {
         province: {
           en: provinceEn,
