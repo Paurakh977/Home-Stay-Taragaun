@@ -363,7 +363,12 @@ export async function PUT(
     
     // Handle features updates if provided
     if (body.localAttractions || body.tourismServices || body.infrastructure) {
-      const currentFeatures = existingHomestay.features || {};
+      // Cast to any or define the expected interface to fix type issues
+      const currentFeatures = existingHomestay.features || {
+        localAttractions: [],
+        tourismServices: [],
+        infrastructure: []
+      };
       
       homestayUpdateData.features = {
         localAttractions: body.localAttractions || currentFeatures.localAttractions || [],
