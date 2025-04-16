@@ -14,23 +14,25 @@ export function cn(...inputs: ClassValue[]) {
 /**
  * Generates a homestay ID based on the homestay name
  * @param homeStayName - The name of the homestay
- * @returns A unique homestay ID
+ * @returns A unique homestay ID that is SEO-friendly
  */
 export function generateHomestayId(homeStayName: string): string {
-  // Clean the homestay name, remove spaces and special characters
+  // Convert to lowercase and trim
   const cleanName = homeStayName
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9]/gi, '');
+    // Replace non-alphanumeric and spaces with hyphens
+    .replace(/[^a-z0-9]+/gi, '-')
+    // Remove leading/trailing hyphens
+    .replace(/^-+|-+$/g, '')
+    // Replace multiple consecutive hyphens with a single one
+    .replace(/-+/g, '-');
   
-  // Take the first 8 characters of the cleaned name
-  const namePrefix = cleanName.substring(0, 8);
+  // Use the full processed name rather than just first 8 chars
+  // But add a short timestamp for uniqueness
+  const shortId = Date.now().toString().slice(-4);
   
-  // Generate a timestamp suffix (last 6 characters of milliseconds)
-  const timestamp = Date.now().toString().slice(-6);
-  
-  // Combine with a separator
-  return `${namePrefix}-${timestamp}`;
+  return `${cleanName}-${shortId}`;
 }
 
 /**

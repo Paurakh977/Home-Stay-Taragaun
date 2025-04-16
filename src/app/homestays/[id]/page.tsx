@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, Star, MapPin, Home, Users, Bed, Phone, Mail, ChevronRight, X, Calendar, Map, Share2, Heart } from "lucide-react";
 import Image from "next/image";
+import Head from "next/head";
+import Script from "next/script";
+import { Metadata } from "next";
 
 interface HomestayData {
   _id: string;
@@ -124,8 +127,95 @@ const getApiImageUrl = (
   return result;
 };
 
+// SEO Component for the homestay detail page
+function SEOHead({ homestay, contacts }: { homestay: HomestayData | null, contacts: ContactData[] }) {
+  if (!homestay) return null;
+  
+  const title = `${homestay.homeStayName} - Authentic Homestay in ${homestay.address.district.en}, Nepal`;
+  const description = homestay.description 
+    ? `${homestay.description.substring(0, 160)}...` 
+    : `Experience authentic Nepali hospitality at ${homestay.homeStayName} in ${homestay.address.formattedAddress.en}. ${homestay.homeCount} homes, ${homestay.bedCount} beds.`;
+  
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "LodgingBusiness",
+    "name": homestay.homeStayName,
+    "description": homestay.description || `Authentic homestay experience in ${homestay.address.formattedAddress.en}`,
+    "url": typeof window !== 'undefined' ? window.location.href : '',
+    "telephone": contacts && contacts.length > 0 ? contacts[0].mobile : "",
+    "email": contacts && contacts.length > 0 ? contacts[0].email : "",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": homestay.address.city || homestay.address.municipality.en,
+      "addressRegion": homestay.address.district.en,
+      "addressCountry": "Nepal",
+      "streetAddress": `${homestay.address.tole}, Ward ${homestay.address.ward.en}`
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": "0", // Placeholder - to be replaced with actual data
+      "longitude": "0"  // Placeholder - to be replaced with actual data
+    },
+    "starRating": {
+      "@type": "Rating",
+      "ratingValue": homestay.averageRating.toString(),
+      "bestRating": "5"
+    },
+    "amenityFeature": [
+      ...homestay.features.localAttractions.map(attraction => ({
+        "@type": "LocationFeatureSpecification",
+        "name": attraction,
+        "value": true
+      })),
+      ...homestay.features.tourismServices.map(service => ({
+        "@type": "LocationFeatureSpecification",
+        "name": service,
+        "value": true
+      }))
+    ],
+    "image": homestay.profileImage ? getApiImageUrl(homestay.profileImage, homestay.homestayId) : "/images/placeholder-homestay.jpg"
+  };
+  
+  return (
+    <>
+      <Head>
+        <title>{title}</title>
+        <meta name="description" content={description} />
+        
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={typeof window !== 'undefined' ? window.location.href : ''} />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={description} />
+        <meta property="og:image" content={homestay.profileImage ? getApiImageUrl(homestay.profileImage, homestay.homestayId) : "/images/placeholder-homestay.jpg"} />
+        
+        {/* Twitter */}
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:url" content={typeof window !== 'undefined' ? window.location.href : ''} />
+        <meta property="twitter:title" content={title} />
+        <meta property="twitter:description" content={description} />
+        <meta property="twitter:image" content={homestay.profileImage ? getApiImageUrl(homestay.profileImage, homestay.homestayId) : "/images/placeholder-homestay.jpg"} />
+        
+        {/* Canonical URL */}
+        <link rel="canonical" href={typeof window !== 'undefined' ? window.location.href : ''} />
+        
+        {/* Additional SEO tags */}
+        <meta name="keywords" content={`homestay, Nepal, ${homestay.homeStayName}, ${homestay.address.district.en}, ${homestay.address.province.en}, accommodation, authentic, travel, tourism, ${homestay.address.municipality.en}`} />
+        <meta name="geo.region" content="NP" />
+        <meta name="geo.placename" content={`${homestay.address.district.en}, Nepal`} />
+      </Head>
+      
+      {/* Structured data for rich results */}
+      <Script id="homestay-structured-data" type="application/ld+json">
+        {JSON.stringify(structuredData)}
+      </Script>
+    </>
+  );
+}
+
 export default function HomestayPortalPage() {
   const params = useParams();
+  const router = useRouter();
   const homestayId = params.id as string;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -138,6 +228,103 @@ export default function HomestayPortalPage() {
   
   // New state for map modal
   const [showMapModal, setShowMapModal] = useState(false);
+  
+  // Add SEO-friendly title and meta description dynamically
+  useEffect(() => {
+    if (homestay) {
+      // Update document title for SEO
+      document.title = `${homestay.homeStayName} - Authentic Homestay in ${homestay.address.district.en}, Nepal`;
+      
+      // Add structured data for search engines
+      const script = document.createElement('script');
+      script.type = 'application/ld+json';
+      script.id = 'homestay-structured-data';
+      
+      const structuredData = {
+        "@context": "https://schema.org",
+        "@type": "LodgingBusiness",
+        "name": homestay.homeStayName,
+        "description": homestay.description || `Authentic homestay experience in ${homestay.address.formattedAddress.en}`,
+        "url": window.location.href,
+        "telephone": contacts && contacts.length > 0 ? contacts[0].mobile : "",
+        "email": contacts && contacts.length > 0 ? contacts[0].email : "",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": homestay.address.city || homestay.address.municipality.en,
+          "addressRegion": homestay.address.district.en,
+          "addressCountry": "Nepal",
+          "streetAddress": `${homestay.address.tole}, Ward ${homestay.address.ward.en}`
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": "0", // Placeholder - to be replaced with actual data
+          "longitude": "0"  // Placeholder - to be replaced with actual data
+        },
+        "starRating": {
+          "@type": "Rating",
+          "ratingValue": homestay.averageRating.toString(),
+          "bestRating": "5"
+        },
+        "amenityFeature": [
+          ...homestay.features.localAttractions.map(attraction => ({
+            "@type": "LocationFeatureSpecification",
+            "name": attraction,
+            "value": true
+          })),
+          ...homestay.features.tourismServices.map(service => ({
+            "@type": "LocationFeatureSpecification",
+            "name": service,
+            "value": true
+          }))
+        ],
+        "image": homestay.profileImage ? getApiImageUrl(homestay.profileImage, homestay.homestayId) : "/images/placeholder-homestay.jpg"
+      };
+      
+      script.innerHTML = JSON.stringify(structuredData);
+      
+      // Remove existing script if it exists
+      const existingScript = document.getElementById('homestay-structured-data');
+      if (existingScript) {
+        existingScript.remove();
+      }
+      
+      // Add the script to the document
+      document.head.appendChild(script);
+      
+      // Add meta description
+      let metaDescription = document.querySelector('meta[name="description"]');
+      if (!metaDescription) {
+        metaDescription = document.createElement('meta');
+        metaDescription.setAttribute('name', 'description');
+        document.head.appendChild(metaDescription);
+      }
+      
+      const description = homestay.description 
+        ? `${homestay.description.substring(0, 160)}...` 
+        : `Experience authentic Nepali hospitality at ${homestay.homeStayName} in ${homestay.address.formattedAddress.en}. ${homestay.homeCount} homes, ${homestay.bedCount} beds.`;
+      
+      metaDescription.setAttribute('content', description);
+      
+      // Add keywords meta tag
+      let metaKeywords = document.querySelector('meta[name="keywords"]');
+      if (!metaKeywords) {
+        metaKeywords = document.createElement('meta');
+        metaKeywords.setAttribute('name', 'keywords');
+        document.head.appendChild(metaKeywords);
+      }
+      
+      const keywords = `homestay, Nepal, ${homestay.homeStayName}, ${homestay.address.district.en}, ${homestay.address.province.en}, accommodation, authentic, travel, tourism, ${homestay.address.municipality.en}`;
+      metaKeywords.setAttribute('content', keywords);
+    }
+    
+    return () => {
+      // Clean up
+      const script = document.getElementById('homestay-structured-data');
+      if (script) {
+        script.remove();
+      }
+    };
+  }, [homestay, contacts]);
   
   // Fetch homestay data
   useEffect(() => {
@@ -271,7 +458,10 @@ export default function HomestayPortalPage() {
   const profileInitials = getInitials(homestay.homeStayName); // Get initials
   
   return (
-    <>
+    <div className="min-h-screen bg-gray-50">
+      {/* Add SEO component with dynamic metadata */}
+      {homestay && <SEOHead homestay={homestay} contacts={contacts} />}
+      
       <div className="bg-gradient-to-b from-slate-50 to-white min-h-screen pb-16">
         {/* Hero section with image slider */}
         <div className="w-full bg-slate-900 relative">
@@ -875,6 +1065,6 @@ export default function HomestayPortalPage() {
           scrollbar-width: none;
         }
       `}</style>
-    </>
+    </div>
   );
 } 

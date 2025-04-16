@@ -6,6 +6,7 @@ import Link from "next/link";
 
 interface HomestayListingProps {
   adminUsername?: string;
+  locationFilter?: string;
 }
 
 interface Homestay {
@@ -32,7 +33,7 @@ interface Homestay {
   };
 }
 
-export default function HomestayListing({ adminUsername }: HomestayListingProps) {
+export default function HomestayListing({ adminUsername, locationFilter }: HomestayListingProps) {
   const [homestays, setHomestays] = useState<Homestay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +47,11 @@ export default function HomestayListing({ adminUsername }: HomestayListingProps)
         let url = `/api/homestays?limit=50`;
         if (adminUsername) {
           url += `&adminUsername=${adminUsername}`;
+        }
+        
+        // Add location filter if provided
+        if (locationFilter) {
+          url += `&${locationFilter}`;
         }
         
         console.log("Fetching homestays from:", url);
@@ -97,7 +103,7 @@ export default function HomestayListing({ adminUsername }: HomestayListingProps)
     };
 
     fetchHomestays();
-  }, [adminUsername]);
+  }, [adminUsername, locationFilter]);
 
   // Helper function to get image URL
   const getImageUrl = (imagePath: string | undefined, adminUsername?: string): string => {
