@@ -18,6 +18,35 @@ export interface IUser extends Document {
     imageUpload?: boolean;
     // Any other permissions
   };
+  // Admin branding fields
+  branding?: {
+    brandName: string;
+    brandDescription: string;
+    logoPath: string;
+    sliderImages: string[];
+    contactInfo: {
+      address: string;
+      email: string;
+      phone: string;
+      socialLinks: {
+        facebook?: string;
+        instagram?: string;
+        twitter?: string;
+        tiktok?: string;
+        youtube?: string;
+      };
+    };
+    aboutUs: {
+      story: string;
+      mission: string;
+      vision: string;
+      team: Array<{
+        name: string;
+        role: string;
+        photoPath?: string;
+      }>;
+    };
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -69,6 +98,71 @@ const userSchema = new Schema<IUser>(
           documentUpload: false,
           imageUpload: false
         };
+      }
+    },
+    // Admin branding fields (only required for 'admin' role)
+    branding: {
+      type: {
+        brandName: {
+          type: String,
+          trim: true,
+        },
+        brandDescription: {
+          type: String,
+          trim: true,
+        },
+        logoPath: {
+          type: String,
+          trim: true,
+        },
+        sliderImages: {
+          type: [String],
+          default: [],
+        },
+        contactInfo: {
+          address: {
+            type: String,
+            trim: true,
+          },
+          email: {
+            type: String,
+            trim: true,
+          },
+          phone: {
+            type: String,
+            trim: true,
+          },
+          socialLinks: {
+            facebook: String,
+            instagram: String,
+            twitter: String,
+            tiktok: String,
+            youtube: String,
+          },
+        },
+        aboutUs: {
+          story: {
+            type: String,
+            trim: true,
+          },
+          mission: {
+            type: String,
+            trim: true,
+          },
+          vision: {
+            type: String,
+            trim: true,
+          },
+          team: [{
+            name: String,
+            role: String,
+            photoPath: String,
+          }],
+        },
+      },
+      required: function(this: any) {
+        // Only required for admin role
+        return this.role === 'admin';
       }
     },
   },

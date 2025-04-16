@@ -37,7 +37,7 @@ const SUPERADMIN_API_PATHS = ['/api/superadmin']; // Base path for protected sup
 // Public or Special Paths (Exempt from standard auth checks)
 const PUBLIC_PATHS = ['/', '/homestays', '/news', '/contact', '/about']; // Add other public pages
 const AUTH_PATHS = ['/login', '/register', '/api/auth']; // User auth paths
-const SUPERADMIN_AUTH_PATHS = ['/superadmin/login', '/api/superadmin/auth']; // Superadmin auth paths
+const SUPERADMIN_AUTH_PATHS = ['/superadmin/login', '/api/superadmin/auth', '/api/superadmin/uploads/branding']; // Superadmin auth paths and uploads
 const PUBLIC_API_PATHS = ['/api/homestays', '/api/location']; // Publicly accessible API routes
 const ASSET_REGEX = /^\/(_next\/static\/|_next\/image\/|static\/|images\/|favicon\.ico|.*\.(?:png|jpg|jpeg|gif|svg|webp))/;
 const SEED_API_PATH = '/api/seed-superadmin'; // Allow access for seeding

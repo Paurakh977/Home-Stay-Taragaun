@@ -30,14 +30,16 @@ export async function POST(request: Request) {
   await dbConnect();
 
   try {
-    const { username, password, email, contactNumber, role } = await request.json();
+    const requestBody = await request.json();
+    const { username, password, email, contactNumber, role, branding } = requestBody;
     
     // Log the received data for debugging (remove in production)
     console.log('Received user data:', { 
       username, 
       email, 
       contactNumber: contactNumber || 'MISSING',
-      role
+      role,
+      hasBranding: !!branding
     });
 
     // Improved validation
@@ -55,6 +57,11 @@ export async function POST(request: Request) {
     }
     if (!role) {
       return NextResponse.json({ message: 'Role is required' }, { status: 400 });
+    }
+
+    // Validate role-specific fields
+    if (role === 'admin' && !branding) {
+      return NextResponse.json({ message: 'Branding data is required for admin users' }, { status: 400 });
     }
 
     // Validate contact number (must be 10 digits)
@@ -90,7 +97,7 @@ export async function POST(request: Request) {
     }
 
     // Create the user document with all fields explicitly defined
-    const userDoc = {
+    const userDoc: any = {
       username: username.toLowerCase(),
       password: password,
       email: email.toLowerCase(),
@@ -106,8 +113,17 @@ export async function POST(request: Request) {
       }
     };
 
+    // Add branding data for admin users
+    if (role === 'admin' && branding) {
+      userDoc.branding = branding;
+    }
+
     // Log the document being saved
-    console.log('Creating user with data:', { ...userDoc, password: '[REDACTED]' });
+    console.log('Creating user with data:', { 
+      ...userDoc, 
+      password: '[REDACTED]',
+      branding: userDoc.branding ? 'PRESENT' : 'MISSING'
+    });
 
     // Create the new user (password will be hashed by the pre-save hook)
     const newUser = new User(userDoc);

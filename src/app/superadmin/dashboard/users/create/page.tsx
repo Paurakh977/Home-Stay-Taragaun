@@ -6,11 +6,22 @@ import { UserManagementForm } from '@/components/superadmin/UserManagementForm';
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from 'next/navigation';
 
+// Define User interface
+interface User {
+  _id: string;
+  username: string;
+  email: string;
+  contactNumber: string;
+  role: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export default function CreateUserPage() {
   const router = useRouter();
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const handleUserAdded = (user: any) => {
+  const handleUserAdded = (user: User) => {
     console.log('User created:', user);
     setIsSuccess(true);
     

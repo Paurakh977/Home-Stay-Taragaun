@@ -33,6 +33,11 @@ interface User {
   contactNumber: string;
   role: string;
   createdAt: string;
+  branding?: {
+    brandName: string;
+    logoPath: string;
+    sliderImages: string[];
+  };
 }
 
 export function UserTable() {
@@ -153,6 +158,7 @@ export function UserTable() {
               <TableHead>Email</TableHead>
               <TableHead>Contact Number</TableHead>
               <TableHead>Role</TableHead>
+              <TableHead>Brand Name</TableHead>
               <TableHead>Created</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -160,7 +166,7 @@ export function UserTable() {
           <TableBody>
             {users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
                   No users found
                 </TableCell>
               </TableRow>
@@ -174,6 +180,13 @@ export function UserTable() {
                     <Badge variant="outline" className={getRoleBadgeColor(user.role)}>
                       {user.role}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {user.role === 'admin' ? (
+                      user.branding?.brandName || 'Not set'
+                    ) : (
+                      '-'
+                    )}
                   </TableCell>
                   <TableCell>{formatDate(user.createdAt)}</TableCell>
                   <TableCell className="text-right">
