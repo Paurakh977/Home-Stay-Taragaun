@@ -48,10 +48,12 @@ interface Homestay {
   status: 'pending' | 'approved' | 'rejected';
   address?: Address;
   description?: string;
+  adminUsername?: string;
 }
 
 interface AdminHomestayClientProps {
   username?: string;
+  noSidebar?: boolean;
 }
 
 // Define permissions type
@@ -64,13 +66,16 @@ interface UserPermissions {
   imageUpload: boolean;
 }
 
-export default function AdminHomestayClient({ username: propUsername }: AdminHomestayClientProps) {
+export default function AdminHomestayClient({ 
+  username: propUsername,
+  noSidebar = true
+}: AdminHomestayClientProps) {
   const [homestays, setHomestays] = useState<Homestay[]>([]);
   const [filteredHomestays, setFilteredHomestays] = useState<Homestay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-
+  
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
@@ -428,7 +433,34 @@ export default function AdminHomestayClient({ username: propUsername }: AdminHom
 
   const handleRowClick = (homestayId: string) => {
     if (hasPermission('homestayEdit')) {
-      router.push(`/admin/homestays/${homestayId}`);
+      // Use the same approach as handleEdit for consistent routing
+      const getCurrentAdmin = async () => {
+        try {
+          const response = await fetch('/api/admin/auth/me');
+          if (!response.ok) {
+            toast.error("Authentication failed");
+            return;
+          }
+          
+          const data = await response.json();
+          if (data.success && data.user) {
+            const currentAdminUsername = data.user.username;
+            
+            // Route to the admin-specific URL that includes the admin username
+            router.push(`/admin/${currentAdminUsername}/homestays/${homestayId}`);
+            
+            // Log for debugging
+            console.log(`Navigating to /admin/${currentAdminUsername}/homestays/${homestayId}`);
+          } else {
+            toast.error("Failed to retrieve admin details");
+          }
+        } catch (error) {
+          console.error("Error checking admin permissions:", error);
+          toast.error("Failed to verify permissions");
+        }
+      };
+      
+      getCurrentAdmin();
     } else {
       toast.error("You don't have permission to edit homestay details");
     }
@@ -499,7 +531,31 @@ export default function AdminHomestayClient({ username: propUsername }: AdminHom
       return;
     }
     
-    router.push(`/admin/homestays/${homestayId}`);
+    // Get the current admin username from auth
+    const getCurrentAdmin = async () => {
+      try {
+        const response = await fetch('/api/admin/auth/me');
+        if (!response.ok) {
+          toast.error("Authentication failed");
+          return;
+        }
+        
+        const data = await response.json();
+        if (data.success && data.user) {
+          const currentAdminUsername = data.user.username;
+          
+          // Route to the admin-specific URL that includes the admin username
+          router.push(`/admin/${currentAdminUsername}/homestays/${homestayId}`);
+        } else {
+          toast.error("Failed to retrieve admin details");
+        }
+      } catch (error) {
+        console.error("Error checking admin permissions:", error);
+        toast.error("Failed to verify permissions");
+      }
+    };
+    
+    getCurrentAdmin();
   };
   
   // Handle delete functionality
@@ -591,69 +647,63 @@ export default function AdminHomestayClient({ username: propUsername }: AdminHom
     </div>
   );
 
+  // Only render the main content area, no sidebar or layout
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-        <div className="mb-8 flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Homestay Management</h1>
-            <p className="mt-2 text-sm text-gray-600">Review and manage your homestay registrations</p>
+    <div className="p-6 max-w-full overflow-x-auto flex-1">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+        <h1 className="text-2xl font-bold text-gray-900">Homestay Management</h1>
+        
+        {/* Logout button only shown on mobile */}
+        <button
+          onClick={handleLogout}
+          className="md:hidden flex items-center justify-center space-x-2 px-4 py-2 rounded-md text-sm bg-red-600 text-white hover:bg-red-700 transition-colors shadow-sm"
+        >
+          <span className="font-medium">Logout</span>
+        </button>
+      </div>
+        
+      {/* Search and filters */}
+      <div className="mb-6 bg-white rounded-lg shadow p-4">
+        <div className="flex flex-col md:flex-row gap-4">
+          {/* Search bar */}
+          <div className="relative flex-1">
+            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+              <Search size={18} className="text-gray-400" />
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name, ID, or DHSR number..."
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+            />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery("")}
+                className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
           
-          {/* Logout button */}
-          <button 
-            onClick={handleLogout}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          {/* Filter button */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
           >
-            Logout
+            <Filter size={18} className="text-gray-500" />
+            <span>Filters</span>
           </button>
-        </div>
-        
-        {/* Search and Filter Section */}
-        <div className="bg-white rounded-xl shadow-sm mb-6">
-          <div className="p-4 border-b border-gray-100">
-          <div className="flex flex-col md:flex-row gap-4">
-          {/* Search bar */}
-            <div className="relative flex-1">
-              <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                <Search size={18} className="text-gray-400" />
-              </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by name, ID, or DHSR number..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
-              />
-              {searchQuery && (
-                <button 
-                  onClick={() => setSearchQuery("")}
-                  className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-            
-            {/* Filter button */}
-            <button 
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
-            >
-              <Filter size={18} className="text-gray-500" />
-              <span>Filters</span>
-            </button>
-          </div>
         </div>
         
         {/* Filter options */}
         {showFilters && (
-          <div className="p-4 border-t border-gray-100">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              
-              {/* Status and Type Filters (side-by-side) */}
-              <div className="md:col-span-1 grid grid-cols-2 gap-6">
+        <div className="p-4 border-t border-gray-100">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* Status and Type Filters (side-by-side) */}
+            <div className="md:col-span-1 grid grid-cols-2 gap-6">
               {/* Status filter */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
@@ -682,10 +732,10 @@ export default function AdminHomestayClient({ username: propUsername }: AdminHom
                   <option value="private">Private</option>
                 </select>
               </div>
-              </div>
-              
-              {/* Location filters (grouped together) */}
-              <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-6">
+            </div>
+            
+            {/* Location filters (grouped together) */}
+            <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-6">
               {/* Province filter */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Province</label>
@@ -703,7 +753,7 @@ export default function AdminHomestayClient({ username: propUsername }: AdminHom
                 </select>
               </div>
               
-              {/* District filter */}
+            {/* District filter */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">District</label>
                 <select
@@ -721,7 +771,7 @@ export default function AdminHomestayClient({ username: propUsername }: AdminHom
                 </select>
               </div>
               
-              {/* Municipality filter */}
+            {/* Municipality filter */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Municipality</label>
                 <select
@@ -738,30 +788,30 @@ export default function AdminHomestayClient({ username: propUsername }: AdminHom
                   ))}
                 </select>
               </div>
-              </div>
               
-              {/* Clear filters button (aligned to the bottom right area conceptually) */}
-              <div className="md:col-span-3 flex justify-start md:justify-end items-end mt-4 md:mt-0">
-                <button 
-                  onClick={clearFilters}
-                  className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 flex items-center"
-                >
-                  <X size={14} className="mr-1" />
-                  Clear All
-                </button>
+            {/* Clear filters button (aligned to the bottom right area conceptually) */}
+            <div className="md:col-span-3 flex justify-start md:justify-end items-end mt-4 md:mt-0">
+              <button 
+                onClick={clearFilters}
+                className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 flex items-center"
+              >
+                <X size={14} className="mr-1" />
+                Clear All
+              </button>
               </div>
             </div>
           </div>
-        )}
-      </div>
-        
-        {/* Results count */}
-        <div className="mb-4">
-          <p className="text-sm text-gray-600">
-            {filteredHomestays.length} {filteredHomestays.length === 1 ? 'homestay' : 'homestays'} found
-          </p>
         </div>
-        
+      )}
+      </div>
+      
+      {/* Results count */}
+      <div className="mb-4">
+        <p className="text-sm text-gray-600">
+          {filteredHomestays.length} {filteredHomestays.length === 1 ? 'homestay' : 'homestays'} found
+        </p>
+      </div>
+      
       {/* Loading state */}
       {loading && (
         <div className="bg-white rounded-xl shadow-sm p-8 text-center">
@@ -861,7 +911,6 @@ export default function AdminHomestayClient({ username: propUsername }: AdminHom
           </button>
         </div>
       )}
-      </div>
     </div>
   );
 } 

@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Menu, X } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
-import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { toast } from 'sonner';
 
 export default function AdminClientWrapper({
@@ -11,14 +9,19 @@ export default function AdminClientWrapper({
 }: {
   children: React.ReactNode;
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [adminUsername, setAdminUsername] = useState<string | null>(null);
   const pathname = usePathname();
   const router = useRouter();
   
-  // Don't show sidebar on login page
-  const isLoginPage = pathname === '/admin/login';
+  // Extract admin username from the path if it exists
+  const pathParts = pathname.split('/').filter(Boolean);
+  const isAdminRoute = pathParts[0] === 'admin';
+  const potentialAdminUsername = pathParts.length > 1 ? pathParts[1] : null;
+  
+  // Check if this is a login page (either /admin/login or /admin/{username}/login)
+  const isLoginPage = pathname === '/admin/login' || pathname.endsWith('/login');
 
   useEffect(() => {
     const checkUserPermissions = async () => {
@@ -34,18 +37,35 @@ export default function AdminClientWrapper({
         
         if (!response.ok) {
           // Not authenticated, redirect to login
-          router.push('/admin/login');
+          // If we're in a specific admin route, redirect to that admin's login
+          if (isAdminRoute && potentialAdminUsername && !potentialAdminUsername.includes('login')) {
+            router.push(`/admin/${potentialAdminUsername}/login`);
+          } else {
+            router.push('/admin/login');
+          }
           return;
         }
         
         // Check for specific permissions
         const userData = await response.json();
+        const loggedInUsername = userData.user?.username;
+        setAdminUsername(loggedInUsername);
+        
         const permissions = userData.user?.permissions || {};
         
         // Check for admin dashboard access permission
         if (!permissions.adminDashboardAccess) {
           toast.error('You do not have permission to access the admin dashboard');
           router.push('/access-denied');
+          return;
+        }
+        
+        // Check if trying to access another admin's dashboard (when not a superadmin)
+        if (isAdminRoute && potentialAdminUsername && 
+            potentialAdminUsername !== loggedInUsername && 
+            userData.user?.role !== 'superadmin') {
+          toast.error('You do not have permission to access another admin\'s dashboard');
+          router.push(`/admin/${loggedInUsername}`);
           return;
         }
         
@@ -66,18 +86,20 @@ export default function AdminClientWrapper({
         setIsAuthorized(true);
       } catch (error) {
         console.error('Error checking user permissions:', error);
-        router.push('/admin/login');
+        
+        // If we're in a specific admin route, redirect to that admin's login
+        if (isAdminRoute && potentialAdminUsername && !potentialAdminUsername.includes('login')) {
+          router.push(`/admin/${potentialAdminUsername}/login`);
+        } else {
+          router.push('/admin/login');
+        }
       } finally {
         setIsLoading(false);
       }
     };
     
     checkUserPermissions();
-  }, [isLoginPage, pathname, router]);
-
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
+  }, [isLoginPage, pathname, router, isAdminRoute, potentialAdminUsername]);
 
   if (isLoading) {
     return (
@@ -91,41 +113,10 @@ export default function AdminClientWrapper({
     return null; // Don't render anything while redirecting
   }
 
+  // Render the main content without a sidebar
   return (
-    <>
-      {/* Mobile menu button - hidden on login page */}
-      {!isLoginPage && (
-        <button 
-          onClick={toggleSidebar}
-          className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-md bg-white shadow-md"
-          aria-label={sidebarOpen ? "Close menu" : "Open menu"}
-        >
-          {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
-      )}
-
-      {/* Mobile sidebar overlay - hidden on login page */}
-      {!isLoginPage && sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        ></div>
-      )}
-
-      {/* Sidebar for desktop and mobile - hidden on login page */}
-      {!isLoginPage && (
-        <aside 
-          className={`fixed md:static top-0 left-0 h-full z-40 w-64 flex-shrink-0 transform transition-transform duration-300 ease-in-out ${
-            sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-          }`}
-        >
-          <AdminSidebar />
-        </aside>
-      )}
-      
-      <div className="flex-1 flex flex-col">
-        {children}
-      </div>
-    </>
+    <div className="flex-1">
+      {children}
+    </div>
   );
 } 

@@ -50,6 +50,9 @@ const ADMIN_USERNAME_REGEX = /^\/[^\/]+$/;
 // except for the dashboard routes which require authentication
 const ADMIN_USERNAME_NESTED_REGEX = /^\/[^\/]+\/(?!dashboard).+$/;
 
+// Admin username login paths
+const ADMIN_USERNAME_LOGIN_REGEX = /^\/admin\/[^\/]+\/login$/;
+
 // For any admin-specific action routes (like editing, deleting, etc.)
 const ADMIN_EDIT_PATH = /^\/admin\/homestays\/[^\/]+\/edit/;
 const ADMIN_DELETE_PATH = /^\/admin\/homestays\/[^\/]+\/delete/;
@@ -134,6 +137,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Check for admin-specific login pages
+  const isAdminUsernameLoginPath = ADMIN_USERNAME_LOGIN_REGEX.test(pathname);
+  if (isAdminUsernameLoginPath) {
+    return NextResponse.next(); // Allow access to admin login pages
+  }
+
   // 2. Handle base /superadmin path redirection
   if (pathname === '/superadmin') {
       const token = request.cookies.get('superadmin_token')?.value;
@@ -146,26 +155,42 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/superadmin/login', request.url));
   }
 
+  // 3. Handle base /admin path redirection and admin username paths
+  if (pathname === '/admin') {
+    const token = request.cookies.get('auth_token')?.value;
+    const payload = await verifyToken(token);
+    if (payload && payload.isAdmin === true) {
+      // Redirect to admin's personal dashboard
+      return NextResponse.redirect(new URL(`/admin/${payload.username}`, request.url));
+    }
+    // Otherwise, redirect to login
+    return NextResponse.redirect(new URL('/admin/login', request.url));
+  }
+
   // Check for admin username dashboard paths
   const adminUsernameDashboardRegex = /^\/[^\/]+\/dashboard/;
   const isAdminUsernameDashboardPath = adminUsernameDashboardRegex.test(pathname);
   
-  // 3. Identify Path Type
+  // Check for admin-specific dashboard
+  const adminSpecificDashboardRegex = /^\/admin\/[^\/]+$/;
+  const isAdminSpecificDashboardPath = adminSpecificDashboardRegex.test(pathname) && !pathname.includes('/login');
+  
+  // 4. Identify Path Type
   const isSuperAdminDashboardPath = SUPERADMIN_DASHBOARD_PATHS.some(p => pathname.startsWith(p));
   const isSuperAdminAPIPath = SUPERADMIN_API_PATHS.some(p => pathname.startsWith(p)) && !SUPERADMIN_AUTH_PATHS.some(p => pathname.startsWith(p)); // Exclude auth APIs
   
   // More precise check for admin paths - ensure exact match for '/admin' or paths starting with '/admin/'
-  const isAdminUIPath = pathname === '/admin' || pathname.startsWith('/admin/');
+  const isAdminUIPath = (pathname === '/admin' || pathname.startsWith('/admin/')) && !isAdminUsernameLoginPath;
   const isAdminAPIPath = ADMIN_API_PATHS.some(p => pathname.startsWith(p));
   
   // Check both standard dashboard and admin username dashboard paths
   const isDashboardPath = DASHBOARD_PATHS.some(p => pathname.startsWith(p)) || isAdminUsernameDashboardPath;
 
   const requiresSuperAdminAuth = isSuperAdminDashboardPath || isSuperAdminAPIPath;
-  const requiresAdminAuth = isAdminUIPath || isAdminAPIPath;
+  const requiresAdminAuth = isAdminUIPath || isAdminAPIPath || isAdminSpecificDashboardPath;
   const requiresUserAuth = isDashboardPath; // Only dashboard requires generic login for now
 
-  // 4. Handle Superadmin Authentication & Authorization
+  // 5. Handle Superadmin Authentication & Authorization
   if (requiresSuperAdminAuth) {
     const token = request.cookies.get('superadmin_token')?.value;
     const payload = await verifyToken(token);
@@ -183,31 +208,48 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 5. Handle Regular Admin Authentication & Authorization
+  // 6. Handle Regular Admin Authentication & Authorization
   if (requiresAdminAuth) {
     const token = request.cookies.get('auth_token')?.value;
     const payload = await verifyToken(token);
 
     if (!payload || payload.isAdmin !== true) {
       console.log(`Admin access denied for path ${pathname}. Payload:`, payload);
-      const redirectPath = '/login';
+      
+      // For admin-specific paths, redirect to that admin's login
+      if (isAdminSpecificDashboardPath) {
+        const adminUsername = pathname.split('/').pop();
+        const redirectPath = `/admin/${adminUsername}/login`;
+        if (isAdminAPIPath) {
+          return NextResponse.json({ message: payload ? 'Forbidden: Admin role required' : 'Unauthorized' }, { status: payload ? 403 : 401 });
+        }
+        return createRedirectResponse(request, redirectPath, token ? undefined : 'auth_token');
+      }
+      
+      // Generic admin paths
+      const redirectPath = '/admin/login';
       if (isAdminAPIPath) {
         return NextResponse.json({ message: payload ? 'Forbidden: Admin role required' : 'Unauthorized' }, { status: payload ? 403 : 401 });
       }
       return createRedirectResponse(request, redirectPath, token ? undefined : 'auth_token');
     }
 
-    // --- Optional: Verify Homestay ID (if needed for admin context)
-    // if (!payload.homestayId) {
-    //   console.warn(`Admin token missing homestayId for path ${pathname}`);
-    //   // Handle appropriately - maybe redirect or forbid
-    // }
+    // If it's an admin-specific dashboard, check if the admin is accessing their own dashboard or is a superadmin
+    if (isAdminSpecificDashboardPath) {
+      const adminUsername = pathname.split('/').pop();
+      
+      if (payload.username !== adminUsername && payload.role !== 'superadmin') {
+        console.log(`Admin access denied - wrong admin: ${payload.username} trying to access ${adminUsername}`);
+        // Redirect to their own dashboard
+        return NextResponse.redirect(new URL(`/admin/${payload.username}`, request.url));
+      }
+    }
 
     // Valid admin token and role
     return NextResponse.next();
   }
 
-  // 6. Handle Regular User Authentication (Dashboard)
+  // 7. Handle Regular User Authentication (Dashboard)
   if (requiresUserAuth) {
     const token = request.cookies.get('auth_token')?.value;
     const payload = await verifyToken(token);
@@ -221,7 +263,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 7. Allow Public and Auth Paths
+  // 8. Allow Public and Auth Paths
   // If the code reaches here, it's not a protected asset or a path requiring auth check.
   // Check if it's an explicitly public path or an auth-related path.
   const isPublicPath = PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'));
@@ -289,12 +331,6 @@ export async function middleware(request: NextRequest) {
       console.error('Permission check error:', error);
     }
   }
-
-  // 8. Default Deny (Optional but Recommended)
-  // If a path is not matched by any rule above, consider denying access.
-  // However, be cautious as this might block legitimate paths not listed.
-  // console.warn(`Middleware blocked unmatched path: ${pathname}`);
-  // return new Response('Not Found', { status: 404 });
 
   // Default allow if no other rule matched (adjust if stricter control is needed)
   return NextResponse.next();

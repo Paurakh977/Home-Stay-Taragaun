@@ -15,12 +15,16 @@ const sidebarNavItems = [
   // Add more admin sections here later if needed
 ];
 
-export function AdminSidebar() {
+interface AdminSidebarProps {
+  username?: string;
+}
+
+export default function AdminSidebar({ username }: AdminSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isSuperadmin, setIsSuperadmin] = useState(false);
-  const adminUsername = searchParams.get('username');
+  const adminUsername = username || searchParams.get('username');
 
   // Check if user is a superadmin
   useEffect(() => {
@@ -51,7 +55,7 @@ export function AdminSidebar() {
       
       if (response.ok) {
         toast.success("Logged out successfully");
-        router.push("/admin/login");
+        router.push(adminUsername ? `/admin/${adminUsername}/login` : "/admin/login");
       } else {
         throw new Error("Logout failed");
       }
@@ -61,13 +65,16 @@ export function AdminSidebar() {
     }
   };
 
+  // Determine base path for links
+  const adminBasePath = adminUsername ? `/admin/${adminUsername}` : "/admin";
+
   return (
     <aside className="h-full bg-white border-r border-gray-200 flex flex-col">
       <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-        <Link href={adminUsername ? `/admin?username=${adminUsername}` : "/admin"} className="flex items-center">
+        <Link href={adminBasePath} className="flex items-center">
            <span className="font-medium text-gray-900">Admin Dashboard</span>
-           {isSuperadmin && adminUsername && (
-             <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full">
+           {adminUsername && (
+             <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
                {adminUsername}
              </span>
            )}
@@ -84,13 +91,17 @@ export function AdminSidebar() {
       
       <nav className="p-2 flex-1">
         {sidebarNavItems.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href);
-          const href = adminUsername ? `${item.href}?username=${adminUsername}` : item.href;
+          // Update href to include adminUsername if present
+          const itemHref = adminUsername ? 
+            `${item.href}/${adminUsername}` : 
+            item.href;
+          
+          const isActive = pathname === itemHref || pathname.startsWith(itemHref);
           
           return (
             <Link
               key={item.href}
-              href={href}
+              href={itemHref}
               className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm my-1 transition-colors ${
                 isActive
                   ? "bg-gray-100 text-gray-900 font-medium"

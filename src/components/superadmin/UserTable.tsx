@@ -192,7 +192,7 @@ export function UserTable() {
                         <Trash2 className="h-4 w-4" />
                       </Button>
                       {user.role === 'admin' && (
-                        <Link href={`/admin?username=${user.username}`}>
+                        <Link href={`/admin/${user.username}`}>
                           <Button 
                             size="sm" 
                             variant="outline" 

@@ -289,10 +289,51 @@ export default function AdminHomestayDetailPage() {
         const permissions = data.user.permissions || {};
         setUserPermissions(permissions);
         
+        // Store current admin username for ownership checks
+        const currentAdminUsername = data.user.username;
+        setAdminUsername(currentAdminUsername);
+        
         // Check for edit permission - required to view this page
         const canEdit = permissions.homestayEdit === true;
         if (!canEdit) {
           toast.error("You don't have permission to edit homestay details");
+          router.push('/admin');
+          return;
+        }
+        
+        // Now fetch the homestay to check ownership
+        try {
+          const homestayResponse = await fetch(`/api/admin/homestays/${homestayId}`);
+          if (!homestayResponse.ok) {
+            toast.error("Failed to fetch homestay details");
+            router.push('/admin');
+            return;
+          }
+          
+          const homestayData = await homestayResponse.json();
+          if (!homestayData.success || !homestayData.data) {
+            toast.error("Invalid homestay data");
+            router.push('/admin');
+            return;
+          }
+          
+          // Check if this homestay belongs to the current admin
+          if (homestayData.data.adminUsername && 
+              homestayData.data.adminUsername !== currentAdminUsername) {
+            
+            // Check if user is a superadmin (they can edit any homestay)
+            const superadminResponse = await fetch('/api/superadmin/auth/me');
+            if (!superadminResponse.ok) {
+              // Not a superadmin, show error
+              toast.error("You don't have permission to edit another admin's homestay");
+              router.push('/admin');
+              return;
+            }
+            // If superadmin, continue without returning
+          }
+        } catch (error) {
+          console.error("Error fetching homestay data:", error);
+          toast.error("Failed to validate homestay access");
           router.push('/admin');
           return;
         }
@@ -307,7 +348,7 @@ export default function AdminHomestayDetailPage() {
     };
     
     checkPermissions();
-  }, [router]);
+  }, [router, homestayId]);
   
   // Helper function to check permissions
   const hasPermission = (permission: string): boolean => {

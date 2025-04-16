@@ -3,14 +3,13 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Eye, EyeOff, ShieldCheck, Building } from "lucide-react";
+import { Loader2, User } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminLoginPage() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [searchUsername, setSearchUsername] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const router = useRouter();
   
   // Check if user is already logged in
@@ -19,12 +18,21 @@ export default function AdminLoginPage() {
       try {
         const response = await fetch("/api/admin/auth/me");
         if (response.ok) {
-          // Already logged in, redirect to admin dashboard
-          router.push("/admin");
+          // Get the username
+          const data = await response.json();
+          const username = data.user?.username;
+          
+          if (username) {
+            // Already logged in, redirect to admin-specific dashboard
+            router.push(`/admin/${username}`);
+            return;
+          }
         }
-      } catch (error) {
         // Not logged in, continue showing login page
+      } catch (error) {
         console.error("Auth check error:", error);
+      } finally {
+        setCheckingAuth(false);
       }
     };
     
@@ -34,183 +42,69 @@ export default function AdminLoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!username || !password) {
-      toast.error('Please enter both username and password');
+    if (!searchUsername.trim()) {
+      toast.error('Please enter an admin username');
       return;
     }
     
-    setLoading(true);
-    
-    try {
-      const response = await fetch('/api/admin/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username,
-          password,
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        toast.success('Login successful!');
-        router.push('/admin');
-      } else {
-        // Handle different error scenarios with appropriate messages
-        if (response.status === 401) {
-          toast.error('Invalid username or password');
-        } else if (response.status === 403) {
-          if (data.message.includes('permission')) {
-            toast.error('You do not have permission to access the admin dashboard');
-          } else {
-            toast.error('You must be an admin to access this area');
-          }
-        } else {
-          toast.error(data.message || 'Login failed');
-        }
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      toast.error('An error occurred during login. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    // Redirect to the admin-specific login page
+    router.push(`/admin/${searchUsername}/login`);
   };
 
-  // Special debug function to fix permissions
-  const fixAdminPermissions = async () => {
-    try {
-      toast.info("Attempting to fix admin permissions...");
-      
-      const response = await fetch('/api/debug/fix-admin1', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        toast.success('Admin permissions fixed successfully!');
-      } else {
-        toast.error(data.message || 'Failed to fix permissions');
-      }
-    } catch (error) {
-      console.error('Debug error:', error);
-      toast.error('An error occurred. Please check console.');
-    }
-  };
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex flex-col items-center justify-center p-4 sm:p-6">
-      <div className="w-full max-w-md">
-        {/* Card container with improved shadow */}
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          {/* Header with brand color */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-8 text-white text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm mb-4">
-              <ShieldCheck className="h-8 w-8" />
-            </div>
-            <h1 className="text-2xl font-bold">Admin Portal</h1>
-            <p className="mt-1 text-blue-100 text-sm">Homestay Management System</p>
-          </div>
-          
-          {/* Login Form */}
-          <div className="p-6">
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label htmlFor="username" className="block text-gray-700 text-sm font-medium mb-1.5">
-                  Username
-                </label>
-                <div className="relative">
-                  <input
-                    id="username"
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors"
-                    placeholder="Enter your username"
-                    required
-                  />
-                  <Building className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                </div>
-              </div>
-              
-              <div>
-                <label htmlFor="password" className="block text-gray-700 text-sm font-medium mb-1.5">
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors"
-                    placeholder="Enter your password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
-                  </button>
-                </div>
-              </div>
-              
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-2 disabled:opacity-70 flex items-center justify-center"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="animate-spin h-5 w-5 mr-2" />
-                    Signing in...
-                  </>
-                ) : (
-                  'Sign In'
-                )}
-              </button>
-            </form>
-          </div>
-          
-          {/* Footer with debug options */}
-          {process.env.NODE_ENV !== 'production' && (
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 text-center">
-              <p className="text-xs font-medium text-gray-500 mb-2">Developer Actions</p>
-              <div className="flex justify-center space-x-3">
-                <button
-                  onClick={fixAdminPermissions}
-                  className="text-xs bg-orange-100 text-orange-800 px-3 py-1.5 rounded-md hover:bg-orange-200 font-medium transition-colors"
-                >
-                  Fix Permissions
-                </button>
-                <button
-                  onClick={() => {
-                    document.cookie = "auth_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-                    toast.success("Auth cookie cleared");
-                  }}
-                  className="text-xs bg-blue-100 text-blue-800 px-3 py-1.5 rounded-md hover:bg-blue-200 font-medium transition-colors"
-                >
-                  Clear Cookie
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white rounded-xl shadow-md p-8">
+        <h1 className="text-2xl font-bold text-center mb-6">Admin Login</h1>
+        <p className="text-gray-600 text-center mb-8">
+          Enter your admin username to continue
+        </p>
         
-        {/* Back link */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label htmlFor="username" className="sr-only">
+              Admin Username
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <User className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                id="username"
+                type="text"
+                value={searchUsername}
+                onChange={(e) => setSearchUsername(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter admin username"
+                autoComplete="off"
+                required
+              />
+            </div>
+          </div>
+          
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-70 flex items-center justify-center"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                Loading...
+              </>
+            ) : (
+              'Continue to Login'
+            )}
+          </button>
+        </form>
+        
         <div className="text-center mt-6">
           <Link 
             href="/"
