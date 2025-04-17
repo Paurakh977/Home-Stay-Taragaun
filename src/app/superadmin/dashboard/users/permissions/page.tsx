@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Key, User, Home, Check, X, Filter, Search, RefreshCw, Building, MapPin, Users, ChevronsUpDown, Check as CheckIcon, Trash, CircleCheck, CircleX } from "lucide-react";
+import { Key, User, Home, Check, X, Filter, Search, RefreshCw, Building, MapPin, Users, ChevronsUpDown, Check as CheckIcon, Trash, CircleCheck, CircleX, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -84,6 +84,7 @@ export default function PermissionsPage() {
   const [homestayStatusFilter, setHomestayStatusFilter] = useState('all');
   const [homestayAdminFilter, setHomestayAdminFilter] = useState('all');
   const [homestayLoading, setHomestayLoading] = useState(true);
+  const [searchDebounceTimeout, setSearchDebounceTimeout] = useState<NodeJS.Timeout | null>(null);
 
   // State for bulk changes
   const [userBulkPermissions, setUserBulkPermissions] = useState<Partial<UserPermissions>>({});
@@ -170,135 +171,112 @@ export default function PermissionsPage() {
     fetchUsers();
   }, []);
 
-  // Fetch homestays
-  useEffect(() => {
-    const fetchHomestays = async () => {
-      try {
-        setHomestayLoading(true);
-        const response = await fetch('/api/superadmin/homestays');
-        const data = await response.json();
-        
-        if (data.homestays) {
-          // Debug types
-          console.log('Raw homestay data sample:', data.homestays[0]);
-          
-          // Normalize the data with proper type handling
-          const normalizedHomestays = data.homestays.map((homestay: any) => {
-            // Safely get the type - we use 'any' temporarily to avoid type errors
-            let typeValue = 'private'; // Default value
-            
-            // Check for different property names that might exist
-            if (typeof homestay.homeStayType === 'string') {
-              typeValue = homestay.homeStayType;
-            } else if (typeof homestay.homestayType === 'string') {
-              typeValue = homestay.homestayType;
-            } else if (typeof homestay.type === 'string') {
-              typeValue = homestay.type;
-            }
-            
-            // Special case: if homestay has ID "first578" (from your screenshot)
-            // This ensures the one we know is Community displays correctly
-            if (homestay.homestayId === "first578") {
-              console.log("Found first578 homestay, setting type to Community");
-              typeValue = "Community";
-            }
-            
-            // First, log the actual value we found for debugging
-            console.log(`Original type value for ${homestay.homestayId || 'unknown'}: "${typeValue}"`);
-            
-            const normalizedType = typeValue.toLowerCase().includes('community') ? 'community' : 'private';
-            
-            // Log after normalization
-            console.log(`Normalized type for ${homestay.homestayId || 'unknown'}: "${normalizedType}"`);
-            
-            // Create the normalized homestay object
-            return {
-              ...homestay,
-              homeStayType: normalizedType, // Ensure consistent property name and value
-              featureAccess: homestay.featureAccess || {
-                dashboard: false,
-                profile: false,
-                portal: false,
-                documents: false,
-                imageUpload: false,
-                settings: false,
-                chat: false,
-                updateInfo: false
-              }
-            };
-          });
-          
-          // Log a sample of normalized data
-          console.log('Normalized homestay data sample:', normalizedHomestays[0]);
-          
-          setHomestays(normalizedHomestays);
-          setFilteredHomestays(normalizedHomestays);
-        }
-      } catch (error) {
-        console.error('Error fetching homestays:', error);
-        toast.error('Failed to load homestays');
-      } finally {
-        setHomestayLoading(false);
+  // Fetch homestays with search parameter
+  const fetchHomestays = async (searchTerm = '') => {
+    try {
+      setHomestayLoading(true);
+      
+      // Build URL with search parameters
+      const url = new URL('/api/superadmin/homestays', window.location.origin);
+      
+      // Add search term if provided
+      if (searchTerm) {
+        url.searchParams.append('search', searchTerm);
       }
-    };
-    
+      
+      // Add other filters if needed
+      if (homestayStatusFilter !== 'all') {
+        url.searchParams.append('status', homestayStatusFilter);
+      }
+      
+      if (homestayAdminFilter !== 'all') {
+        url.searchParams.append('adminUsername', homestayAdminFilter);
+      }
+      
+      // Make the fetch request with the constructed URL
+      const response = await fetch(url.toString());
+      const data = await response.json();
+      
+      if (data.homestays) {
+        // Normalize the data with proper type handling
+        const normalizedHomestays = data.homestays.map((homestay: any) => {
+          // Safely get the type
+          let typeValue = 'private'; // Default value
+          
+          // Check for different property names that might exist
+          if (typeof homestay.homeStayType === 'string') {
+            typeValue = homestay.homeStayType;
+          } else if (typeof homestay.homestayType === 'string') {
+            typeValue = homestay.homestayType;
+          } else if (typeof homestay.type === 'string') {
+            typeValue = homestay.type;
+          }
+          
+          const normalizedType = typeValue.toLowerCase().includes('community') ? 'community' : 'private';
+          
+          // Create the normalized homestay object
+          return {
+            ...homestay,
+            homeStayType: normalizedType,
+            featureAccess: homestay.featureAccess || {
+              dashboard: false,
+              profile: false,
+              portal: false,
+              documents: false,
+              imageUpload: false,
+              settings: false,
+              chat: false,
+              updateInfo: false
+            }
+          };
+        });
+        
+        setHomestays(normalizedHomestays);
+        setFilteredHomestays(normalizedHomestays);
+      }
+    } catch (error) {
+      console.error('Error fetching homestays:', error);
+      toast.error('Failed to load homestays');
+    } finally {
+      setHomestayLoading(false);
+    }
+  };
+
+  // Initial load of homestays
+  useEffect(() => {
     fetchHomestays();
   }, []);
 
-  // Filter users
+  // Handle search query changes with debounce
   useEffect(() => {
-    let results = [...users];
-    
-    // Apply search filter
-    if (userSearchQuery) {
-      const query = userSearchQuery.toLowerCase();
-      results = results.filter(user => 
-        user.username.toLowerCase().includes(query) || 
-        user.email.toLowerCase().includes(query)
-      );
+    // Clear any existing timeout
+    if (searchDebounceTimeout) {
+      clearTimeout(searchDebounceTimeout);
     }
     
-    // Apply role filter
-    if (userRoleFilter !== 'all') {
-      results = results.filter(user => user.role === userRoleFilter);
-    }
+    // Set a new timeout to perform the search after 300ms of inactivity
+    const timeout = setTimeout(() => {
+      fetchHomestays(homestaySearchQuery);
+    }, 300);
     
-    setFilteredUsers(results);
-  }, [users, userSearchQuery, userRoleFilter]);
+    setSearchDebounceTimeout(timeout);
+    
+    // Clean up the timeout when component unmounts or when search query changes again
+    return () => {
+      if (searchDebounceTimeout) {
+        clearTimeout(searchDebounceTimeout);
+      }
+    };
+  }, [homestaySearchQuery]);
 
-  // Filter homestays
+  // Handle filter changes
+  useEffect(() => {
+    fetchHomestays(homestaySearchQuery);
+  }, [homestayStatusFilter, homestayAdminFilter]);
+
+  // Apply geographic and type filters (client-side filtering for these)
   useEffect(() => {
     let results = [...homestays];
-    
-    // Log sample data for debugging
-    if (homestays.length > 0) {
-      console.log('Filtering with sample homestay:', {
-        id: homestays[0].homestayId,
-        type: homestays[0].homeStayType,
-        status: homestays[0].status
-      });
-    }
-    
-    // Apply search filter
-    if (homestaySearchQuery) {
-      const query = homestaySearchQuery.toLowerCase();
-      results = results.filter(homestay => 
-        homestay.homestayId.toLowerCase().includes(query) || 
-        homestay.homeStayName.toLowerCase().includes(query) ||
-        (homestay.dhsrNo && homestay.dhsrNo.toLowerCase().includes(query)) ||
-        (homestay.address?.villageName && homestay.address.villageName.toLowerCase().includes(query))
-      );
-    }
-    
-    // Apply status filter
-    if (homestayStatusFilter !== 'all') {
-      results = results.filter(homestay => homestay.status === homestayStatusFilter);
-    }
-    
-    // Apply admin filter
-    if (homestayAdminFilter !== 'all') {
-      results = results.filter(homestay => homestay.adminUsername === homestayAdminFilter);
-    }
     
     // Apply province filter
     if (selectedProvince !== 'all') {
@@ -339,37 +317,40 @@ export default function PermissionsPage() {
       });
     }
     
-    // Apply homestay type filter with robust error handling
+    // Apply homestay type filter
     if (selectedType !== 'all') {
-      // Log before filtering
-      console.log(`Filtering by type: "${selectedType}"`);
-      
-      // Count types for debugging
-      const typeCount = {
-        private: results.filter(h => h.homeStayType === 'private').length,
-        community: results.filter(h => h.homeStayType === 'community').length,
-        undefined: results.filter(h => !h.homeStayType).length,
-        other: results.filter(h => h.homeStayType && h.homeStayType !== 'private' && h.homeStayType !== 'community').length
-      };
-      console.log('Type distribution before filtering:', typeCount);
-      
-      // Apply the filter with clean, simple logic since we've normalized the data already
       results = results.filter(homestay => homestay.homeStayType === selectedType);
-      
-      console.log(`After type filter: ${results.length} results`);
     }
     
     setFilteredHomestays(results);
   }, [
     homestays, 
-    homestaySearchQuery, 
-    homestayStatusFilter, 
-    homestayAdminFilter, 
     selectedProvince,
     selectedDistrict,
     selectedMunicipality,
     selectedType
   ]);
+
+  // Filter users
+  useEffect(() => {
+    let results = [...users];
+    
+    // Apply search filter
+    if (userSearchQuery) {
+      const query = userSearchQuery.toLowerCase();
+      results = results.filter(user => 
+        user.username.toLowerCase().includes(query) || 
+        user.email.toLowerCase().includes(query)
+      );
+    }
+    
+    // Apply role filter
+    if (userRoleFilter !== 'all') {
+      results = results.filter(user => user.role === userRoleFilter);
+    }
+    
+    setFilteredUsers(results);
+  }, [users, userSearchQuery, userRoleFilter]);
 
   // Get unique admin usernames from homestays for filter
   const adminUsernames = [...new Set(homestays.map(homestay => homestay.adminUsername))];
@@ -582,6 +563,9 @@ export default function PermissionsPage() {
     setSelectedDistrict('all');
     setSelectedMunicipality('all');
     setSelectedType('all');
+    
+    // Reload homestays with no filters
+    fetchHomestays('');
   };
 
   // Load address data for filters
@@ -944,11 +928,24 @@ export default function PermissionsPage() {
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search homestays..."
+            placeholder="Search by name, ID, DHSR number..."
             value={homestaySearchQuery}
             onChange={(e) => setHomestaySearchQuery(e.target.value)}
-            className="pl-9"
+            className="pl-9 pr-9"
           />
+          {homestayLoading && searchDebounceTimeout && (
+            <div className="absolute right-10 top-2.5">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          {homestaySearchQuery && (
+            <button 
+              className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+              onClick={() => setHomestaySearchQuery('')}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
         
         <Select value={homestayStatusFilter} onValueChange={setHomestayStatusFilter}>
@@ -1130,6 +1127,11 @@ export default function PermissionsPage() {
                       <MapPin className="h-3 w-3 mr-1" />
                       {homestay.address?.province?.en || 'N/A'}, {homestay.address?.district?.en || 'N/A'}
                     </div>
+                    {homestay.dhsrNo && (
+                      <div className="text-xs text-primary font-medium mt-1">
+                        DHSR: {homestay.dhsrNo}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
                     <div className="flex items-center">

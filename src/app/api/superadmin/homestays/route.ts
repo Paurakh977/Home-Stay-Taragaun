@@ -15,6 +15,7 @@ export async function GET(request: Request) {
     const adminUsername = searchParams.get('adminUsername');
     const province = searchParams.get('province');
     const district = searchParams.get('district');
+    const searchQuery = searchParams.get('search');
     
     // Build query
     let query: any = {};
@@ -36,9 +37,22 @@ export async function GET(request: Request) {
       query['address.district.ne'] = district;
     }
     
+    // Add search functionality
+    if (searchQuery) {
+      // Escape special characters in the search query to treat them as literals in regex
+      const escapedQuery = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      
+      query.$or = [
+        { homestayId: { $regex: escapedQuery, $options: 'i' } },
+        { homeStayName: { $regex: escapedQuery, $options: 'i' } },
+        { dhsrNo: { $regex: escapedQuery, $options: 'i' } },
+        { 'address.villageName': { $regex: escapedQuery, $options: 'i' } }
+      ];
+    }
+    
     // Execute query with pagination
     const homestays = await HomestaySingle.find(query)
-      .select('_id homestayId homeStayName homeStayType adminUsername status featureAccess address')
+      .select('_id homestayId homeStayName homeStayType adminUsername status featureAccess address dhsrNo')
       .limit(limit)
       .skip(skip)
       .lean();
