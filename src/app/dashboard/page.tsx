@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { HomeIcon, Building2Icon, CalendarIcon, MapPinIcon, UserIcon, ClipboardCheckIcon } from 'lucide-react';
+import BrandedDashboardHeader from '@/components/dashboard/BrandedDashboardHeader';
 
 interface HomeStay {
   _id: string;
@@ -167,9 +168,12 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
 
   return (
     <div>
+      {/* Branded Header */}
+      <BrandedDashboardHeader adminUsername={adminUsername} />
+      
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600">Welcome to your homestay management dashboard</p>
+        <h1 className="text-2xl font-bold text-gray-900">ड्यासबोर्ड</h1>
+        <p className="text-gray-600">तपाईंको होमस्टे व्यवस्थापन ड्यासबोर्डमा स्वागत छ</p>
       </div>
       
       {/* Stats Cards */}
@@ -177,7 +181,7 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
         <div className="bg-white rounded-lg shadow p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Total Bookings</p>
+              <p className="text-sm text-gray-500">कुल बुकिङहरू</p>
               <p className="text-2xl font-bold text-gray-900">{stats.totalBookings}</p>
             </div>
             <div className="p-3 bg-blue-100 rounded-full">
@@ -189,7 +193,7 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
         <div className="bg-white rounded-lg shadow p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Total Visits</p>
+              <p className="text-sm text-gray-500">कुल भ्रमणहरू</p>
               <p className="text-2xl font-bold text-gray-900">{stats.totalVisits}</p>
             </div>
             <div className="p-3 bg-green-100 rounded-full">
@@ -201,7 +205,7 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
         <div className="bg-white rounded-lg shadow p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Average Rating</p>
+              <p className="text-sm text-gray-500">औसत रेटिंग</p>
               <p className="text-2xl font-bold text-gray-900">{stats.avgRating}/5</p>
             </div>
             <div className="p-3 bg-yellow-100 rounded-full">
@@ -215,7 +219,7 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
         <div className="bg-white rounded-lg shadow p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Pending Inquiries</p>
+              <p className="text-sm text-gray-500">पेन्डिङ सोधपुछहरू</p>
               <p className="text-2xl font-bold text-gray-900">{stats.pendingInquiries}</p>
             </div>
             <div className="p-3 bg-red-100 rounded-full">
@@ -230,7 +234,7 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
       {/* Recent Homestays */}
       <div className="bg-white rounded-lg shadow mb-8">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">Recent Homestays</h2>
+          <h2 className="text-lg font-medium text-gray-900">हालैका होमस्टेहरू</h2>
         </div>
         <div className="px-6 py-4">
         {/* Error message */}
@@ -238,7 +242,7 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
           <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
             <div className="flex">
               <div>
-                <p className="text-red-700 font-medium">Error</p>
+                <p className="text-red-700 font-medium">त्रुटि</p>
                 <p className="text-sm text-red-700">{error}</p>
               </div>
             </div>
@@ -253,11 +257,11 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
         ) : homestays.length === 0 ? (
             <div className="text-center py-8">
               <Building2Icon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No homestays found</h3>
-            <p className="text-gray-600 mb-4">No homestays have been registered yet.</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">कुनै होमस्टे फेला परेन</h3>
+            <p className="text-gray-600 mb-4">अहिलेसम्म कुनै होमस्टे दर्ता गरिएको छैन।</p>
             <Link href={adminUsername ? `/${adminUsername}/register` : "/register"}>
               <button className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark transition">
-                Register a Homestay
+                होमस्टे दर्ता गर्नुहोस्
               </button>
             </Link>
           </div>
@@ -267,19 +271,19 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
                 <thead className="bg-gray-50">
                   <tr>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Homestay
+                      होमस्टे
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Location
+                      स्थान
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
+                      स्थिति
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
+                      मिति
                     </th>
                     <th scope="col" className="relative px-6 py-3">
-                      <span className="sr-only">View</span>
+                      <span className="sr-only">हेर्नुहोस्</span>
                     </th>
                   </tr>
                 </thead>
@@ -313,7 +317,7 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <Link href={adminUsername ? `/${adminUsername}/dashboard/homestays/${homestay._id}` : `/dashboard/homestays/${homestay._id}`}>
-                          <span className="text-primary hover:text-primary-dark">View</span>
+                          <span className="text-primary hover:text-primary-dark">हेर्नुहोस्</span>
                         </Link>
                       </td>
                     </tr>
@@ -327,7 +331,7 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
             <div className="mt-4 text-right">
               <Link href={adminUsername ? `/${adminUsername}/dashboard/homestays` : "/dashboard/homestays"}>
                 <span className="text-primary hover:text-primary-dark text-sm font-medium">
-                  View all homestays →
+                  सबै होमस्टेहरू हेर्नुहोस् →
                 </span>
               </Link>
             </div>
@@ -338,7 +342,7 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
       {/* Quick Links */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">Quick Links</h2>
+          <h2 className="text-lg font-medium text-gray-900">द्रुत लिङ्कहरू</h2>
         </div>
         <div className="px-6 py-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -349,8 +353,8 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
                     <UserIcon className="h-5 w-5 text-primary" />
                   </div>
                   <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-900">Update Profile</p>
-                    <p className="text-xs text-gray-500">Manage your homestay profile</p>
+                    <p className="text-sm font-medium text-gray-900">प्रोफाइल अपडेट</p>
+                    <p className="text-xs text-gray-500">आफ्नो होमस्टे प्रोफाइल व्यवस्थापन गर्नुहोस्</p>
                   </div>
                 </div>
               </div>
@@ -364,8 +368,8 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
                       <Building2Icon className="h-5 w-5 text-green-600" />
                     </div>
                     <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-900">Update Homestay</p>
-                      <p className="text-xs text-gray-500">Edit your homestay information</p>
+                      <p className="text-sm font-medium text-gray-900">होमस्टे अपडेट</p>
+                      <p className="text-xs text-gray-500">आफ्नो होमस्टेको जानकारी सम्पादन गर्नुहोस्</p>
                     </div>
                   </div>
                 </div>
@@ -381,8 +385,8 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
                     </svg>
                   </div>
                   <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-900">Account Settings</p>
-                    <p className="text-xs text-gray-500">Manage your account preferences</p>
+                    <p className="text-sm font-medium text-gray-900">खाता सेटिङहरू</p>
+                    <p className="text-xs text-gray-500">आफ्नो खाता प्राथमिकताहरू व्यवस्थापन गर्नुहोस्</p>
                   </div>
                 </div>
               </div>

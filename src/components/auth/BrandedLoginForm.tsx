@@ -1,22 +1,17 @@
-"use client";
+'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { EyeIcon, EyeOffIcon } from 'lucide-react';
-import BrandedLoginForm from '@/components/auth/BrandedLoginForm';
+import { useBranding } from '@/context/BrandingContext';
 
-interface LoginPageProps {
+interface BrandedLoginFormProps {
   adminUsername?: string;
 }
 
-export default function LoginPage({ adminUsername }: LoginPageProps) {
-  // If an adminUsername is provided, use the branded login form
-  if (adminUsername) {
-    return <BrandedLoginForm adminUsername={adminUsername} />;
-  }
-
-  // Regular login form (non-admin)
+export default function BrandedLoginForm({ adminUsername }: BrandedLoginFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -25,6 +20,7 @@ export default function LoginPage({ adminUsername }: LoginPageProps) {
     password: '',
   });
   const router = useRouter();
+  const branding = useBranding();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -50,7 +46,7 @@ export default function LoginPage({ adminUsername }: LoginPageProps) {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Login failed');
+        throw new Error(errorData.message || 'लगइन असफल भयो');
       }
 
       const data = await response.json();
@@ -66,7 +62,7 @@ export default function LoginPage({ adminUsername }: LoginPageProps) {
       router.push(dashboardPath);
     } catch (error) {
       console.error('Login error:', error);
-      setError(error instanceof Error ? error.message : 'Failed to login');
+      setError(error instanceof Error ? error.message : 'लगइन गर्न असमर्थ');
     } finally {
       setIsLoading(false);
     }
@@ -79,16 +75,37 @@ export default function LoginPage({ adminUsername }: LoginPageProps) {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Sign in to your account
+        {/* Brand Logo */}
+        <div className="flex justify-center">
+          {branding.logoPath ? (
+            <div className="relative h-24 w-24 mb-5">
+              <Image
+                src={branding.logoPath}
+                alt={branding.brandName || 'Brand Logo'}
+                fill
+                className="object-contain"
+              />
+            </div>
+          ) : (
+            <div className="h-20 w-20 bg-primary rounded-full flex items-center justify-center text-white font-bold text-3xl mb-5">
+              {branding.brandName?.charAt(0) || 'H'}
+            </div>
+          )}
+        </div>
+        
+        <h2 className="text-center text-3xl font-extrabold text-gray-900 mb-2">
+          {branding.brandName || 'हाम्रो होम स्टे'}
         </h2>
+        <p className="text-center text-xl text-primary font-medium">
+          आफ्नो खातामा लगइन गर्नुहोस्
+        </p>
         <p className="mt-2 text-center text-sm text-gray-600">
-          Or{' '}
+          वा{' '}
           <Link
             href={`${adminUsername ? `/${adminUsername}` : ""}/register`}
             className="font-medium text-primary hover:text-indigo-500"
           >
-            register your homestay
+            आफ्नो होमस्टे दर्ता गर्नुहोस्
           </Link>
         </p>
       </div>
@@ -108,7 +125,7 @@ export default function LoginPage({ adminUsername }: LoginPageProps) {
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label htmlFor="homestayId" className="block text-sm font-medium text-gray-700">
-                Homestay ID
+                होमस्टे आईडी
               </label>
               <div className="mt-1">
                 <input
@@ -126,7 +143,7 @@ export default function LoginPage({ adminUsername }: LoginPageProps) {
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
+                पासवर्ड
               </label>
               <div className="mt-1 relative">
                 <input
@@ -161,13 +178,13 @@ export default function LoginPage({ adminUsername }: LoginPageProps) {
                   className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                 />
                 <label htmlFor="remember_me" className="ml-2 block text-sm text-gray-900">
-                  Remember me
+                  मलाई सम्झनुहोस्
                 </label>
               </div>
 
               <div className="text-sm">
                 <Link href="/reset-password" className="font-medium text-primary hover:text-indigo-500">
-                  Forgot your password?
+                  पासवर्ड बिर्सनुभयो?
                 </Link>
               </div>
             </div>
@@ -180,7 +197,7 @@ export default function LoginPage({ adminUsername }: LoginPageProps) {
                   isLoading ? 'opacity-75 cursor-not-allowed' : ''
                 }`}
               >
-                {isLoading ? 'Signing in...' : 'Sign in'}
+                {isLoading ? 'लगइन गर्दै...' : 'लगइन गर्नुहोस्'}
               </button>
             </div>
           </form>

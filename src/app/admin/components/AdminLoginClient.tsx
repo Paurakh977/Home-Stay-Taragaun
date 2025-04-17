@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Lock, User } from 'lucide-react';
+import Image from 'next/image';
+import { useBranding } from '@/context/BrandingContext';
 
 interface AdminLoginClientProps {
   adminUsername: string;
@@ -13,6 +15,7 @@ export default function AdminLoginClient({ adminUsername }: AdminLoginClientProp
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const branding = useBranding();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,14 +58,36 @@ export default function AdminLoginClient({ adminUsername }: AdminLoginClientProp
 
   return (
     <div className="w-full max-w-md space-y-8 bg-white p-10 rounded-xl shadow-md">
-      <div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Admin Login
+      <div className="text-center">
+        {/* Brand Logo */}
+        <div className="flex justify-center mb-4">
+          {branding.logoPath ? (
+            <div className="relative h-20 w-20 rounded-full overflow-hidden border-2 border-white shadow-sm">
+              <Image
+                src={branding.logoPath}
+                alt={branding.brandName || 'Brand Logo'}
+                fill
+                className="object-cover"
+                sizes="80px"
+              />
+            </div>
+          ) : (
+            <div className="h-20 w-20 bg-primary rounded-full flex items-center justify-center text-white font-bold text-3xl shadow-sm">
+              {branding.brandName?.charAt(0) || adminUsername.charAt(0).toUpperCase()}
+            </div>
+          )}
+        </div>
+
+        <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900">
+          {branding.brandName || 'Admin Portal'}
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
           <span className="font-medium text-primary">
             {adminUsername}
           </span>
+          {branding.brandDescription && (
+            <span className="block mt-1 text-xs text-gray-500">{branding.brandDescription}</span>
+          )}
         </p>
       </div>
       

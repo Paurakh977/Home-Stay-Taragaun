@@ -45,8 +45,8 @@ export default function ClientAdminDashboard({ adminUsername }: ClientAdminDashb
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-auto">
-        <AdminHomestayClient username={adminUsername} />
+      <div className="flex-1 flex flex-col overflow-auto md:pl-0">
+        <AdminHomestayClient username={adminUsername} noSidebar={true} />
       </div>
     </div>
   );

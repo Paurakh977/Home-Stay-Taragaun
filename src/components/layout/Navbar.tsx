@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu, X, LogOut, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useBranding } from "@/context/BrandingContext";
 
 interface UserInfo {
   homestayId: string;
@@ -22,6 +24,7 @@ const Navbar = ({ adminUsername }: NavbarProps) => {
   const [user, setUser] = useState<UserInfo | null>(null);
   const pathname = usePathname();
   const router = useRouter();
+  const branding = useBranding();
 
   // Prevent Navbar rendering on superadmin pages
   if (pathname.startsWith('/superadmin')) {
@@ -131,10 +134,23 @@ const Navbar = ({ adminUsername }: NavbarProps) => {
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <Link href={baseHref || '/'} className="flex-shrink-0 flex items-center">
-              <div className="h-10 w-10 bg-primary rounded-full flex items-center justify-center text-white font-bold text-lg">
-                HH
-              </div>
-              <span className="ml-2 text-xl font-bold text-gray-900 truncate max-w-[140px] sm:max-w-none">Hamro Home Stay</span>
+              {branding.logoPath ? (
+                <div className="h-10 w-10 relative rounded-full overflow-hidden">
+                  <Image 
+                    src={branding.logoPath} 
+                    alt={branding.brandName || 'Logo'} 
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="h-10 w-10 bg-primary rounded-full flex items-center justify-center text-white font-bold text-lg">
+                  {branding.brandName?.charAt(0) || 'H'}
+                </div>
+              )}
+              <span className="ml-2 text-xl font-bold text-gray-900 truncate max-w-[140px] sm:max-w-none">
+                {branding.brandName || 'Hamro Home Stay'}
+              </span>
             </Link>
           </div>
           

@@ -1,6 +1,8 @@
 import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { getUserByUsername } from '@/lib/services/userService';
+import { getBrandingByAdminUsername } from '@/lib/services/brandingService';
+import { BrandingProvider } from '@/context/BrandingContext';
 import AdminLoginForm from '../../components/AdminLoginForm';
 
 // Loading fallback for Suspense
@@ -32,16 +34,21 @@ export default async function AdminLoginPage({
       // If admin doesn't exist or isn't an admin, return 404
       return notFound();
     }
+    
+    // Fetch branding data for this admin
+    const brandingData = await getBrandingByAdminUsername(adminUsername);
+    
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <Suspense fallback={<LoadingFallback />}>
+          <BrandingProvider brandingData={brandingData}>
+            <AdminLoginForm adminUsername={adminUsername} />
+          </BrandingProvider>
+        </Suspense>
+      </div>
+    );
   } catch (error) {
     console.error('Error fetching admin:', error);
     return notFound();
   }
-  
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <Suspense fallback={<LoadingFallback />}>
-        <AdminLoginForm adminUsername={adminUsername} />
-      </Suspense>
-    </div>
-  );
 } 

@@ -1,10 +1,12 @@
 "use client";
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Hotel, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
+import { useBranding } from '@/context/BrandingContext';
 
 const sidebarNavItems = [
   {
@@ -25,6 +27,7 @@ export default function AdminSidebar({ username }: AdminSidebarProps) {
   const searchParams = useSearchParams();
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const adminUsername = username || searchParams.get('username');
+  const branding = useBranding();
 
   // Check if user is a superadmin
   useEffect(() => {
@@ -70,23 +73,34 @@ export default function AdminSidebar({ username }: AdminSidebarProps) {
 
   return (
     <aside className="h-full bg-white border-r border-gray-200 flex flex-col">
-      <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-        <Link href={adminBasePath} className="flex items-center">
-           <span className="font-medium text-gray-900">Admin Dashboard</span>
-           {adminUsername && (
-             <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-               {adminUsername}
-             </span>
-           )}
+      <div className="p-4 border-b border-gray-100">
+        <Link href={adminBasePath} className="flex items-center space-x-3">
+          {branding.logoPath ? (
+            <div className="relative h-8 w-8 rounded-full overflow-hidden">
+              <Image
+                src={branding.logoPath}
+                alt={branding.brandName || 'Admin Logo'}
+                fill
+                className="object-cover"
+                sizes="32px"
+              />
+            </div>
+          ) : (
+            <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center text-white font-bold">
+              {branding.brandName?.charAt(0) || (adminUsername ? adminUsername.charAt(0).toUpperCase() : 'A')}
+            </div>
+          )}
+          <div>
+            <div className="font-medium text-gray-900 text-sm">
+              {branding.brandName || 'Admin Dashboard'}
+            </div>
+            {adminUsername && (
+              <span className="text-xs text-gray-500">
+                {adminUsername}
+              </span>
+            )}
+          </div>
         </Link>
-        {/* Logout button for mobile/top position */}
-        <button
-          onClick={handleLogout}
-          className="md:hidden flex items-center justify-center p-2 rounded-md bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
-          aria-label="Logout"
-        >
-          <LogOut className="h-5 w-5" />
-        </button>
       </div>
       
       <nav className="p-2 flex-1">
@@ -115,7 +129,7 @@ export default function AdminSidebar({ username }: AdminSidebarProps) {
         })}
       </nav>
       
-      {/* Logout button for desktop/bottom position */}
+      {/* Logout button */}
       <div className="p-4 mt-auto border-t border-gray-100">
         <button
           onClick={handleLogout}
