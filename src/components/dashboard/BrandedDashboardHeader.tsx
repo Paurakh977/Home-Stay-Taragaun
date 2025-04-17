@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useBranding } from '@/context/BrandingContext';
+import { getImageUrl } from '@/lib/utils';
 
 interface BrandedDashboardHeaderProps {
   adminUsername?: string;
@@ -32,7 +33,7 @@ export default function BrandedDashboardHeader({ adminUsername }: BrandedDashboa
           {branding.logoPath ? (
             <div className="relative h-16 w-16 md:h-20 md:w-20 rounded-full overflow-hidden border-2 border-white shadow-md">
               <Image
-                src={branding.logoPath}
+                src={getImageUrl(branding.logoPath)}
                 alt={branding.brandName || 'Brand Logo'}
                 fill
                 className="object-cover"

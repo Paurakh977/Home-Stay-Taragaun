@@ -7,6 +7,7 @@ import { Hotel, LogOut, PlusCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { useBranding } from '@/context/BrandingContext';
+import { getImageUrl } from '@/lib/utils';
 
 const sidebarNavItems = [
   {
@@ -83,7 +84,7 @@ export default function AdminSidebar({ username }: AdminSidebarProps) {
           {branding.logoPath ? (
             <div className="relative h-8 w-8 rounded-full overflow-hidden">
               <Image
-                src={branding.logoPath}
+                src={getImageUrl(branding.logoPath)}
                 alt={branding.brandName || 'Admin Logo'}
                 fill
                 className="object-cover"

@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Menu, X, LogOut, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBranding } from "@/context/BrandingContext";
+import { getImageUrl } from "@/lib/utils";
 
 interface UserInfo {
   homestayId: string;
@@ -137,7 +138,7 @@ const Navbar = ({ adminUsername }: NavbarProps) => {
               {branding.logoPath ? (
                 <div className="h-10 w-10 relative rounded-full overflow-hidden">
                   <Image 
-                    src={branding.logoPath} 
+                    src={getImageUrl(branding.logoPath)} 
                     alt={branding.brandName || 'Logo'} 
                     fill
                     className="object-cover"

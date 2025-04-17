@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getImageUrl } from "@/lib/utils";
 import { useBranding } from "@/context/BrandingContext";
 
 export default function ImageSlider() {
@@ -52,7 +52,7 @@ export default function ImageSlider() {
         >
           <div className="relative h-full w-full">
             <Image
-              src={slide}
+              src={getImageUrl(slide)}
               alt={`Homestay slide ${index + 1}`}
               fill
               priority={index === 0}
@@ -104,4 +104,4 @@ export default function ImageSlider() {
       </div>
     </div>
   );
-} 
+}

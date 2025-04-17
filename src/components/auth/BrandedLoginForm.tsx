@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { EyeIcon, EyeOffIcon } from 'lucide-react';
 import { useBranding } from '@/context/BrandingContext';
+import { getImageUrl } from '@/lib/utils';
 
 interface BrandedLoginFormProps {
   adminUsername?: string;
@@ -80,7 +81,7 @@ export default function BrandedLoginForm({ adminUsername }: BrandedLoginFormProp
           {branding.logoPath ? (
             <div className="relative h-24 w-24 mb-5">
               <Image
-                src={branding.logoPath}
+                src={getImageUrl(branding.logoPath)}
                 alt={branding.brandName || 'Brand Logo'}
                 fill
                 className="object-contain"

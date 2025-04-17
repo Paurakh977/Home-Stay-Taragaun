@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useBranding } from "@/context/BrandingContext";
 import { Facebook, Instagram, Twitter, Youtube } from "lucide-react";
+import { getImageUrl } from "@/lib/utils";
 
 interface FooterProps {
   adminUsername?: string;
@@ -24,7 +25,7 @@ const Footer = ({ adminUsername }: FooterProps) => {
               {branding.logoPath ? (
                 <div className="relative h-10 w-10 rounded-full overflow-hidden mr-2">
                   <Image
-                    src={branding.logoPath}
+                    src={getImageUrl(branding.logoPath)}
                     alt={branding.brandName || 'Logo'}
                     fill
                     className="object-cover"

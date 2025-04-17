@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { useBranding } from '@/context/BrandingContext';
+import { getImageUrl } from '@/lib/utils';
 
 // Define TeamMember interface
 interface TeamMember {
@@ -40,7 +41,7 @@ export default function AdminAboutPage() {
               {branding.logoPath ? (
                 <div className="relative h-24 w-24 md:h-32 md:w-32">
                   <Image
-                    src={branding.logoPath}
+                    src={getImageUrl(branding.logoPath)}
                     alt={branding.brandName || 'Brand Logo'}
                     fill
                     className="object-cover rounded-full shadow-md border-4 border-white"
@@ -170,7 +171,7 @@ export default function AdminAboutPage() {
                   {member.photoPath ? (
                     <div className="relative mx-auto w-20 h-20 rounded-full overflow-hidden mb-3 border-2 border-white shadow-sm group-hover:shadow-md transition-all">
                       <Image
-                        src={member.photoPath}
+                        src={getImageUrl(member.photoPath)}
                         alt={member.name}
                         fill
                         className="object-cover"

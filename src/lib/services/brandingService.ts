@@ -9,25 +9,44 @@ import { BrandingData } from '@/context/BrandingContext';
  */
 export async function getBrandingByAdminUsername(adminUsername: string): Promise<BrandingData> {
   try {
+    console.log(`Fetching branding data for admin: ${adminUsername} at ${new Date().toISOString()}`);
     await dbConnect();
     
-    // Find the admin user
+    // Find the admin user - use a query with a timestamp to avoid MongoDB query cache
+    const timestamp = Date.now();
     const adminUser = await User.findOne({ 
       username: adminUsername,
-      role: 'admin'
-    }).lean();
+      role: 'admin',
+    }, null, { maxTimeMS: 30000, lean: true })
+    .lean();
     
     if (!adminUser || !adminUser.branding) {
       console.warn(`Branding data not found for admin: ${adminUsername}`);
       return getDefaultBranding();
     }
     
+    // Add a timestamp to image paths to force browser refresh
+    const logoPath = adminUser.branding.logoPath ? 
+      `${adminUser.branding.logoPath}` : '';
+    
+    const sliderImages = adminUser.branding.sliderImages ? 
+      adminUser.branding.sliderImages.map(img => `${img}`) : [];
+    
+    // Prepare team members with timestamped photo paths
+    const team = adminUser.branding.aboutUs?.team?.map((member: any) => ({
+      name: member.name || '',
+      role: member.role || '',
+      photoPath: member.photoPath ? `${member.photoPath}` : '',
+    })) || [];
+    
+    console.log(`Successfully fetched branding data for admin: ${adminUsername}`);
+    
     // Return the branding data
     return {
       brandName: adminUser.branding.brandName || '',
       brandDescription: adminUser.branding.brandDescription || '',
-      logoPath: adminUser.branding.logoPath || '',
-      sliderImages: adminUser.branding.sliderImages || [],
+      logoPath,
+      sliderImages,
       contactInfo: {
         address: adminUser.branding.contactInfo?.address || '',
         email: adminUser.branding.contactInfo?.email || '',
@@ -44,12 +63,9 @@ export async function getBrandingByAdminUsername(adminUsername: string): Promise
         story: adminUser.branding.aboutUs?.story || '',
         mission: adminUser.branding.aboutUs?.mission || '',
         vision: adminUser.branding.aboutUs?.vision || '',
-        team: adminUser.branding.aboutUs?.team?.map((member: any) => ({
-          name: member.name || '',
-          role: member.role || '',
-          photoPath: member.photoPath || '',
-        })) || []
-      }
+        team
+      },
+      _fetchedAt: Date.now() // Add timestamp for debugging purposes
     };
   } catch (error) {
     console.error('Error fetching branding data:', error);
@@ -80,6 +96,7 @@ function getDefaultBranding(): BrandingData {
       mission: 'To connect travelers with authentic local experiences.',
       vision: 'Creating memorable cultural exchanges through hospitality.',
       team: []
-    }
+    },
+    _fetchedAt: Date.now()
   };
 } 

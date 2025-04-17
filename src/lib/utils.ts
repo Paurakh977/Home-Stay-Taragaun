@@ -68,3 +68,23 @@ export function verifyPassword(password: string, hashedPassword: string): boolea
   const hashedInput = hashPassword(password);
   return hashedInput === hashedPassword;
 }
+
+/**
+ * Transforms an upload path to an API image path with cache busting
+ * @param imagePath - The original image path from the database (e.g., /uploads/...)
+ * @returns A properly formatted image URL for the API with cache busting
+ */
+export function getImageUrl(imagePath: string): string {
+  if (!imagePath) return '';
+  
+  // Check if imagePath is already a proper URL or API path
+  if (!imagePath.startsWith('/uploads/')) {
+    return imagePath;
+  }
+  
+  // Transform /uploads/path/to/image.jpg to /api/images/path/to/image.jpg
+  const apiPath = imagePath.replace('/uploads/', '/api/images/');
+  
+  // Add cache busting timestamp
+  return `${apiPath}?t=${Date.now()}`;
+}

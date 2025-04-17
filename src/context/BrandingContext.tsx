@@ -32,6 +32,7 @@ export interface BrandingData {
     vision: string;
     team: TeamMember[];
   };
+  _fetchedAt?: number; // Timestamp when the data was fetched
 }
 
 // Create context with default empty values

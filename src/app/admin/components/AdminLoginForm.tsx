@@ -7,6 +7,7 @@ import { Loader2, Eye, EyeOff, ShieldCheck, Building } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useBranding } from "@/context/BrandingContext";
+import { getImageUrl } from "@/lib/utils";
 
 interface AdminLoginFormProps {
   adminUsername: string;
@@ -110,7 +111,7 @@ export default function AdminLoginForm({ adminUsername }: AdminLoginFormProps) {
               {branding.logoPath ? (
                 <div className="relative h-24 w-24 rounded-full overflow-hidden border-2 border-white shadow-sm">
                   <Image
-                    src={branding.logoPath}
+                    src={getImageUrl(branding.logoPath)}
                     alt={branding.brandName || 'Brand Logo'}
                     fill
                     className="object-cover"
