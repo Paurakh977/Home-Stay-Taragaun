@@ -191,16 +191,22 @@ export function UserTable() {
                   <TableCell>{formatDate(user.createdAt)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      <Link href={`/superadmin/dashboard/users/${user._id}`}>
+                        <Button size="icon" variant="ghost" className="h-8 w-8" title="View Details">
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </Link>
                       <Link href={`/superadmin/dashboard/users/edit/${user._id}`}>
-                        <Button size="icon" variant="ghost" className="h-8 w-8">
+                        <Button size="icon" variant="ghost" className="h-8 w-8" title="Edit Branding">
                           <Edit className="h-4 w-4" />
                         </Button>
                       </Link>
                       <Button 
                         size="icon" 
                         variant="ghost" 
-                        className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
                         onClick={() => setUserToDelete(user)}
+                        title="Delete User"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

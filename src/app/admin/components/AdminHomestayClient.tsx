@@ -432,8 +432,16 @@ export default function AdminHomestayClient({
   }, [homestays, searchQuery, selectedStatus, selectedProvince, selectedDistrict, selectedMunicipality, selectedType, addressData]);
 
   const handleRowClick = (homestayId: string) => {
+    // If we have the username from props, use it directly (for superadmin access)
+    if (propUsername) {
+      router.push(`/admin/${propUsername}/homestays/${homestayId}`);
+      console.log(`Navigating to /admin/${propUsername}/homestays/${homestayId}`);
+      return;
+    }
+    
+    // Otherwise check permissions and get from current user session
     if (hasPermission('homestayEdit')) {
-      // Use the same approach as handleEdit for consistent routing
+      // Get the current admin username from auth
       const getCurrentAdmin = async () => {
         try {
           const response = await fetch('/api/admin/auth/me');
@@ -525,7 +533,14 @@ export default function AdminHomestayClient({
 
   // Handle edit functionality
   const handleEdit = (homestayId: string) => {
-    // Check for edit permission before allowing
+    // If we have the username from props, use it directly (for superadmin access)
+    if (propUsername) {
+      router.push(`/admin/${propUsername}/homestays/${homestayId}`);
+      console.log(`Navigating to /admin/${propUsername}/homestays/${homestayId}`);
+      return;
+    }
+    
+    // Otherwise check permissions and get from current user session
     if (!hasPermission('homestayEdit')) {
       toast.error("You don't have permission to edit homestay details");
       return;

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import { User } from '@/lib/models';
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 
 interface RouteParams {
   params: {
@@ -82,10 +83,14 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       }, { status: 400 });
     }
 
-    // Special case: handle password update separately
+    // Special case: handle password update separately with proper hashing
     if (password) {
-      console.log('Updating password separately');
-      await User.findByIdAndUpdate(id, { password });
+      console.log('Updating password with proper hashing');
+      // Generate salt and hash the password
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+      // Update with hashed password
+      await User.findByIdAndUpdate(id, { password: hashedPassword });
     }
 
     console.log('Allowed updates:', allowedUpdates);
