@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Hotel, LogOut, PlusCircle } from 'lucide-react';
+import { Hotel, LogOut, PlusCircle, ListFilter, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { useBranding } from '@/context/BrandingContext';
@@ -19,6 +19,17 @@ const sidebarNavItems = [
     title: "Add Homestay",
     href: "register",
     icon: PlusCircle,
+  },
+  {
+    title: "Homestay Listing",
+    href: "/admin/homestay-listing",
+    icon: ListFilter,
+  },
+  {
+    title: "Change Password",
+    href: "/admin/change-password",
+    icon: KeyRound,
+    hideForSuperadmin: true,
   },
   // Add more admin sections here later if needed
 ];
@@ -110,7 +121,9 @@ export default function AdminSidebar({ username }: AdminSidebarProps) {
       </div>
       
       <nav className="p-2 flex-1">
-        {sidebarNavItems.map((item) => {
+        {sidebarNavItems
+          .filter(item => !item.hideForSuperadmin || !isSuperadmin)
+          .map((item) => {
           // Special case for "Add Homestay" to use the correct path format
           if (item.title === "Add Homestay") {
             const registerHref = adminUsername ? `/${adminUsername}/register` : "/register";
@@ -120,6 +133,48 @@ export default function AdminSidebar({ username }: AdminSidebarProps) {
               <Link
                 key={item.href}
                 href={registerHref}
+                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm my-1 transition-colors ${
+                  isActive
+                    ? "bg-gray-100 text-gray-900 font-medium"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                }`}
+              >
+                <item.icon className="h-4 w-4" />
+                <span>{item.title}</span>
+              </Link>
+            );
+          }
+
+          // Special case for "Homestay Listing"
+          if (item.title === "Homestay Listing") {
+            const listingHref = adminUsername ? `/admin/${adminUsername}/homestay-listing` : "/admin/homestay-listing";
+            const isActive = pathname === listingHref || pathname.startsWith(listingHref);
+            
+            return (
+              <Link
+                key={item.href}
+                href={listingHref}
+                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm my-1 transition-colors ${
+                  isActive
+                    ? "bg-gray-100 text-gray-900 font-medium"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                }`}
+              >
+                <item.icon className="h-4 w-4" />
+                <span>{item.title}</span>
+              </Link>
+            );
+          }
+
+          // Special case for "Change Password"
+          if (item.title === "Change Password") {
+            const passwordHref = adminUsername ? `/admin/${adminUsername}/change-password` : "/admin/change-password";
+            const isActive = pathname === passwordHref || pathname.startsWith(passwordHref);
+            
+            return (
+              <Link
+                key={item.href}
+                href={passwordHref}
                 className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm my-1 transition-colors ${
                   isActive
                     ? "bg-gray-100 text-gray-900 font-medium"
