@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Hotel, LogOut, PlusCircle, ListFilter, KeyRound } from 'lucide-react';
+import { Hotel, LogOut, PlusCircle, ListFilter, KeyRound, Users, ChevronDown, ChevronUp, UserPlus, UserCog } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { useBranding } from '@/context/BrandingContext';
@@ -34,6 +34,20 @@ const sidebarNavItems = [
   // Add more admin sections here later if needed
 ];
 
+// New Officers dropdown items
+const officerItems = [
+  {
+    title: "Create Officer",
+    href: "/admin/officer/create",
+    icon: UserPlus,
+  },
+  {
+    title: "Manage Officers",
+    href: "/admin/officer/list",
+    icon: UserCog,
+  }
+];
+
 interface AdminSidebarProps {
   username?: string;
 }
@@ -45,6 +59,22 @@ export default function AdminSidebar({ username }: AdminSidebarProps) {
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const adminUsername = username || searchParams.get('username');
   const branding = useBranding();
+  const [officersDropdownOpen, setOfficersDropdownOpen] = useState(false);
+
+  // Check if any officer-related route is active
+  const isOfficersActive = officerItems.some(item => {
+    const itemHref = adminUsername ? 
+      `${item.href}/${adminUsername}` : 
+      item.href;
+    return pathname === itemHref || pathname.startsWith(itemHref);
+  });
+
+  // Automatically open dropdown if an officer-related route is active
+  useEffect(() => {
+    if (isOfficersActive) {
+      setOfficersDropdownOpen(true);
+    }
+  }, [isOfficersActive]);
 
   // Check if user is a superadmin
   useEffect(() => {
@@ -87,6 +117,11 @@ export default function AdminSidebar({ username }: AdminSidebarProps) {
 
   // Determine base path for links
   const adminBasePath = adminUsername ? `/admin/${adminUsername}` : "/admin";
+
+  // Toggle officers dropdown
+  const toggleOfficersDropdown = () => {
+    setOfficersDropdownOpen(!officersDropdownOpen);
+  };
 
   return (
     <aside className="h-full bg-white border-r border-gray-200 flex flex-col">
@@ -209,6 +244,52 @@ export default function AdminSidebar({ username }: AdminSidebarProps) {
             </Link>
           );
         })}
+
+        {/* Officers Dropdown Section */}
+        <div className="mt-2">
+          <button 
+            onClick={toggleOfficersDropdown}
+            className={`flex items-center justify-between w-full px-3 py-2 rounded-md text-sm my-1 transition-colors ${
+              isOfficersActive
+                ? "bg-gray-100 text-gray-900 font-medium"
+                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              <Users className="h-4 w-4" />
+              <span>Officers</span>
+            </div>
+            {officersDropdownOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </button>
+          
+          {/* Officers dropdown menu */}
+          {officersDropdownOpen && (
+            <div className="ml-2 pl-2 border-l border-gray-200 mt-1 mb-1 space-y-1">
+              {officerItems.map((item) => {
+                const itemHref = adminUsername ? 
+                  `/admin/${adminUsername}${item.href.replace('/admin', '')}` : 
+                  item.href;
+                
+                const isActive = pathname === itemHref || pathname.startsWith(itemHref);
+                
+                return (
+                  <Link
+                    key={item.title}
+                    href={itemHref}
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                      isActive
+                        ? "bg-gray-100 text-gray-900 font-medium"
+                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                    }`}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.title}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </nav>
       
       {/* Logout button */}

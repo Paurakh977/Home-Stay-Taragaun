@@ -8,6 +8,8 @@ export interface IUser extends Document {
   email: string; // Added email field
   contactNumber: string; // Added contact number field
   role: 'superadmin' | 'admin' | 'officer' | string; // Updated to include officer role
+  isActive?: boolean; // Whether the account is active
+  parentAdmin?: string; // For officers: reference to the admin they belong to
   permissions?: {
     // Admin Panel Permissions
     adminDashboardAccess?: boolean;
@@ -84,6 +86,13 @@ const userSchema = new Schema<IUser>(
       required: [true, 'Role is required'],
       enum: ['superadmin', 'admin', 'officer'], // Updated to include officer role
       default: 'admin', // Default role
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    parentAdmin: {
+      type: String,
     },
     permissions: {
       type: Map,

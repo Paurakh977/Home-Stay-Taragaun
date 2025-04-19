@@ -34,6 +34,9 @@ interface UserData {
   email: string;
   contactNumber: string;
   role: string;
+  isActive?: boolean;
+  parentAdmin?: string;
+  permissions?: Record<string, boolean>;
   logoPath?: string;
   sliderPaths?: string[];
   teamPhotoPaths?: string[];
@@ -105,6 +108,11 @@ export async function createUser(userData: UserData) {
     // Hash password
     if (userData.password) {
       userData.password = await hashPassword(userData.password);
+    }
+
+    // For officer roles, ensure parentAdmin is set
+    if (userData.role === "officer" && !userData.parentAdmin) {
+      throw new Error("Officer must have a parent admin");
     }
 
     // Handle branding data for admin users
