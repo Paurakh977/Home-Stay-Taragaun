@@ -3,6 +3,7 @@ import dbConnect from '@/lib/mongodb';
 import User from '@/lib/models/User';
 import { createUser } from '@/lib/services/userService';
 import { verifyAdminToken } from '@/lib/auth';
+import bcrypt from 'bcryptjs';
 
 // Define interface for officer data
 interface OfficerData {
@@ -238,10 +239,15 @@ async function createOfficerWithAdmin(admin: AdminUser, officerData: OfficerData
   
   console.log('Final permissions:', JSON.stringify(allowedPermissions));
   
-  // Create officer data
+  // FIXED: Don't hash the password here, let the User model handle it
+  console.log('OFFICER CREATE: Setting up password');
+  console.log(`OFFICER CREATE: Password length: ${password.length}`);
+  console.log(`OFFICER CREATE: Password starts with: ${password.substring(0, 2)}`);
+  
+  // Create officer data - passing the raw password to be hashed in Model's pre-save hook
   const officerDataForDB = {
     username,
-    password,
+    password,  // Pass raw password here, NOT hashed
     email,
     contactNumber,
     role: 'officer',
@@ -256,10 +262,26 @@ async function createOfficerWithAdmin(admin: AdminUser, officerData: OfficerData
   }));
   
   try {
-    // Create the officer
+    // Create the officer - password will be hashed in the User model
     const newOfficer = await createUser(officerDataForDB);
     
     console.log(`Officer created successfully: ${newOfficer.username}`);
+    
+    // Verify the password was correctly set by testing it directly with the same
+    // method used during login
+    console.log('VERIFICATION: Testing password with bcrypt.compare');
+    const savedOfficer = await User.findById(newOfficer._id).select('+password');
+    if (savedOfficer) {
+      const passwordCheck = await bcrypt.compare(password, savedOfficer.password);
+      console.log(`VERIFICATION: Original password verification: ${passwordCheck}`);
+      
+      // If it doesn't match, log details for debugging
+      if (!passwordCheck) {
+        console.error('CRITICAL ERROR: Password doesn\'t match after creation!');
+        console.log(`Original password length: ${password.length}`);
+        console.log(`Stored hash: ${savedOfficer.password}`);
+      }
+    }
     
     return NextResponse.json({
       success: true,

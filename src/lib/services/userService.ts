@@ -4,8 +4,18 @@ import bcrypt from 'bcryptjs'; // Use bcryptjs instead of bcrypt
 
 // Simple hash password function until we can find the proper import
 async function hashPassword(password: string): Promise<string> {
+  console.log('HASH DEBUG [userService]: Using hashPassword function');
+  console.log(`HASH DEBUG [userService]: Password length: ${password.length}`);
+  console.log(`HASH DEBUG [userService]: Password starts with: ${password.substring(0, 2)}...`);
+  
   const salt = await bcrypt.genSalt(10);
-  return bcrypt.hash(password, salt);
+  console.log(`HASH DEBUG [userService]: Generated salt: ${salt}`);
+  
+  const hashedPassword = await bcrypt.hash(password, salt);
+  console.log(`HASH DEBUG [userService]: Hashed password length: ${hashedPassword.length}`);
+  console.log(`HASH DEBUG [userService]: Hashed password starts with: ${hashedPassword.substring(0, 10)}...`);
+  
+  return hashedPassword;
 }
 
 // Define interfaces for better type safety
@@ -59,6 +69,8 @@ interface UserData {
     photo?: string;
   }>;
   branding?: any;
+  // Add flag to prevent double hashing
+  skipPasswordHashing?: boolean;
 }
 
 /**
@@ -103,11 +115,35 @@ export async function getUserByUsername(username: string) {
 // Create user function
 export async function createUser(userData: UserData) {
   try {
+    console.log('USER CREATE DEBUG: Starting user creation');
+    console.log(`USER CREATE DEBUG: Username: ${userData.username}, Role: ${userData.role}`);
+    
     await dbConnect();
 
-    // Hash password
+    // IMPORTANT: Fixed double hashing issue
     if (userData.password) {
-      userData.password = await hashPassword(userData.password);
+      console.log(`USER CREATE DEBUG: Raw password length: ${userData.password.length}`);
+      
+      // We need to check if we should skip password hashing (already pre-hashed)
+      if (!userData.skipPasswordHashing) {
+        console.log('USER CREATE DEBUG: Hashing password in userService');
+        
+        // If we're creating an officer, the password should NOT be hashed here
+        // because it will be hashed again in the User model pre-save hook
+        if (userData.role === "officer") {
+          // IMPORTANT: For officers, we'll set a flag on the data to skip the pre-save hook hashing
+          // This flag will be used by the model's pre-save hook
+          console.log('USER CREATE DEBUG: Officer role detected - setting _skipPasswordHashing flag');
+          // @ts-ignore - Add custom property to the data that will be checked in pre-save hook
+          userData._skipPasswordHashing = true;
+        } else {
+          // For non-officers, hash the password here
+          userData.password = await hashPassword(userData.password);
+          console.log(`USER CREATE DEBUG: Password hashed, new length: ${userData.password.length}`);
+        }
+      } else {
+        console.log('USER CREATE DEBUG: Password hashing skipped (already hashed)');
+      }
     }
 
     // For officer roles, ensure parentAdmin is set
@@ -171,9 +207,26 @@ export async function createUser(userData: UserData) {
     delete userData.story;
     delete userData.mission;
     delete userData.vision;
+    delete userData.skipPasswordHashing; // Remove this flag before saving
 
     // Create new user
+    console.log('USER CREATE DEBUG: Creating user in database');
     const newUser = await User.create(userData);
+    console.log(`USER CREATE DEBUG: User created with ID: ${newUser._id}`);
+    
+    // Verify password hash was saved correctly
+    const createdUser = await User.findById(newUser._id).select('+password');
+    if (createdUser) {
+      console.log('USER CREATE DEBUG: Password verification');
+      console.log(`USER CREATE DEBUG: Final password hash in DB: ${createdUser.password.substring(0, 10)}...`);
+      
+      // If the original plain password was provided, test it
+      if (userData.password && userData.password.length < 30) { // Assuming plain passwords are shorter than 30 chars
+        const testResult = await bcrypt.compare(userData.password, createdUser.password);
+        console.log(`USER CREATE DEBUG: Test password verification result: ${testResult}`);
+      }
+    }
+    
     return newUser;
   } catch (error: unknown) {
     console.error("Error creating user:", error);

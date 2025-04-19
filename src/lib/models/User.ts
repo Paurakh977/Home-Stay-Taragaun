@@ -183,22 +183,57 @@ const userSchema = new Schema<IUser>(
 
 // Pre-save hook to hash password before saving
 userSchema.pre<IUser>('save', async function (next) {
+  console.log(`PASSWORD DEBUG [${this.username}]: Pre-save hook called`);
+  
+  // Check for the skip flag (used in userService.createUser for officers)
+  // @ts-ignore - Check for our custom property
+  if (this._skipPasswordHashing) {
+    console.log(`PASSWORD DEBUG [${this.username}]: Skipping password hash due to _skipPasswordHashing flag`);
+    // @ts-ignore - Remove the flag so it doesn't get stored in DB
+    delete this._skipPasswordHashing;
+    return next();
+  }
+  
   // Only hash the password if it has been modified (or is new)
-  if (!this.isModified('password')) return next();
+  if (!this.isModified('password')) {
+    console.log(`PASSWORD DEBUG [${this.username}]: Password not modified, skipping hash`);
+    return next();
+  }
 
   try {
+    console.log(`PASSWORD DEBUG [${this.username}]: Hashing password started`);
+    console.log(`PASSWORD DEBUG [${this.username}]: Plain password length: ${this.password.length}`);
+    console.log(`PASSWORD DEBUG [${this.username}]: First two chars: ${this.password.substring(0, 2)}, Last two chars: ${this.password.substring(this.password.length - 2)}`);
+    
     // Generate a salt and hash the password
     const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
+    console.log(`PASSWORD DEBUG [${this.username}]: Generated salt: ${salt}`);
+    
+    const hashedPassword = await bcrypt.hash(this.password, salt);
+    console.log(`PASSWORD DEBUG [${this.username}]: Hashed password length: ${hashedPassword.length}`);
+    console.log(`PASSWORD DEBUG [${this.username}]: Hash prefix: ${hashedPassword.substring(0, 10)}...`);
+    
+    this.password = hashedPassword;
+    console.log(`PASSWORD DEBUG [${this.username}]: Password hashing completed`);
     next();
   } catch (error: any) {
+    console.error(`PASSWORD DEBUG [${this.username}]: Error hashing password:`, error);
     next(error);
   }
 });
 
 // Method to compare entered password with the hashed password
 userSchema.methods.comparePassword = async function (enteredPassword: string): Promise<boolean> {
-  return await bcrypt.compare(enteredPassword, this.password);
+  console.log(`PASSWORD COMPARE DEBUG [${this.username}]: Starting password comparison`);
+  console.log(`PASSWORD COMPARE DEBUG [${this.username}]: Entered password length: ${enteredPassword.length}`);
+  console.log(`PASSWORD COMPARE DEBUG [${this.username}]: First two chars: ${enteredPassword.substring(0, 2)}, Last two chars: ${enteredPassword.substring(enteredPassword.length - 2)}`);
+  console.log(`PASSWORD COMPARE DEBUG [${this.username}]: Stored hash length: ${this.password.length}`);
+  console.log(`PASSWORD COMPARE DEBUG [${this.username}]: Stored hash prefix: ${this.password.substring(0, 10)}...`);
+  
+  const isMatch = await bcrypt.compare(enteredPassword, this.password);
+  
+  console.log(`PASSWORD COMPARE DEBUG [${this.username}]: Password match result: ${isMatch}`);
+  return isMatch;
 };
 
 
