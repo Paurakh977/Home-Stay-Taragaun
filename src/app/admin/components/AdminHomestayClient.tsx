@@ -54,6 +54,12 @@ interface Homestay {
 interface AdminHomestayClientProps {
   username?: string;
   noSidebar?: boolean;
+  isOfficer?: boolean;
+  officerData?: {
+    username: string;
+    parentAdmin: string;
+    permissions: Record<string, boolean>;
+  } | null;
 }
 
 // Define permissions type
@@ -68,7 +74,9 @@ interface UserPermissions {
 
 export default function AdminHomestayClient({ 
   username: propUsername,
-  noSidebar = true
+  noSidebar = true,
+  isOfficer = false,
+  officerData = null
 }: AdminHomestayClientProps) {
   const [homestays, setHomestays] = useState<Homestay[]>([]);
   const [filteredHomestays, setFilteredHomestays] = useState<Homestay[]>([]);
@@ -112,6 +120,15 @@ export default function AdminHomestayClient({
     const checkAuth = async () => {
       try {
         console.log("Client: Starting authentication check");
+
+        // If we're already authenticated as an officer, use their permissions
+        if (isOfficer && officerData) {
+          console.log('Client: Using officer authentication data');
+          
+          // Use the permissions provided by the officer data
+          setUserPermissions(officerData.permissions as UserPermissions);
+          return;
+        }
 
         // First try to check if there's a superadmin token
         const superadminResponse = await fetch('/api/superadmin/auth/me');
@@ -291,74 +308,63 @@ export default function AdminHomestayClient({
     }
   }, [selectedDistrict, addressData.districtMunicipalitiesMap, selectedMunicipality]);
 
-  // Fetch homestays
+  // Load homestays data
   useEffect(() => {
     const fetchHomestays = async () => {
+      if (!userPermissions) return; // Wait for permissions to be set
+      
       setLoading(true);
       setError(null);
+      
       try {
-        // Use the username from props
-        const queryUsername = propUsername;
+        // Determine which API endpoint to use based on whether we're using officer auth
+        const apiEndpoint = isOfficer
+          ? '/api/officer/homestays'
+          : '/api/admin/homestays';
+          
+        // Get the username to filter homestays by - either from props or from officer data
+        const username = propUsername || (isOfficer && officerData ? officerData.parentAdmin : undefined);
         
-        let username = null;
-        let isSuperadmin = false;
-        
-        // First check if user is a superadmin
-        const superadminResponse = await fetch('/api/superadmin/auth/me');
-        if (superadminResponse.ok) {
-          // Superadmin access
-          isSuperadmin = true;
-          username = queryUsername; // Use the username from props
-          
-          if (!username) {
-            throw new Error('Admin username required for superadmin access');
-          }
-        } else {
-          // Regular admin access - get username from auth data
-          const authResponse = await fetch('/api/admin/auth/me');
-          if (!authResponse.ok) {
-            router.push('/admin/login');
-            return;
-          }
-          
-          const authData = await authResponse.json();
-          username = authData.user?.username;
-          
-          if (!username) {
-            throw new Error('Username not found in auth data');
-          }
+        if (!username) {
+          setError("Missing admin username");
+          setLoading(false);
+          return;
         }
+          
+        const url = `${apiEndpoint}?adminUsername=${encodeURIComponent(username)}`;
+        console.log(`Client: Fetching homestays from ${url}`);
         
-        // Fetch homestays for the specified admin
-        const response = await fetch(`/api/admin/homestays?adminUsername=${username}`);
+        const response = await fetch(url);
+        
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `Failed to fetch homestays: ${response.statusText}`);
+          throw new Error(`Failed to fetch homestays. Status: ${response.status}`);
         }
         
         const data = await response.json();
-        if (data.success) {
-          // Use || [] for safety
-          const homestayData = data.homestays || []; 
-          setHomestays(homestayData as Homestay[]); 
-          setFilteredHomestays(homestayData as Homestay[]);
-        } else {
-          throw new Error(data.error || 'API request failed');
+        
+        if (!data.success) {
+          throw new Error(data.error || "Failed to fetch homestays");
         }
+        
+        // Process the homestays data
+        const fetchedHomestays = data.homestays || [];
+        setHomestays(fetchedHomestays);
+        setFilteredHomestays(fetchedHomestays);
+        
+        console.log(`Client: Loaded ${fetchedHomestays.length} homestays`);
       } catch (err) {
-        console.error("Fetch error:", err);
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
-        // Explicitly set to empty arrays on error
-        setHomestays([]); 
-        setFilteredHomestays([]); 
+        console.error("Client: Error fetching homestays:", err);
+        setError(err instanceof Error ? err.message : String(err));
       } finally {
         setLoading(false);
       }
     };
     
-    fetchHomestays();
-  }, [router, propUsername]);
-  
+    if (userPermissions) {
+      fetchHomestays();
+    }
+  }, [propUsername, userPermissions, isOfficer, officerData]);
+
   // Apply filters and search
   useEffect(() => {
     let results = [...homestays];
@@ -431,47 +437,44 @@ export default function AdminHomestayClient({
     setFilteredHomestays(results);
   }, [homestays, searchQuery, selectedStatus, selectedProvince, selectedDistrict, selectedMunicipality, selectedType, addressData]);
 
+  // Handle row click to navigate to homestay detail
   const handleRowClick = (homestayId: string) => {
-    // If we have the username from props, use it directly (for superadmin access)
-    if (propUsername) {
-      router.push(`/admin/${propUsername}/homestays/${homestayId}`);
-      console.log(`Navigating to /admin/${propUsername}/homestays/${homestayId}`);
+    // If we're operating as an officer, use the officer routes
+    if (isOfficer && officerData?.parentAdmin) {
+      const adminUsername = officerData.parentAdmin;
+      router.push(`/officer/${adminUsername}/homestays/${homestayId}`);
       return;
     }
     
-    // Otherwise check permissions and get from current user session
-    if (hasPermission('homestayEdit')) {
-      // Get the current admin username from auth
-      const getCurrentAdmin = async () => {
-        try {
-          const response = await fetch('/api/admin/auth/me');
-          if (!response.ok) {
-            toast.error("Authentication failed");
-            return;
-          }
-          
-          const data = await response.json();
-          if (data.success && data.user) {
-            const currentAdminUsername = data.user.username;
-            
-            // Route to the admin-specific URL that includes the admin username
-            router.push(`/admin/${currentAdminUsername}/homestays/${homestayId}`);
-            
-            // Log for debugging
-            console.log(`Navigating to /admin/${currentAdminUsername}/homestays/${homestayId}`);
-          } else {
-            toast.error("Failed to retrieve admin details");
-          }
-        } catch (error) {
-          console.error("Error checking admin permissions:", error);
-          toast.error("Failed to verify permissions");
+    // Otherwise use standard admin routes
+    // Determine if we should use the admin username route
+    const getCurrentAdmin = async () => {
+      try {
+        if (propUsername) {
+          router.push(`/admin/${propUsername}/homestays/${homestayId}`);
+          return;
         }
-      };
-      
-      getCurrentAdmin();
-    } else {
-      toast.error("You don't have permission to edit homestay details");
-    }
+        
+        const response = await fetch('/api/admin/auth/me');
+        if (response.ok) {
+          const data = await response.json();
+          const username = data.user?.username;
+          
+          if (username) {
+            router.push(`/admin/${username}/homestays/${homestayId}`);
+          } else {
+            router.push(`/admin/homestays/${homestayId}`);
+          }
+        } else {
+          router.push(`/admin/homestays/${homestayId}`);
+        }
+      } catch (error) {
+        console.error('Error getting current admin:', error);
+        router.push(`/admin/homestays/${homestayId}`);
+      }
+    };
+    
+    getCurrentAdmin();
   };
 
   // Clear all filters
@@ -493,42 +496,63 @@ export default function AdminHomestayClient({
     }
   };
   
-  // Logout function
+  // Handle logout for both admin and officer
   const handleLogout = async () => {
     try {
-      console.log('Client: Logging out...');
-      // Call the logout API endpoint
-      const response = await fetch('/api/admin/auth/logout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const endpoint = isOfficer ? '/api/officer/auth/logout' : '/api/admin/auth/logout';
       
-      if (response.ok) {
-        console.log('Client: Logout successful');
-        toast.success("Logged out successfully");
+      // Try the server-side logout first
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
         
-        // Clear the cookie client-side too for immediate effect
-        document.cookie = "auth_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-        
-        // Redirect to login
-        router.push('/admin/login');
-      } else {
-        console.error('Client: Logout failed');
-        toast.error("Logout failed");
+        if (response.ok) {
+          toast.success('Logged out successfully');
+        } else {
+          console.warn(`Server-side logout (${endpoint}) returned error:`, response.status);
+          // Continue with client-side fallback
+        }
+      } catch (fetchError) {
+        console.warn(`Server-side logout (${endpoint}) failed, using client-side fallback:`, fetchError);
+        // Continue with client-side fallback
       }
+      
+      // Client-side fallback - clear cookies directly
+      document.cookie = "officer_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      document.cookie = "auth_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      
+      if (isOfficer) {
+        // Redirect to officer login
+        router.push('/officer/login');
+      } else {
+        // Redirect to admin login
+        router.push('/admin/login');
+      }
+      
     } catch (error) {
-      console.error('Client: Logout error:', error);
-      toast.error("Error during logout");
+      console.error('Logout error:', error);
+      toast.error('Logout failed');
+      
+      // Last resort fallback - just redirect to login
+      setTimeout(() => {
+        window.location.href = isOfficer ? '/officer/login' : '/admin/login';
+      }, 1000);
     }
   };
 
-  // Check if current user has a specific permission
+  // Check user permissions
   const hasPermission = (permission: keyof UserPermissions): boolean => {
-    // If we don't know the user's permissions yet, default to false
-    if (!userPermissions) return false;
-    return userPermissions[permission] === true;
+    // If operating as an officer, use officer permissions
+    if (isOfficer && officerData) {
+      return !!officerData.permissions[permission];
+    }
+    
+    // Otherwise use admin permissions
+    return userPermissions ? !!userPermissions[permission] : false;
   };
 
   // Handle edit functionality

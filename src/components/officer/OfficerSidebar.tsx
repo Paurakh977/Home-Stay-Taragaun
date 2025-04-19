@@ -69,19 +69,44 @@ export default function OfficerSidebar({ adminUsername, officerUsername }: Offic
 
   const handleLogout = async () => {
     try {
-      const response = await fetch("/api/officer/auth/logout", {
-        method: "POST",
-      });
-      
-      if (response.ok) {
-        toast.success("Logged out successfully");
-        router.push(adminUsernameValue ? `/officer/${adminUsernameValue}/login` : "/officer/login");
-      } else {
-        throw new Error("Logout failed");
+      // Try the server-side logout first
+      try {
+        const response = await fetch("/api/officer/auth/logout", {
+          method: "POST",
+          // Add headers to help with fetch request
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+        
+        if (response.ok) {
+          toast.success("Logged out successfully");
+        } else {
+          console.warn("Server-side logout returned error:", response.status);
+          // Continue with client-side fallback
+        }
+      } catch (fetchError) {
+        console.warn("Server-side logout failed, using client-side fallback:", fetchError);
+        // Continue with client-side fallback
       }
+      
+      // Client-side fallback - clear cookies directly
+      document.cookie = "officer_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      document.cookie = "auth_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      
+      // Navigate to login page
+      router.push(adminUsernameValue ? `/officer/${adminUsernameValue}/login` : "/officer/login");
+      
     } catch (error) {
       console.error("Logout error:", error);
       toast.error("Failed to logout. Please try again.");
+      
+      // Last resort fallback - just redirect to login
+      setTimeout(() => {
+        window.location.href = adminUsernameValue ? 
+          `/officer/${adminUsernameValue}/login` : 
+          "/officer/login";
+      }, 1000);
     }
   };
 

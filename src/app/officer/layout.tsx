@@ -62,6 +62,51 @@ export default function OfficerLayout({
           observer.observe(document.body, { childList: true, subtree: true });
         `}
       </Script>
+      
+      {/* Error recovery for fetch errors */}
+      <Script id="fetch-error-recovery" strategy="afterInteractive">
+        {`
+          // Global error handler for fetch errors, especially ERR_CONNECTION_REFUSED
+          window.addEventListener('error', function(event) {
+            // Check if it's a network error
+            if (
+              event.message && (
+                event.message.includes('Failed to fetch') || 
+                event.message.includes('NetworkError') ||
+                event.message.includes('ERR_CONNECTION_REFUSED')
+              )
+            ) {
+              console.warn('Network error detected, handling gracefully:', event.message);
+              
+              // Prevent default error behavior to avoid crashing the app
+              event.preventDefault();
+              
+              // Check if we're on an officer page
+              const isOfficerPage = window.location.pathname.includes('/officer');
+              
+              // Check if we need to handle logout errors
+              if (
+                event.error && 
+                event.error.stack && 
+                (
+                  event.error.stack.includes('handleLogout') || 
+                  event.error.stack.includes('logout')
+                )
+              ) {
+                console.warn('Logout error detected, clearing cookies client-side');
+                // Clear cookies client-side
+                document.cookie = "officer_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+                document.cookie = "auth_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+                
+                // Force redirect to login after a brief delay
+                setTimeout(() => {
+                  window.location.href = '/officer/login';
+                }, 1000);
+              }
+            }
+          });
+        `}
+      </Script>
 
       <Suspense fallback={<LoadingFallback />}>
         <OfficerClientWrapper>

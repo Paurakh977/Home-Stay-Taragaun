@@ -86,10 +86,13 @@ export default function OfficerHomestayClient({
   }
 
   // If verification passed, reuse the AdminHomestayClient but with the parent admin's username
+  // and specify that this is being used by an officer
   return (
     <AdminHomestayClient 
       username={officerData?.parentAdmin} 
-      noSidebar={noSidebar} 
+      noSidebar={noSidebar}
+      isOfficer={true}
+      officerData={officerData}
     />
   );
 }
