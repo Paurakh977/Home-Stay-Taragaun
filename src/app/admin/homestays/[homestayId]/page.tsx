@@ -8,6 +8,7 @@ import Link from 'next/link';
 // Remove the import from '@/types/homestay' if HomestayData is defined below
 // import { HomestayData } from '@/types/homestay'; 
 import { CheckCircle, XCircle, ArrowLeft, FileText, Loader2, ExternalLink, MapPin, Phone, User, Mail, Building, Globe, Image as ImageIcon, File as FileIcon, List, Edit, Plus, X, Upload, Eye, Download, Trash2, AlertCircle } from 'lucide-react';
+import { useAdminOfficer } from '@/context/AdminOfficerContext';
 
 // --- Comprehensive Type Definition (Move to types/homestay.ts if preferred) ---
 
@@ -248,29 +249,90 @@ const EditableInfoItem: React.FC<{
 };
 
 export default function AdminHomestayDetailPage() { 
-  // Get params safely from Next.js useParams hook
-  const params = useParams();
-  const homestayId = params.homestayId as string;
   const router = useRouter();
-  
-  const [homestay, setHomestay] = useState<HomestayData | null>(null);
+  const params = useParams<{ homestayId: string }>();
+  const homestayId = params?.homestayId || '';
   const [loading, setLoading] = useState(true);
+  const [homestay, setHomestay] = useState<HomestayData | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedHomestay, setEditedHomestay] = useState<HomestayData | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [isDeletingDocument, setIsDeletingDocument] = useState(false);
+  const [documentIndexToDelete, setDocumentIndexToDelete] = useState<number | null>(null);
+  const [documentToUpload, setDocumentToUpload] = useState<DocumentInfo[]>([]);
+  const [isUploadingDocuments, setIsUploadingDocuments] = useState(false);
+  const [isConfirmingDocumentDelete, setIsConfirmingDocumentDelete] = useState(false);
+  const [newDocumentFiles, setNewDocumentFiles] = useState<{
+    [key: string]: File[];
+  }>({});
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [updateError, setUpdateError] = useState<string | null>(null);
   
-  // Permission state
-  const [userPermissions, setUserPermissions] = useState<Record<string, boolean>>({});
-  const [permissionChecked, setPermissionChecked] = useState(false);
+  // Use the AdminOfficerContext to check if we're in officer context
+  const { isOfficer, officerData } = useAdminOfficer();
   
-  // Admin username from URL
+  const [permissionChecked, setPermissionChecked] = useState(false);
+  const [userPermissions, setUserPermissions] = useState<Record<string, boolean>>({});
   const [adminUsername, setAdminUsername] = useState<string | null>(null);
   
   // Check permissions on page load
   useEffect(() => {
     const checkPermissions = async () => {
       try {
-        // Check if user has permission to edit homestays
+        // If we're in officer mode, use the officer's permissions
+        if (isOfficer && officerData) {
+          console.log("Using officer permissions from context:", officerData);
+          setUserPermissions(officerData.permissions);
+          setAdminUsername(officerData.parentAdmin);
+          
+          // Check for edit permission - required to view this page
+          const canEdit = officerData.permissions.homestayEdit === true;
+          if (!canEdit) {
+            toast.error("You don't have permission to edit homestay details");
+            router.push(`/officer/${officerData.parentAdmin}`);
+            return;
+          }
+          
+          // Now fetch the homestay to check ownership
+          try {
+            // Use officer-specific endpoint to fetch homestay
+            const homestayResponse = await fetch(`/api/officer/homestays/${homestayId}`);
+            if (!homestayResponse.ok) {
+              toast.error("Failed to fetch homestay details");
+              router.push(`/officer/${officerData.parentAdmin}`);
+              return;
+            }
+            
+            const homestayData = await homestayResponse.json();
+            if (!homestayData.success || !homestayData.data) {
+              toast.error("Invalid homestay data");
+              router.push(`/officer/${officerData.parentAdmin}`);
+              return;
+            }
+            
+            // Check if this homestay belongs to the officer's admin
+            if (homestayData.data.adminUsername && 
+                homestayData.data.adminUsername !== officerData.parentAdmin) {
+              toast.error("You don't have permission to edit another admin's homestay");
+              router.push(`/officer/${officerData.parentAdmin}`);
+              return;
+            }
+          } catch (error) {
+            console.error("Error fetching homestay data:", error);
+            toast.error("Failed to validate homestay access");
+            router.push(`/officer/${officerData.parentAdmin}`);
+            return;
+          }
+          
+          // Mark permissions as checked
+          setPermissionChecked(true);
+          return;
+        }
+        
+        // Regular admin flow - Check if user has permission to edit homestays
         const response = await fetch('/api/admin/auth/me');
         if (!response.ok) {
           toast.error("Authentication failed. Please log in again.");
@@ -343,22 +405,24 @@ export default function AdminHomestayDetailPage() {
       } catch (error) {
         console.error("Permission check error:", error);
         toast.error("Failed to verify permissions");
-        router.push('/admin');
+        if (isOfficer && officerData) {
+          router.push(`/officer/${officerData.parentAdmin}`);
+        } else {
+          router.push('/admin');
+        }
       }
     };
     
     checkPermissions();
-  }, [router, homestayId]);
+  }, [router, homestayId, isOfficer, officerData]);
   
   // Helper function to check permissions
   const hasPermission = (permission: string): boolean => {
     return userPermissions[permission] === true;
   };
   
-  // Inline editing state
-  const [isEditing, setIsEditing] = useState(false);
+  // Inline editing state (integrating with isEditing and isSaving above)
   const [editedData, setEditedData] = useState<Partial<HomestayData>>({});
-  const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   
   // Location dropdown data
@@ -421,7 +485,12 @@ export default function AdminHomestayDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/admin/homestays/${homestayId}`);
+      // Use appropriate API endpoint based on user role
+      const apiUrl = isOfficer && officerData 
+        ? `/api/officer/homestays/${homestayId}`
+        : `/api/admin/homestays/${homestayId}`;
+        
+      const response = await fetch(apiUrl);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || `Failed to fetch details: ${response.statusText}`);
@@ -465,7 +534,7 @@ export default function AdminHomestayDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [homestayId]);
+  }, [homestayId, isOfficer, officerData]);
 
   useEffect(() => {
     if (homestayId) {
@@ -568,7 +637,12 @@ export default function AdminHomestayDetailPage() {
     setUpdateStatus('loading');
     setUpdateError(null);
     try {
-      const response = await fetch(`/api/admin/homestays/${homestayId}`, {
+      // Use appropriate API endpoint based on user role
+      const apiUrl = isOfficer && officerData 
+        ? `/api/officer/homestays/${homestayId}`
+        : `/api/admin/homestays/${homestayId}`;
+        
+      const response = await fetch(apiUrl, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
@@ -860,8 +934,13 @@ export default function AdminHomestayDetailPage() {
       
       console.log('Saving changes:', updateData);
       
+      // Use appropriate API endpoint based on user role
+      const apiUrl = isOfficer && officerData 
+        ? `/api/officer/homestays/${homestayId}/update`
+        : `/api/admin/homestays/${homestayId}/update`;
+      
       // Save changes via API
-      const response = await fetch(`/api/admin/homestays/${homestayId}/update`, {
+      const response = await fetch(apiUrl, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updateData),

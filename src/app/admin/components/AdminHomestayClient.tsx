@@ -442,6 +442,7 @@ export default function AdminHomestayClient({
     // If we're operating as an officer, use the officer routes
     if (isOfficer && officerData?.parentAdmin) {
       const adminUsername = officerData.parentAdmin;
+      // Use the direct route for officer homestay details
       router.push(`/officer/${adminUsername}/homestays/${homestayId}`);
       return;
     }
