@@ -5,20 +5,37 @@ import { User } from '@/lib/models';
 // We will add middleware later to verify the JWT and check the role
 
 // GET handler to fetch all users
-export async function GET() {
+export async function GET(request: Request) {
   await dbConnect();
 
   try {
-    // Find all users and sort by creation date (newest first)
-    const users = await User.find({})
+    // Parse URL to get query parameters
+    const { searchParams } = new URL(request.url);
+    const role = searchParams.get('role');
+    
+    // Build query object based on parameters
+    const query: Record<string, any> = {};
+    if (role) {
+      query.role = role;
+      console.log(`Filtering users by role: ${role}`);
+    }
+
+    // Find users with the query and sort by creation date (newest first)
+    const users = await User.find(query)
       .select('-password') // Exclude the password field
       .sort({ createdAt: -1 });
 
-    // Return the users as JSON
-    return NextResponse.json({ users }, { status: 200 });
+    console.log(`Found ${users.length} users${role ? ` with role ${role}` : ''}`);
+    
+    // Return the users as JSON with success flag
+    return NextResponse.json({ 
+      success: true,
+      users 
+    }, { status: 200 });
   } catch (error) {
     console.error('Error fetching users:', error);
     return NextResponse.json({ 
+      success: false,
       message: 'Failed to fetch users', 
       error: (error as Error).message 
     }, { status: 500 });
