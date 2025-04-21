@@ -10,7 +10,12 @@ const officialSchema = new Schema(
     },
     name: { type: String, required: true },
     role: { type: String, required: true },
-    contactNo: { type: String, required: true }
+    contactNo: { type: String, required: true },
+    gender: { 
+      type: String, 
+      enum: ['male', 'female', 'other'],
+      default: 'male'
+    }
   },
   {
     timestamps: true,

@@ -10,6 +10,9 @@ interface Official {
 
 interface CommitteeData {
   officials: Official[];
+  operatorName?: string; // Added for Homestay Operator
+  operatorGender?: string; // Added for Homestay Operator gender
+  operatorContactNo?: string; // Added for Homestay Operator contact number
 }
 
 type CommitteeOfficialsProps = {
@@ -55,6 +58,12 @@ const CommitteeOfficials: React.FC<CommitteeOfficialsProps> = ({ formData, updat
     handleOfficialChange(index, "contactNo", formattedValue);
   };
 
+  // Handle operator phone number input with formatting
+  const handleOperatorPhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formattedValue = formatPhoneNumber(e.target.value);
+    updateFormData({ operatorContactNo: formattedValue });
+  };
+
   // Add a new official
   const addOfficial = () => {
     updateFormData({
@@ -70,6 +79,16 @@ const CommitteeOfficials: React.FC<CommitteeOfficialsProps> = ({ formData, updat
     }
   };
 
+  // Handle operator change
+  const handleOperatorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    updateFormData({ operatorName: e.target.value });
+  };
+
+  // Handle operator gender change
+  const handleOperatorGenderChange = (gender: string) => {
+    updateFormData({ operatorGender: gender });
+  };
+
   return (
     <div className="space-y-6">
       <div className="mb-4">
@@ -81,6 +100,113 @@ const CommitteeOfficials: React.FC<CommitteeOfficialsProps> = ({ formData, updat
           At least one official with complete information is required.
         </p>
       </div>
+
+      {/* Homestay Operator Section - Visually distinct */}
+      <div className="border border-blue-300 bg-blue-50 rounded-md p-5 mb-6">
+        <h3 className="text-lg font-medium text-blue-900 mb-4 border-b border-blue-200 pb-2">
+          Homestay Operator Information (सञ्चालकको विवरण)
+          <span className="text-red-500 ml-1">*</span>
+        </h3>
+        
+        <div className="grid grid-cols-1 gap-4">
+          {/* Operator Name */}
+          <div>
+            <label htmlFor="operatorName" className="block text-sm font-medium text-gray-700 mb-1">
+              Homestay Operator's Name (सञ्चालकको नाम)
+              <span className="text-red-500 ml-1">*</span>
+            </label>
+            <input
+              type="text"
+              id="operatorName"
+              value={formData.operatorName || ''}
+              onChange={handleOperatorChange}
+              className={`mt-1 block w-full px-3 py-2 bg-white border ${
+                !formData.operatorName ? 'border-red-300' : 'border-gray-300'
+              } rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary`}
+              required
+            />
+            {!formData.operatorName && 
+              <p className="mt-1 text-xs text-red-500">This field is required</p>
+            }
+          </div>
+
+          {/* Operator Contact Number */}
+          <div>
+            <label htmlFor="operatorContactNo" className="block text-sm font-medium text-gray-700 mb-1">
+              Contact No/सम्पर्क नं.
+              <span className="text-red-500 ml-1">*</span>
+            </label>
+            <input
+              type="tel"
+              id="operatorContactNo"
+              value={formData.operatorContactNo || '+977'}
+              onChange={handleOperatorPhoneChange}
+              className={`mt-1 block w-full px-3 py-2 bg-white border ${
+                (!formData.operatorContactNo || formData.operatorContactNo === '+977') ||
+                (formData.operatorContactNo && !isValidPhoneNumber(formData.operatorContactNo))
+                  ? 'border-red-300' 
+                  : 'border-gray-300'
+              } rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary`}
+              placeholder="+977"
+              required
+            />
+            {(!formData.operatorContactNo || formData.operatorContactNo === '+977') && 
+              <p className="mt-1 text-xs text-red-500">This field is required</p>
+            }
+            {formData.operatorContactNo && formData.operatorContactNo !== "+977" && !isValidPhoneNumber(formData.operatorContactNo) && 
+              <p className="mt-1 text-xs text-red-500">Please enter a valid Nepali phone number (+977 followed by 10 digits)</p>
+            }
+            <p className="mt-1 text-xs text-gray-500">Format: +977 followed by 10 digits (e.g. +9779812345678)</p>
+          </div>
+
+          {/* Operator Gender */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Operator's Gender (सञ्चालकको लिङ्ग)
+              <span className="text-red-500 ml-1">*</span>
+            </label>
+            <div className="flex gap-6 mt-2">
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  name="operatorGender"
+                  checked={formData.operatorGender === 'male' || !formData.operatorGender}
+                  onChange={() => handleOperatorGenderChange('male')}
+                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 mr-2"
+                />
+                <span>Male (पुरुष)</span>
+              </label>
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  name="operatorGender"
+                  checked={formData.operatorGender === 'female'}
+                  onChange={() => handleOperatorGenderChange('female')}
+                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 mr-2"
+                />
+                <span>Female (महिला)</span>
+              </label>
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  name="operatorGender"
+                  checked={formData.operatorGender === 'other'}
+                  onChange={() => handleOperatorGenderChange('other')}
+                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 mr-2"
+                />
+                <span>Other (अन्य)</span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <p className="mt-3 text-sm text-blue-700">
+          <strong>Note:</strong> This is the main operator/owner of the homestay, separate from officials below.
+        </p>
+      </div>
+
+      <h3 className="text-lg font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
+        Committee Officials (समितिका पदाधिकारीहरू)
+      </h3>
 
       {formData.officials.map((official, index) => (
         <div key={index} className="border border-gray-200 rounded-md p-5 mb-4">

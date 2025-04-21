@@ -27,6 +27,9 @@ type FormData = {
   directions?: string; // Optional written directions
   
   // Page 3
+  operatorName: string; // Added for Homestay Operator
+  operatorGender: string; // Added for Homestay Operator gender
+  operatorContactNo: string; // Added for Homestay Operator contact number
   officials: {
     name: string;
     role: string;
@@ -86,6 +89,9 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
     bedCount: 1,
     homeStayType: "community", // Default to community
     directions: "", // Initialize directions as empty string
+    operatorName: "", // Initialize operator name
+    operatorGender: "male", // Initialize operator gender with default
+    operatorContactNo: "+977", // Initialize operator contact number
     officials: [{ name: "", role: "", contactNo: "+977" }],
     province: "",
     district: "",
@@ -176,6 +182,12 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
     if (formData.homeCount < 1) errors.push("Home Count must be at least 1");
     if (formData.roomCount < 1) errors.push("Room Count must be at least 1");
     if (formData.bedCount < 1) errors.push("Bed Count must be at least 1");
+    
+    // Homestay Operator (step 3)
+    if (!formData.operatorName) errors.push("Homestay Operator's Name is required");
+    if (!formData.operatorContactNo || formData.operatorContactNo === "+977" || !isValidPhoneNumber(formData.operatorContactNo)) {
+      errors.push("Valid Homestay Operator contact number is required");
+    }
     
     // Committee Officials (step 3)
     const hasCompleteOfficial = formData.officials.some(
@@ -287,9 +299,23 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
       
       console.log('Submitting form data...');
       
-      // Include the adminUsername in the request data if provided
+      // Add operator as an official with role "operator"
+      const allOfficials = [
+        { 
+          name: formData.operatorName, 
+          role: 'operator', 
+          contactNo: formData.operatorContactNo,
+          gender: formData.operatorGender 
+        },
+        ...formData.officials
+      ];
+      
+      // Create request body without the separate operator fields to avoid duplication
+      const { operatorName, operatorGender, operatorContactNo, ...formDataWithoutOperator } = formData;
+      
       const requestData = {
-        ...formData,
+        ...formDataWithoutOperator,
+        officials: allOfficials,
         adminUsername: adminUsername // Use the prop if available
       };
       
