@@ -172,7 +172,8 @@ export async function PUT(request: NextRequest, context: ParamsContext) {
             name: officialData.name,
             role: officialData.role,
             contactNo: officialData.contactNo,
-            email: officialData.email || ""
+            email: officialData.email || "",
+            gender: officialData.gender || "male"
           });
         });
       

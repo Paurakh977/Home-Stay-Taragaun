@@ -293,38 +293,67 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
 
   // Submit form to database
   const submitForm = async () => {
+    // Validate form before submission
+    validateForm();
+    
+    if (validationErrors.length > 0) {
+      setShowValidationErrors(true);
+      return;
+    }
+    
+    setIsSubmitting(true);
+    setSubmitError(null);
+    
     try {
-      setIsSubmitting(true);
-      setSubmitError(null);
+      // Map form data to the format expected by the API
+      const apiData = {
+        adminUsername,
+        homeStayName: formData.homeStayName,
+        villageName: formData.villageName,
+        homeCount: formData.homeCount,
+        roomCount: formData.roomCount,
+        bedCount: formData.bedCount,
+        homeStayType: formData.homeStayType,
+        directions: formData.directions,
+        
+        // Create an official for the operator (This is the important part we're fixing)
+        officials: [
+          // Add operator as an official with role 'operator'
+          {
+            name: formData.operatorName,
+            role: 'operator',
+            contactNo: formData.operatorContactNo,
+            gender: formData.operatorGender || 'male' // Explicitly include gender
+          },
+          // Add the rest of the regular officials
+          ...formData.officials
+        ],
+        
+        // Address information
+        province: formData.province,
+        district: formData.district,
+        municipality: formData.municipality,
+        ward: formData.ward,
+        city: formData.city,
+        tole: formData.tole,
+        
+        // Features
+        localAttractions: formData.localAttractions,
+        tourismServices: formData.tourismServices,
+        infrastructure: formData.infrastructure,
+        
+        // Contacts
+        contacts: formData.contacts
+      };
       
       console.log('Submitting form data...');
-      
-      // Add operator as an official with role "operator"
-      const allOfficials = [
-        { 
-          name: formData.operatorName, 
-          role: 'operator', 
-          contactNo: formData.operatorContactNo,
-          gender: formData.operatorGender 
-        },
-        ...formData.officials
-      ];
-      
-      // Create request body without the separate operator fields to avoid duplication
-      const { operatorName, operatorGender, operatorContactNo, ...formDataWithoutOperator } = formData;
-      
-      const requestData = {
-        ...formDataWithoutOperator,
-        officials: allOfficials,
-        adminUsername: adminUsername // Use the prop if available
-      };
       
       const response = await fetch('/api/homestays', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestData),
+        body: JSON.stringify(apiData),
       });
       
       // Check if the response is ok before trying to parse JSON

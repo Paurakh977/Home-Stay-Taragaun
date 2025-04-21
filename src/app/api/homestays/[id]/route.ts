@@ -462,7 +462,8 @@ export async function PUT(
             homestayId: homestayId,
             name: officialData.name,
             role: officialData.role,
-            contactNo: officialData.contactNo
+            contactNo: officialData.contactNo,
+            gender: officialData.gender || "male"
           });
         });
       

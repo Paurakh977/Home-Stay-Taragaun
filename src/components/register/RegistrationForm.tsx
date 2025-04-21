@@ -22,7 +22,7 @@ export default function RegistrationForm({ adminUsername }: RegistrationFormProp
     ward: '',
     city: '',
     tole: '',
-    officials: [{ name: '', role: '', contactNo: '' }],
+    officials: [{ name: '', role: '', contactNo: '', gender: 'male' }],
     contacts: [{ name: '', mobile: '', email: '' }],
     localAttractions: [],
     tourismServices: [],
@@ -46,7 +46,7 @@ export default function RegistrationForm({ adminUsername }: RegistrationFormProp
   const addOfficial = () => {
     setFormData({
       ...formData,
-      officials: [...formData.officials, { name: '', role: '', contactNo: '' }]
+      officials: [...formData.officials, { name: '', role: '', contactNo: '', gender: 'male' }]
     });
   };
   

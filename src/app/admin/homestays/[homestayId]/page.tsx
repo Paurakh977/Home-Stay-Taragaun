@@ -43,6 +43,7 @@ interface OfficialData {
   name?: string;       // Changed from fullName
   role?: string;       // Changed from position
   contactNo?: string; // Changed from contactNumber
+  gender?: string;    // Added gender field for operator
 }
 
 interface ContactData {
@@ -876,96 +877,46 @@ export default function AdminHomestayDetailPage() {
   
   // Save changes to the database
   const handleSaveChanges = async () => {
-    if (!homestay) return;
+    setIsSaving(true);
     
     try {
-      setIsSaving(true);
-      setSaveMessage(null);
+      const updateData = { 
+        ...editedData,
+        homestayId: homestay?.homestayId || ''
+      };
       
-      // Create update payload with only changed fields
-      const updateData: any = {};
-      
-      // Process each edited field
-      Object.entries(editedData).forEach(([key, value]) => {
-        // Special handling for address object to ensure proper structure
-        if (key === 'address') {
-          const originalAddress = homestay.address || {};
-          const editedAddress = value as any;
-          
-          // Only include address if something has changed
-          if (JSON.stringify(editedAddress) !== JSON.stringify(originalAddress)) {
-            updateData.address = editedAddress;
-          }
-        }
-        // Special handling for contacts and officials arrays
-        else if (key === 'contacts' || key === 'officials') {
-          // For arrays, we need to check if any element has changed
-          const originalArray = homestay[key as keyof HomestayData] as any[] || [];
-          const editedArray = value as any[];
-          
-          // Compare arrays by stringifying (not ideal but works for basic comparison)
-          if (JSON.stringify(editedArray) !== JSON.stringify(originalArray)) {
-            updateData[key] = editedArray;
-          }
-        }
-        // Handle features object with its arrays
-        else if (key === 'features') {
-          const originalFeatures = homestay.features || {};
-          const editedFeatures = value as any;
-          
-          if (JSON.stringify(editedFeatures) !== JSON.stringify(originalFeatures)) {
-            updateData.features = editedFeatures;
-          }
-        }
-        // Handle all other fields
-        else if (JSON.stringify(value) !== JSON.stringify(homestay[key as keyof HomestayData])) {
-          updateData[key] = value;
-        }
-      });
-      
-      // Skip if no changes
-      if (Object.keys(updateData).length === 0) {
-        setIsEditing(false);
-        setIsSaving(false);
-        setSaveMessage('No changes detected');
-        setTimeout(() => setSaveMessage(null), 2000);
-        return;
+      // Ensure all officials have required fields including gender
+      if (updateData.officials) {
+        updateData.officials = updateData.officials.map((official: OfficialData) => ({
+          ...official,
+          homestayId: homestay?.homestayId || '',
+          // Make sure gender is included for all officials, especially the operator
+          gender: official.gender || 'male'
+        }));
       }
       
-      console.log('Saving changes:', updateData);
-      
-      // Use appropriate API endpoint based on user role
-      const apiUrl = isOfficer && officerData 
-        ? `/api/officer/homestays/${homestayId}/update`
-        : `/api/admin/homestays/${homestayId}/update`;
-      
-      // Save changes via API
-      const response = await fetch(apiUrl, {
+      // API call to update homestay
+      const response = await fetch(`/api/admin/homestays/${params.homestayId}/update`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updateData),
       });
       
-      const data = await response.json();
-      
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to update homestay');
+        throw new Error(response.statusText);
       }
       
-      // Update local state with new data
-      setHomestay(data.homestay || {
-        ...homestay,
-        ...updateData
-      });
-      setEditedData({});
-      setSaveMessage('Changes saved successfully');
+      const data = await response.json();
       
-      // Exit edit mode
-      setTimeout(() => {
-        setIsEditing(false);
-        setSaveMessage(null);
-      }, 2000);
-      
+      if (data.success) {
+        setUpdateStatus('success');
+        setHomestay(prev => prev ? { ...prev, ...updateData } : null);
+        setEditedData({});
+        setSaveMessage('Changes saved successfully');
+        setTimeout(() => setSaveMessage(null), 2000);
+      } else {
+        throw new Error(data.error || 'Failed to update homestay');
+      }
     } catch (err) {
       console.error("Save error:", err);
       setSaveMessage(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -1996,6 +1947,107 @@ export default function AdminHomestayDetailPage() {
                </>
              )}
            </InfoSection>
+
+          {/* Homestay Operator Section */}
+          <InfoSection title="Homestay Operator" icon={User}>
+              {!isEditing ? (
+                <div className="space-y-3">
+                  {(homestay.officials || []).find(official => official.role === 'operator') ? (
+                    <div className="border-b border-gray-100 pb-2 last:border-b-0">
+                      {(() => {
+                        const operator = (homestay.officials || []).find(official => official.role === 'operator');
+                        return (
+                          <>
+                            <InfoItem label="Name" value={operator?.name} />
+                            <InfoItem label="Contact" value={operator?.contactNo} />
+                            <InfoItem label="Gender" value={operator?.gender} />
+                          </>
+                        );
+                      })()}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 italic">No operator registered.</p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {(() => {
+                    // Find operator in edited data or original data
+                    const operatorIndex = (editedData.officials || homestay.officials || [])
+                      .findIndex(official => official.role === 'operator');
+                    
+                    // If operator exists, show edit form
+                    if (operatorIndex !== -1) {
+                      // Fix the possible undefined error with proper null checks and fallback to empty array
+                      const officials = editedData.officials || homestay.officials || [];
+                      const operator = officials[operatorIndex];
+                      return (
+                        <div className="p-3 border border-gray-200 rounded-md">
+                          <h4 className="text-sm font-medium mb-2">Operator Details</h4>
+                          
+                          <div className="grid grid-cols-1 gap-2">
+                            <div className="mb-2">
+                              <label className="text-xs text-gray-500 block mb-1">Name</label>
+                              <input 
+                                type="text"
+                                value={operator.name || ''}
+                                onChange={(e) => updateOfficialField(operatorIndex, 'name', e.target.value)}
+                                className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-primary focus:border-primary"
+                              />
+                            </div>
+                            
+                            <div className="mb-2">
+                              <label className="text-xs text-gray-500 block mb-1">Contact Number</label>
+                              <input 
+                                type="text"
+                                value={operator.contactNo || ''}
+                                onChange={(e) => updateOfficialField(operatorIndex, 'contactNo', e.target.value)}
+                                className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-primary focus:border-primary"
+                              />
+                            </div>
+                            
+                            <div className="mb-2">
+                              <label className="text-xs text-gray-500 block mb-1">Gender</label>
+                              <select
+                                value={operator.gender || 'male'}
+                                onChange={(e) => updateOfficialField(operatorIndex, 'gender', e.target.value)}
+                                className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-primary focus:border-primary"
+                              >
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="other">Other</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    } else {
+                      // If no operator exists, show add operator button
+                      return (
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            const newOfficials = [...(editedData.officials || homestay.officials || [])];
+                            newOfficials.push({ 
+                              homestayId: homestay.homestayId, 
+                              role: 'operator', 
+                              name: '', 
+                              contactNo: '',
+                              gender: 'male'
+                            });
+                            handleInputChange('officials', newOfficials);
+                          }}
+                          className="flex items-center justify-center w-full p-2 border border-dashed border-gray-300 rounded-md text-gray-500 hover:text-gray-700 hover:border-gray-400"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Operator
+                        </button>
+                      );
+                    }
+                  })()}
+                </div>
+              )}
+          </InfoSection>
 
           {/* Officials Section - Accessing officials array with correct fields */}
           <InfoSection title="Committee Officials" icon={User}>

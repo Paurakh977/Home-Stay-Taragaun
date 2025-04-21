@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { jwtVerify } from 'jose';
 import dbConnect from '@/lib/mongodb';
-import { HomestaySingle } from '@/lib/models';
+import { HomestaySingle, Official, Contact, Location } from '@/lib/models';
 
 // Use the JWT_SECRET from environment or fallback for development
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_for_development';
@@ -53,11 +53,17 @@ export async function GET(
       );
     }
     
-    // Fetch the homestay data - ensure it belongs to the parent admin
-    const homestay = await HomestaySingle.findOne({ 
-      homestayId, 
-      adminUsername: parentAdmin 
-    }).lean();
+    // Fetch the homestay data and related collections (officials, contacts, location)
+    // similar to how it's done in the admin API
+    const [homestay, officials, contacts, location] = await Promise.all([
+      HomestaySingle.findOne({ 
+        homestayId, 
+        adminUsername: parentAdmin 
+      }).lean(),
+      Official.find({ homestayId }).lean(),
+      Contact.find({ homestayId }).lean(),
+      Location.findOne({ homestayId }).lean()
+    ]);
     
     if (!homestay) {
       console.log(`API: Homestay not found or doesn't belong to admin: ${parentAdmin}`);
@@ -69,9 +75,17 @@ export async function GET(
     
     console.log(`API: Successfully fetched homestay data for ID: ${homestayId}`);
     
+    // Combine all data into a single response, just like the admin API
+    const responseData = {
+      ...homestay,
+      officials,
+      contacts,
+      location
+    };
+    
     return NextResponse.json({
       success: true,
-      data: homestay
+      data: responseData
     });
     
   } catch (error: any) {

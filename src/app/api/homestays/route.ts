@@ -440,7 +440,8 @@ export async function POST(req: NextRequest) {
             homestayId,
             name: officialData.name,
             role: officialData.role,
-            contactNo: officialData.contactNo
+            contactNo: officialData.contactNo,
+            gender: officialData.gender || "male"
           });
           
           return official._id;
