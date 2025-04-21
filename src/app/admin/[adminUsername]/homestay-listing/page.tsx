@@ -53,6 +53,8 @@ interface Homestay {
   contactIds?: string[];
   contacts?: Contact[];
   address?: Address;
+  officials?: { role: string; name: string; gender?: string }[];
+  operator?: { role: string; name: string; gender?: string };
 }
 
 export default function HomestayListingPage() {
@@ -181,35 +183,9 @@ export default function HomestayListingPage() {
           throw new Error(data.error || 'Failed to load homestays data');
         }
 
-        const homestaysWithoutContacts = data.homestays as Homestay[];
-        
-        // Fetch contacts for all homestays that have contactIds
-        const homestaysWithContactPromises = homestaysWithoutContacts.map(async (homestay) => {
-          if (homestay.contactIds && homestay.contactIds.length > 0) {
-            try {
-              // Fetch first contact only for simplicity
-              const contactId = homestay.contactIds[0];
-              const contactResponse = await fetch(`/api/admin/contacts/${contactId}`);
-              
-              if (contactResponse.ok) {
-                const contactData = await contactResponse.json();
-                if (contactData.success && contactData.contact) {
-                  return {
-                    ...homestay,
-                    contacts: [contactData.contact]
-                  };
-                }
-              }
-            } catch (error) {
-              console.error(`Error fetching contact for homestay ${homestay.homestayId}:`, error);
-            }
-          }
-          return homestay;
-        });
-        
-        const homestaysWithContacts = await Promise.all(homestaysWithContactPromises);
-        setHomestays(homestaysWithContacts);
-        setFilteredHomestays(homestaysWithContacts);
+        // The homestays now include operator and contacts data from the API
+        setHomestays(data.homestays);
+        setFilteredHomestays(data.homestays);
       } catch (error) {
         console.error('Error fetching homestays:', error);
         setError('Could not load homestays. Please try again later.');
@@ -304,10 +280,10 @@ export default function HomestayListingPage() {
   // Function to get status badge color
   const getStatusColor = (status: Homestay['status']): string => {
     switch (status) {
-      case 'approved': return 'bg-green-100 text-green-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'approved': return 'bg-green-100 text-green-800 border-green-200';
+      case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
+      case 'pending': 
+      default: return 'bg-yellow-100 text-yellow-800 border-yellow-200';
     }
   };
 
@@ -515,55 +491,124 @@ export default function HomestayListingPage() {
             <div className="bg-white rounded-lg shadow overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">DHSR No</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        S.N.
+                      </th>
+                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Home Stay
+                      </th>
+                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        ID/DHSR
+                      </th>
+                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Owner Info
+                      </th>
+                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Contact Person
+                      </th>
+                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Contact Details
+                      </th>
+                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Location
+                      </th>
+                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Type
+                      </th>
+                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {filteredHomestays.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                        <td colSpan={9} className="px-6 py-4 text-center text-sm text-gray-500">
                           No homestays found
                         </td>
                       </tr>
                     ) : (
-                      filteredHomestays.map((homestay) => (
-                        <tr 
-                          key={homestay._id} 
-                          onClick={() => handleRowClick(homestay.homestayId)}
-                          className="hover:bg-gray-50 cursor-pointer"
-                        >
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{homestay.homeStayName}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(homestay.status)}`}>
-                              {homestay.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {homestay.dhsrNo || 'Not assigned'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {homestay.homeStayType === 'community' ? 'Community' : 'Private'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {homestay.address ? (
-                              <div className="flex items-start gap-1">
-                                <MapPin size={14} className="mt-0.5 min-w-4 text-gray-400" />
-                                <span>{homestay.address.formattedAddress?.en || `${homestay.address.district?.en}, ${homestay.address.province?.en}`}</span>
-                              </div>
-                            ) : (
-                              'No location data'
-                            )}
-                          </td>
-                        </tr>
-                      ))
+                      filteredHomestays.map((homestay, index) => {
+                        const operator = homestay.operator || homestay.officials?.find(official => official.role === 'operator');
+                        const contact = homestay.contacts && homestay.contacts.length > 0 ? homestay.contacts[0] : null;
+                        
+                        return (
+                          <tr 
+                            key={homestay._id} 
+                            onClick={() => handleRowClick(homestay.homestayId)}
+                            className="hover:bg-gray-50 cursor-pointer transition-colors"
+                          >
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {index + 1}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">{homestay.homeStayName}</div>
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">{homestay.homestayId}</div>
+                              {homestay.dhsrNo && (
+                                <div className="text-xs text-gray-500">DHSR: {homestay.dhsrNo}</div>
+                              )}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap">
+                              {operator ? (
+                                <div>
+                                  <div className="text-sm font-medium text-gray-900">{operator.name}</div>
+                                  <div className="text-xs text-gray-500 capitalize">{operator.gender || 'N/A'}</div>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-gray-500">No operator info</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap">
+                              {contact ? (
+                                <div className="text-sm font-medium text-gray-900">{contact.name}</div>
+                              ) : (
+                                <span className="text-xs text-gray-500">No contact info</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap">
+                              {contact ? (
+                                <div>
+                                  <div className="text-xs text-gray-500">{contact.mobile}</div>
+                                  {contact.email && (
+                                    <div className="text-xs text-gray-500 truncate max-w-xs">{contact.email}</div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-xs text-gray-500">No contact details</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4">
+                              {homestay.address ? (
+                                <div className="flex items-start">
+                                  <MapPin className="h-4 w-4 text-gray-400 mt-0.5 mr-1 flex-shrink-0" />
+                                  <div>
+                                    <div className="text-sm text-gray-900">
+                                      {homestay.address.municipality?.ne || ''}, {homestay.address.district?.ne || ''}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {homestay.address.province?.ne || ''}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-gray-500">No address info</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900 capitalize">{homestay.homeStayType}</div>
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap">
+                              <span className={`px-2 py-1 text-xs font-medium rounded-full capitalize border ${getStatusColor(homestay.status)}`}>
+                                {homestay.status}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>

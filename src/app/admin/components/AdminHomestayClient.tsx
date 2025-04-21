@@ -125,8 +125,17 @@ export default function AdminHomestayClient({
         if (isOfficer && officerData) {
           console.log('Client: Using officer authentication data');
           
-          // Use the permissions provided by the officer data
-          setUserPermissions(officerData.permissions as UserPermissions);
+          // Create a properly structured UserPermissions object from the Record<string, boolean>
+          const mappedPermissions: UserPermissions = {
+            adminDashboardAccess: !!officerData.permissions.adminDashboardAccess,
+            homestayApproval: !!officerData.permissions.homestayApproval,
+            homestayEdit: !!officerData.permissions.homestayEdit,
+            homestayDelete: !!officerData.permissions.homestayDelete,
+            documentUpload: !!officerData.permissions.documentUpload,
+            imageUpload: !!officerData.permissions.imageUpload
+          };
+          
+          setUserPermissions(mappedPermissions);
           return;
         }
 
