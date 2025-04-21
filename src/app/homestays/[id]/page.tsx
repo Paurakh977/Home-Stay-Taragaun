@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, Star, MapPin, Home, Users, Bed, Phone, Mail, ChevronRight, X, Calendar, Map, Share2, Heart } from "lucide-react";
@@ -8,6 +8,7 @@ import Image from "next/image";
 import Head from "next/head";
 import Script from "next/script";
 import { Metadata } from "next";
+import { toast } from "react-hot-toast";
 
 interface HomestayData {
   _id: string;
@@ -53,6 +54,8 @@ interface HomestayData {
       [fieldId: string]: any;
     };
   };
+  latitude?: number;
+  longitude?: number;
 }
 
 interface ContactData {
@@ -213,6 +216,284 @@ function SEOHead({ homestay, contacts }: { homestay: HomestayData | null, contac
   );
 }
 
+// Replace the HomestayMap component with this enhanced version
+const HomestayMap = ({ latitude, longitude, name, address }: { 
+  latitude: number | undefined, 
+  longitude: number | undefined, 
+  name: string,
+  address?: string
+}) => {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const [isMapReady, setIsMapReady] = useState(false);
+  const [fullscreenMode, setFullscreenMode] = useState(false);
+  const mapId = useMemo(() => `map-${Math.random().toString(36).substring(2, 9)}`, []);
+
+  // Function to destroy the map
+  const destroyMap = useCallback(() => {
+    if (mapInstanceRef.current) {
+      console.log("Removing existing map");
+      mapInstanceRef.current.remove();
+      mapInstanceRef.current = null;
+    }
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      destroyMap();
+    };
+  }, [destroyMap]);
+
+  // Load Leaflet scripts
+  useEffect(() => {
+    if (!latitude || !longitude || typeof window === 'undefined') return;
+
+    // Check if Leaflet is already loaded
+    if (!window.L) {
+      // Load Leaflet CSS
+      const linkEl = document.createElement('link');
+      linkEl.rel = 'stylesheet';
+      linkEl.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      linkEl.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+      linkEl.crossOrigin = '';
+      document.head.appendChild(linkEl);
+      
+      // Load Leaflet JS
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
+      script.crossOrigin = '';
+      script.onload = () => {
+        setIsMapReady(true);
+      };
+      document.body.appendChild(script);
+      
+      return () => {
+        // Cleanup function
+        destroyMap();
+        if (linkEl.parentNode) document.head.removeChild(linkEl);
+        if (script.parentNode) document.body.removeChild(script);
+      };
+    } else {
+      // Leaflet already loaded
+      setIsMapReady(true);
+    }
+  }, [latitude, longitude, destroyMap]);
+
+  // Toggle fullscreen mode
+  const toggleFullscreen = () => {
+    setFullscreenMode(!fullscreenMode);
+    // Give time for the DOM to update before invalidating map size
+    setTimeout(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    }, 100);
+  };
+
+  // Get directions in Google Maps
+  const getDirections = () => {
+    if (latitude && longitude) {
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`, '_blank');
+    }
+  };
+
+  // Initialize map when Leaflet is ready
+  useEffect(() => {
+    if (!isMapReady || !latitude || !longitude || !mapRef.current) return;
+
+    // Ensure we don't already have a map instance
+    destroyMap();
+
+    try {
+      // Add marker styles if not already added
+      if (!document.getElementById('homestay-marker-styles')) {
+        const style = document.createElement('style');
+        style.id = 'homestay-marker-styles';
+        style.textContent = `
+          .homestay-marker-pin {
+            width: 36px;
+            height: 36px;
+            border-radius: 50% 50% 50% 0;
+            background: linear-gradient(135deg, #ff5e62, #ff9966);
+            transform: rotate(-45deg);
+            position: absolute;
+            top: -18px;
+            left: -18px;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+            animation: bounce 1s ease infinite;
+            border: 2px solid #fff;
+          }
+          .homestay-marker-pin::after {
+            content: '';
+            width: 18px;
+            height: 18px;
+            position: absolute;
+            background-color: #fff;
+            border-radius: 50%;
+            top: 9px;
+            left: 9px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+          }
+          .homestay-marker-icon {
+            position: absolute;
+            top: -6px;
+            left: -6px;
+            transform: rotate(45deg);
+            color: #ff5e62;
+            font-size: 16px;
+            z-index: 2;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+          }
+          .homestay-marker-label {
+            position: absolute;
+            top: -50px;
+            left: 10px;
+            background-color: white;
+            padding: 4px 10px;
+            border-radius: 20px;
+            white-space: nowrap;
+            font-weight: 500;
+            font-size: 13px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            z-index: 1;
+            pointer-events: none;
+          }
+          .fullscreen-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+          }
+          .fullscreen-btn:hover {
+            background: #f8f9fa;
+          }
+          @keyframes bounce {
+            0%, 100% {
+              transform: rotate(-45deg) translateY(0);
+            }
+            50% {
+              transform: rotate(-45deg) translateY(-5px);
+            }
+          }
+          .leaflet-container {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      console.log("Creating new map instance");
+      // Initialize map with default view
+      const map = window.L.map(mapRef.current, {
+        zoomControl: false, // We'll add zoom control to bottom right
+        attributionControl: true
+      }).setView([latitude, longitude], 14);
+      
+      // Store the map instance
+      mapInstanceRef.current = map;
+      
+      // Add tile layer
+      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
+      
+      // Add zoom control to bottom right
+      window.L.control.zoom({
+        position: 'bottomright'
+      }).addTo(map);
+
+      // Custom marker icon with label
+      const customIcon = window.L.divIcon({
+        className: 'custom-map-marker',
+        html: `
+          <div class="homestay-marker-pin"></div>
+          <div class="homestay-marker-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+          </div>
+          <div class="homestay-marker-label">${name}</div>
+        `,
+        iconSize: [36, 36],
+        iconAnchor: [18, 36]
+      });
+      
+      // Add marker without popup
+      window.L.marker([latitude, longitude], {
+        icon: customIcon
+      }).addTo(map);
+      
+      // Ensure map size is correct
+      setTimeout(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
+      }, 100);
+    } catch (error) {
+      console.error("Error initializing map:", error);
+    }
+  }, [isMapReady, latitude, longitude, name, destroyMap]);
+
+  // If no coordinates, show message
+  if (!latitude || !longitude) {
+    return (
+      <div className="bg-gray-100 rounded-lg p-4 text-center h-64 flex items-center justify-center">
+        <p className="text-gray-500">Location not available</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`relative rounded-lg overflow-hidden shadow-md ${fullscreenMode ? 'fixed inset-0 z-50 bg-white rounded-none' : ''}`} 
+      style={{ height: fullscreenMode ? '100vh' : '400px' }}>
+      <div ref={mapRef} className="h-full w-full z-10"></div>
+      
+      <button 
+        className="fullscreen-btn"
+        onClick={toggleFullscreen}
+      >
+        {fullscreenMode ? (
+          <>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
+            </svg>
+            Exit Fullscreen
+          </>
+        ) : (
+          <>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+            </svg>
+            Fullscreen
+          </>
+        )}
+      </button>
+      
+      {!fullscreenMode && (
+        <button 
+          className="absolute bottom-4 right-4 z-10 bg-white rounded-md shadow-lg px-4 py-2 text-sm font-medium flex items-center gap-2 hover:bg-gray-50 transition-colors"
+          onClick={getDirections}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+          </svg>
+          Get Directions
+        </button>
+      )}
+    </div>
+  );
+};
+
 export default function HomestayPortalPage() {
   const params = useParams();
   const router = useRouter();
@@ -226,7 +507,7 @@ export default function HomestayPortalPage() {
   const [showFullImage, setShowFullImage] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   
-  // New state for map modal
+  // New state for map
   const [showMapModal, setShowMapModal] = useState(false);
   
   // Add SEO-friendly title and meta description dynamically
@@ -435,7 +716,12 @@ export default function HomestayPortalPage() {
   
   // Function to handle map view
   const handleViewMap = () => {
-    setShowMapModal(true);
+    // Open Google Maps directions in a new tab
+    if (homestay?.latitude && homestay?.longitude) {
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${homestay.latitude},${homestay.longitude}`, '_blank');
+    } else {
+      toast.error("This homestay doesn't have location coordinates set.");
+    }
   };
   
   if (loading) {
@@ -670,6 +956,25 @@ export default function HomestayPortalPage() {
               </button>
             </div>
           </div>
+        
+        {/* Homestay Location */}
+        <div className="bg-white rounded-lg shadow-lg mb-8 p-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Location</h2>
+          <HomestayMap 
+            latitude={homestay?.latitude} 
+            longitude={homestay?.longitude}
+            name={homestay?.homeStayName || 'Homestay'}
+            address={homestay?.address?.formattedAddress?.en || 
+              homestay?.address ? `${homestay.address.tole}, ${homestay.address.city}, ${homestay.address.ward?.en}, ${homestay.address.municipality?.en}, ${homestay.address.district?.en}, ${homestay.address.province?.en}` : ''}
+          />
+          {homestay?.address && (
+            <p className="mt-4 text-gray-700">
+              {homestay.address.formattedAddress?.en || 
+                `${homestay.address.tole}, ${homestay.address.city}, ${homestay.address.ward?.en}, ${homestay.address.municipality?.en}, ${homestay.address.district?.en}, ${homestay.address.province?.en}`
+              }
+            </p>
+          )}
+        </div>
         
         {/* Main Content */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
