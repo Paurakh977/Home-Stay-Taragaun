@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nepal Location Finder</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    
+    <!-- GeoSearch CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-geosearch@3.8.0/dist/geosearch.css" />
+    
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="test.css">
+</head>
+<body>
+    <!-- Page 1: Map with search -->
+    <div id="page1">
+        <div class="container">
+            <div id="map"></div>
+            
+            <!-- Google Maps Style Search Bar -->
+            <div class="search-container">
+                <i class="material-icons search-icon">search</i>
+                <input type="text" class="search-box" id="searchInput" placeholder="Search in Nepal">
+                
+                <!-- Search Suggestions Dropdown -->
+                <div class="suggestions-container" id="suggestions">
+                    <!-- Suggestions will be dynamically added here -->
+                </div>
+            </div>
+            
+            <!-- Map Type Control -->
+            <div class="map-type-control">
+                <select id="mapTypeSelect">
+                    <option value="street">Street Map</option>
+                    <option value="satellite">Satellite</option>
+                    <option value="terrain">Terrain</option>
+                    <option value="mapbox">Detailed Map</option>
+                </select>
+            </div>
+            
+            <!-- Bottom Panel -->
+            <div class="bottom-panel">
+                <div class="panel-header">
+                    <h3>Selected Location</h3>
+                </div>
+                <div class="coordinates-display">
+                    <i class="material-icons" style="font-size: 14px; vertical-align: middle; color: #5F6368; margin-right: 4px;">place</i>
+                    <span id="coordinates" class="coordinates-value">None selected</span>
+                </div>
+                <div class="location-info">
+                    <div class="info-row">
+                        <span class="info-label">ADDRESS:</span>
+                        <span id="address" class="info-value">Finding location...</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">DISTRICT:</span>
+                        <span id="district" class="info-value">Finding district...</span>
+                    </div>
+                </div>
+                <div class="action-buttons">
+                    <button id="saveLocation" class="action-button">SAVE LOCATION</button>
+                    <button id="viewGoogleMaps" class="google-maps-button">
+                        <i class="material-icons">map</i> Google Maps
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Measurement Tool Control -->
+            <div class="measurement-control">
+                <button id="measureDistance" class="measure-button">
+                    <i class="material-icons">straighten</i> Measure Distance
+                </button>
+            </div>
+            
+            <!-- Loading Indicator -->
+            <div class="loading-container" id="loadingIndicator">
+                <div class="spinner"></div>
+                <div>Loading...</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Page 2: Location Details -->
+    <div id="page2">
+        <div class="location-details">
+            <div class="location-header">
+                <button class="back-button" id="backToSearch">
+                    <i class="material-icons">arrow_back</i>
+                </button>
+                <h1 class="location-title">Selected Location</h1>
+            </div>
+            
+            <div class="coordinates-card">
+                <div class="coordinates-label">COORDINATES</div>
+                <div id="savedCoordinates" class="coordinates-text">Not selected</div>
+                
+                <button id="viewGoogleMapsResult" class="google-maps-button" style="margin-top: 8px;">
+                    <i class="material-icons">map</i> Open in Google Maps
+                </button>
+            </div>
+            
+            <div class="coordinates-card">
+                <div class="coordinates-label">ADDRESS</div>
+                <div id="savedAddress" class="coordinates-text">Not available</div>
+            </div>
+            
+            <div class="coordinates-card">
+                <div class="coordinates-label">DISTRICT</div>
+                <div id="savedDistrict" class="coordinates-text">Not available</div>
+            </div>
+            
+            <div id="resultMap"></div>
+            
+            <button class="share-button" id="copyCoordinates">
+                <i class="material-icons">content_copy</i> COPY COORDINATES
+            </button>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    
+    <!-- GeoSearch JS -->
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-geosearch@3.8.0/dist/bundle.min.js"></script>
+    
+    <script src="test.js"></script>
+   
+</body>
+</html>

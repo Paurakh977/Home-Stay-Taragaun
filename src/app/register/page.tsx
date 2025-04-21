@@ -25,6 +25,10 @@ type FormData = {
   
   // Page 2 (WayToHomeStay)
   directions?: string; // Optional written directions
+  latitude?: number;   // Added for map location
+  longitude?: number;  // Added for map location
+  locationAddress?: string; // Added for reverse geocoded address
+  locationDistrict?: string; // Added for district information
   
   // Page 3
   operatorName: string; // Added for Homestay Operator
@@ -89,6 +93,10 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
     bedCount: 1,
     homeStayType: "community", // Default to community
     directions: "", // Initialize directions as empty string
+    latitude: undefined, // Initialize latitude as undefined
+    longitude: undefined, // Initialize longitude as undefined
+    locationAddress: "", // Initialize location address
+    locationDistrict: "", // Initialize location district
     operatorName: "", // Initialize operator name
     operatorGender: "male", // Initialize operator gender with default
     operatorContactNo: "+977", // Initialize operator contact number
@@ -182,6 +190,11 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
     if (formData.homeCount < 1) errors.push("Home Count must be at least 1");
     if (formData.roomCount < 1) errors.push("Room Count must be at least 1");
     if (formData.bedCount < 1) errors.push("Bed Count must be at least 1");
+    
+    // Check if location coordinates are provided (step 2)
+    if (!formData.latitude || !formData.longitude) {
+      errors.push("Please select and save your homestay's location on the map");
+    }
     
     // Homestay Operator (step 3)
     if (!formData.operatorName) errors.push("Homestay Operator's Name is required");
@@ -315,6 +328,8 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
         bedCount: formData.bedCount,
         homeStayType: formData.homeStayType,
         directions: formData.directions,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
         
         // Create an official for the operator (This is the important part we're fixing)
         officials: [

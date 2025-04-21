@@ -346,6 +346,8 @@ export async function POST(req: NextRequest) {
       bedCount: body.bedCount,
       homeStayType: body.homeStayType,
       directions: body.directions || "",
+      latitude: body.latitude || null, // Add latitude
+      longitude: body.longitude || null, // Add longitude
       featureAccess: {
         dashboard: false,
         profile: false,
