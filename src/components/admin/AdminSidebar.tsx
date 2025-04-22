@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Hotel, LogOut, PlusCircle, ListFilter, KeyRound, Users, ChevronDown, ChevronUp, UserPlus, UserCog } from 'lucide-react';
+import { Hotel, LogOut, PlusCircle, ListFilter, KeyRound, Users, ChevronDown, ChevronUp, UserPlus, UserCog, BarChart2, MapPin, Star, Map, Home } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { useBranding } from '@/context/BrandingContext';
@@ -48,6 +48,30 @@ const officerItems = [
   }
 ];
 
+// New Reports dropdown items
+const reportItems = [
+  {
+    title: "Geographical Classification",
+    href: "/admin/report/geographical-classification",
+    icon: MapPin,
+  },
+  {
+    title: "Service Rating & Feedbacks",
+    href: "/admin/report/service-ratings",
+    icon: Star,
+  },
+  {
+    title: "Local Tourism Attractions",
+    href: "/admin/report/tourism-attractions",
+    icon: Map,
+  },
+  {
+    title: "Physical Infrastructure",
+    href: "/admin/report/infrastructure",
+    icon: Home,
+  }
+];
+
 interface AdminSidebarProps {
   username?: string;
 }
@@ -60,6 +84,7 @@ export default function AdminSidebar({ username }: AdminSidebarProps) {
   const adminUsername = username || searchParams.get('username');
   const branding = useBranding();
   const [officersDropdownOpen, setOfficersDropdownOpen] = useState(false);
+  const [reportsDropdownOpen, setReportsDropdownOpen] = useState(false);
 
   // Check if any officer-related route is active
   const isOfficersActive = officerItems.some(item => {
@@ -69,12 +94,24 @@ export default function AdminSidebar({ username }: AdminSidebarProps) {
     return pathname === itemHref || pathname.startsWith(itemHref);
   });
 
-  // Automatically open dropdown if an officer-related route is active
+  // Check if any report-related route is active
+  const isReportsActive = reportItems.some(item => {
+    const itemHref = adminUsername ? 
+      `${item.href.replace('/admin', `/admin/${adminUsername}`)}` : 
+      item.href;
+    return pathname === itemHref || pathname.startsWith(itemHref);
+  });
+
+  // Automatically open dropdowns if related routes are active
   useEffect(() => {
     if (isOfficersActive) {
       setOfficersDropdownOpen(true);
     }
-  }, [isOfficersActive]);
+    
+    if (isReportsActive) {
+      setReportsDropdownOpen(true);
+    }
+  }, [isOfficersActive, isReportsActive]);
 
   // Check if user is a superadmin
   useEffect(() => {
@@ -121,6 +158,11 @@ export default function AdminSidebar({ username }: AdminSidebarProps) {
   // Toggle officers dropdown
   const toggleOfficersDropdown = () => {
     setOfficersDropdownOpen(!officersDropdownOpen);
+  };
+  
+  // Toggle reports dropdown
+  const toggleReportsDropdown = () => {
+    setReportsDropdownOpen(!reportsDropdownOpen);
   };
 
   return (
@@ -244,6 +286,52 @@ export default function AdminSidebar({ username }: AdminSidebarProps) {
             </Link>
           );
         })}
+
+        {/* Reports Dropdown Section */}
+        <div className="mt-2">
+          <button 
+            onClick={toggleReportsDropdown}
+            className={`flex items-center justify-between w-full px-3 py-2 rounded-md text-sm my-1 transition-colors ${
+              isReportsActive
+                ? "bg-gray-100 text-gray-900 font-medium"
+                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              <BarChart2 className="h-4 w-4" />
+              <span>Reports</span>
+            </div>
+            {reportsDropdownOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </button>
+          
+          {/* Reports dropdown menu */}
+          {reportsDropdownOpen && (
+            <div className="ml-2 pl-2 border-l border-gray-200 mt-1 mb-1 space-y-1">
+              {reportItems.map((item) => {
+                const itemHref = adminUsername ? 
+                  `/admin/${adminUsername}${item.href.replace('/admin', '')}` : 
+                  item.href;
+                
+                const isActive = pathname === itemHref || pathname.startsWith(itemHref);
+                
+                return (
+                  <Link
+                    key={item.title}
+                    href={itemHref}
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                      isActive
+                        ? "bg-gray-100 text-gray-900 font-medium"
+                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                    }`}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.title}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Officers Dropdown Section */}
         <div className="mt-2">

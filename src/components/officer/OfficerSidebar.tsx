@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Hotel, LogOut, PlusCircle, ListFilter, KeyRound } from 'lucide-react';
+import { Hotel, LogOut, PlusCircle, ListFilter, KeyRound, BarChart2, ChevronDown, ChevronUp, MapPin, Star, Map, Home } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { useBranding } from '@/context/BrandingContext';
@@ -33,6 +33,30 @@ const sidebarNavItems = [
   },
 ];
 
+// Reports dropdown items
+const reportItems = [
+  {
+    title: "Geographical Classification",
+    href: "/officer/report/geographical-classification",
+    icon: MapPin,
+  },
+  {
+    title: "Service Rating & Feedbacks",
+    href: "/officer/report/service-ratings",
+    icon: Star,
+  },
+  {
+    title: "Local Tourism Attractions",
+    href: "/officer/report/tourism-attractions",
+    icon: Map,
+  },
+  {
+    title: "Physical Infrastructure",
+    href: "/officer/report/infrastructure",
+    icon: Home,
+  }
+];
+
 interface OfficerSidebarProps {
   adminUsername?: string;
   officerUsername?: string;
@@ -45,6 +69,22 @@ export default function OfficerSidebar({ adminUsername, officerUsername }: Offic
   const [officerName, setOfficerName] = useState(officerUsername || '');
   const adminUsernameValue = adminUsername || searchParams.get('adminUsername');
   const branding = useBranding();
+  const [reportsDropdownOpen, setReportsDropdownOpen] = useState(false);
+
+  // Check if any report-related route is active
+  const isReportsActive = reportItems.some(item => {
+    const itemHref = adminUsernameValue ? 
+      `${item.href.replace('/officer', `/officer/${adminUsernameValue}`)}` : 
+      item.href;
+    return pathname === itemHref || pathname.startsWith(itemHref);
+  });
+
+  // Automatically open dropdowns if related routes are active
+  useEffect(() => {
+    if (isReportsActive) {
+      setReportsDropdownOpen(true);
+    }
+  }, [isReportsActive]);
 
   // Fetch officer data if not provided
   useEffect(() => {
@@ -108,6 +148,11 @@ export default function OfficerSidebar({ adminUsername, officerUsername }: Offic
           "/officer/login";
       }, 1000);
     }
+  };
+
+  // Toggle reports dropdown
+  const toggleReportsDropdown = () => {
+    setReportsDropdownOpen(!reportsDropdownOpen);
   };
 
   // Determine base path for links
@@ -237,6 +282,52 @@ export default function OfficerSidebar({ adminUsername, officerUsername }: Offic
             </Link>
           );
         })}
+        
+        {/* Reports Dropdown Section */}
+        <div className="mt-2">
+          <button 
+            onClick={toggleReportsDropdown}
+            className={`flex items-center justify-between w-full px-3 py-2 rounded-md text-sm my-1 transition-colors ${
+              isReportsActive
+                ? "bg-gray-100 text-gray-900 font-medium"
+                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              <BarChart2 className="h-4 w-4" />
+              <span>Reports</span>
+            </div>
+            {reportsDropdownOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </button>
+          
+          {/* Reports dropdown menu */}
+          {reportsDropdownOpen && (
+            <div className="ml-2 pl-2 border-l border-gray-200 mt-1 mb-1 space-y-1">
+              {reportItems.map((item) => {
+                const itemHref = adminUsernameValue ? 
+                  `/officer/${adminUsernameValue}${item.href.replace('/officer', '')}` : 
+                  item.href;
+                
+                const isActive = pathname === itemHref || pathname.startsWith(itemHref);
+                
+                return (
+                  <Link
+                    key={item.title}
+                    href={itemHref}
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                      isActive
+                        ? "bg-gray-100 text-gray-900 font-medium"
+                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                    }`}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.title}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </nav>
       
       {/* Logout button */}
