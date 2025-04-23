@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 interface HomestayFeaturesData {
   localAttractions: string[];
@@ -13,11 +13,63 @@ type HomestayFeaturesFormProps = {
   updateFormData: (data: Partial<HomestayFeaturesData>) => void;
 };
 
+// Common tourism services with English/Nepali translations
+const commonTourismServices = [
+  { value: "Welcome and Farewell/स्वागत तथा विदाई", checked: false },
+  { value: "Comfortable Accommodation/आरामदायी आवास", checked: false },
+  { value: "Gift or Souvenir/मायाको चिनो (उपहार)", checked: false },
+  { value: "Traditional Cultural Program/परम्परागत सांस्कृतिक कार्यक्रम", checked: false },
+  { value: "Local Dishes/स्थानीय परिकारहरू", checked: false },
+];
+
+// Common infrastructure with English/Nepali translations
+const commonInfrastructure = [
+  { value: "Community Building/सामुदायिक भवन", checked: false },
+  { value: "Guest Room, Toilet, Bathroom/पाहुना कोठा, शौचालय, स्नानघर", checked: false },
+  { value: "Transportation Facility/यातायात सुविधा", checked: false },
+  { value: "Drinking Water and Solar Lighting/खानेपानी तथा सोलार बत्ती", checked: false },
+  { value: "Security Post (Nepaltar)/सुरक्षा चौकी (नेपालटार)", checked: false },
+  { value: "Health Post (Udayapurgadhi)/स्वास्थ्य चौकी (उदयपुरगढी)", checked: false },
+  { value: "Communication Facility (Mobile)/सञ्चार सुविधा (मोबाइल)", checked: false },
+];
+
 const HomestayFeaturesForm: React.FC<HomestayFeaturesFormProps> = ({ formData, updateFormData }) => {
   // State for new items
   const [newAttraction, setNewAttraction] = useState("");
   const [newService, setNewService] = useState("");
   const [newInfrastructure, setNewInfrastructure] = useState("");
+  
+  // State for checkboxes
+  const [tourismServiceCheckboxes, setTourismServiceCheckboxes] = useState(
+    commonTourismServices.map(service => ({
+      ...service,
+      checked: formData.tourismServices.includes(service.value)
+    }))
+  );
+  
+  const [infrastructureCheckboxes, setInfrastructureCheckboxes] = useState(
+    commonInfrastructure.map(infra => ({
+      ...infra,
+      checked: formData.infrastructure.includes(infra.value)
+    }))
+  );
+  
+  // Update checkbox states when formData changes
+  useEffect(() => {
+    setTourismServiceCheckboxes(
+      commonTourismServices.map(service => ({
+        ...service,
+        checked: formData.tourismServices.includes(service.value)
+      }))
+    );
+    
+    setInfrastructureCheckboxes(
+      commonInfrastructure.map(infra => ({
+        ...infra,
+        checked: formData.infrastructure.includes(infra.value)
+      }))
+    );
+  }, [formData.tourismServices, formData.infrastructure]);
 
   // Make sure arrays exist
   const attractions = Array.isArray(formData.localAttractions) ? formData.localAttractions : [];
@@ -77,6 +129,48 @@ const HomestayFeaturesForm: React.FC<HomestayFeaturesFormProps> = ({ formData, u
       addFunction();
     }
   };
+  
+  // Handle checkbox change for tourism services
+  const handleTourismServiceCheckboxChange = (index: number) => {
+    const updatedCheckboxes = [...tourismServiceCheckboxes];
+    updatedCheckboxes[index].checked = !updatedCheckboxes[index].checked;
+    setTourismServiceCheckboxes(updatedCheckboxes);
+    
+    // Update form data based on checked boxes
+    const checkedValues = updatedCheckboxes
+      .filter(item => item.checked)
+      .map(item => item.value);
+      
+    // Combine checked values with custom entries (excluding common ones)
+    const customServices = services.filter(
+      service => !commonTourismServices.some(common => common.value === service)
+    );
+    
+    updateFormData({
+      tourismServices: [...checkedValues, ...customServices]
+    });
+  };
+  
+  // Handle checkbox change for infrastructure
+  const handleInfrastructureCheckboxChange = (index: number) => {
+    const updatedCheckboxes = [...infrastructureCheckboxes];
+    updatedCheckboxes[index].checked = !updatedCheckboxes[index].checked;
+    setInfrastructureCheckboxes(updatedCheckboxes);
+    
+    // Update form data based on checked boxes
+    const checkedValues = updatedCheckboxes
+      .filter(item => item.checked)
+      .map(item => item.value);
+      
+    // Combine checked values with custom entries (excluding common ones)
+    const customInfrastructure = infrastructures.filter(
+      infra => !commonInfrastructure.some(common => common.value === infra)
+    );
+    
+    updateFormData({
+      infrastructure: [...checkedValues, ...customInfrastructure]
+    });
+  };
 
   return (
     <div className="space-y-8">
@@ -133,13 +227,35 @@ const HomestayFeaturesForm: React.FC<HomestayFeaturesFormProps> = ({ formData, u
           <span className="text-red-500 ml-1">*</span>
         </h3>
         <p className="text-sm text-gray-600">At least one service is required.</p>
+        
+        {/* Common tourism services checkboxes */}
+        <div className="space-y-2 mb-4">
+          <p className="text-sm font-medium text-gray-700">Common services (check all that apply):</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {tourismServiceCheckboxes.map((service, index) => (
+              <div key={index} className="flex items-center">
+                <input
+                  type="checkbox"
+                  id={`tourism-service-${index}`}
+                  checked={service.checked}
+                  onChange={() => handleTourismServiceCheckboxChange(index)}
+                  className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                />
+                <label htmlFor={`tourism-service-${index}`} className="ml-2 text-sm text-gray-700">
+                  {service.value.split('/')[0]} / {service.value.split('/')[1]}
+                </label>
+              </div>
+            ))}
+          </div>
+        </div>
+        
         <div className="flex items-center space-x-2">
           <input
             type="text"
             value={newService}
             onChange={(e) => setNewService(e.target.value)}
             onKeyDown={(e) => handleKeyDown(e, handleAddService)}
-            placeholder="Add service or facility / सेवा वा सुविधा थप्नुहोस्"
+            placeholder="Add additional service or facility / अतिरिक्त सेवा वा सुविधा थप्नुहोस्"
             className="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
           />
           <button
@@ -151,21 +267,22 @@ const HomestayFeaturesForm: React.FC<HomestayFeaturesFormProps> = ({ formData, u
           </button>
         </div>
         
-        {/* List of added services */}
+        {/* List of added custom services */}
         <div className="space-y-2">
-          {services.map((service, index) => (
-            <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-md">
-              <span>{service}</span>
-              <button
-                type="button"
-                onClick={() => handleRemoveService(index)}
-                className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
-                disabled={services.length === 1}
-              >
-                ✕
-              </button>
-            </div>
-          ))}
+          {services
+            .filter(service => !commonTourismServices.some(common => common.value === service))
+            .map((service, index) => (
+              <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-md">
+                <span>{service}</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveService(services.indexOf(service))}
+                  className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
           {services.length === 0 && (
             <p className="text-sm text-red-500 italic">No services added yet. Please add at least one.</p>
           )}
@@ -179,13 +296,35 @@ const HomestayFeaturesForm: React.FC<HomestayFeaturesFormProps> = ({ formData, u
           <span className="text-red-500 ml-1">*</span>
         </h3>
         <p className="text-sm text-gray-600">At least one infrastructure item is required.</p>
+        
+        {/* Common infrastructure checkboxes */}
+        <div className="space-y-2 mb-4">
+          <p className="text-sm font-medium text-gray-700">Common infrastructure (check all that apply):</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {infrastructureCheckboxes.map((infra, index) => (
+              <div key={index} className="flex items-center">
+                <input
+                  type="checkbox"
+                  id={`infrastructure-${index}`}
+                  checked={infra.checked}
+                  onChange={() => handleInfrastructureCheckboxChange(index)}
+                  className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                />
+                <label htmlFor={`infrastructure-${index}`} className="ml-2 text-sm text-gray-700">
+                  {infra.value.split('/')[0]} / {infra.value.split('/')[1]}
+                </label>
+              </div>
+            ))}
+          </div>
+        </div>
+        
         <div className="flex items-center space-x-2">
           <input
             type="text"
             value={newInfrastructure}
             onChange={(e) => setNewInfrastructure(e.target.value)}
             onKeyDown={(e) => handleKeyDown(e, handleAddInfrastructure)}
-            placeholder="Add infrastructure / पूर्वाधार थप्नुहोस्"
+            placeholder="Add additional infrastructure / अतिरिक्त पूर्वाधार थप्नुहोस्"
             className="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
           />
           <button
@@ -197,21 +336,22 @@ const HomestayFeaturesForm: React.FC<HomestayFeaturesFormProps> = ({ formData, u
           </button>
         </div>
         
-        {/* List of added infrastructure */}
+        {/* List of added custom infrastructure */}
         <div className="space-y-2">
-          {infrastructures.map((item, index) => (
-            <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-md">
-              <span>{item}</span>
-              <button
-                type="button"
-                onClick={() => handleRemoveInfrastructure(index)}
-                className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
-                disabled={infrastructures.length === 1}
-              >
-                ✕
-              </button>
-            </div>
-          ))}
+          {infrastructures
+            .filter(infra => !commonInfrastructure.some(common => common.value === infra))
+            .map((item, index) => (
+              <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-md">
+                <span>{item}</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveInfrastructure(infrastructures.indexOf(item))}
+                  className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
           {infrastructures.length === 0 && (
             <p className="text-sm text-red-500 italic">No infrastructure added yet. Please add at least one.</p>
           )}
