@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, BarChart2, Mail, Phone, MapPin, Calendar, Download, FileText, FileSpreadsheet, Search, Filter, ArrowUpDown } from 'lucide-react';
 import Image from 'next/image';
@@ -8,6 +8,7 @@ import { useBranding } from '@/context/BrandingContext';
 import { getImageUrl } from '@/lib/utils';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { attractionsCategories } from '@/app/register/components/HomestayFeaturesForm';
 
 interface FilterOptions {
   province?: string;
@@ -15,6 +16,7 @@ interface FilterOptions {
   municipality?: string;
   homestayType?: 'community' | 'private' | '';
   status?: 'approved' | 'pending' | 'rejected' | '';
+  selectedAttractions?: string[];
 }
 
 interface Homestay {
@@ -50,6 +52,11 @@ interface Homestay {
   homeCount?: number;
   bedCount?: number;
   description?: string;
+  features?: {
+    localAttractions?: string[];
+    tourismServices?: string[];
+    infrastructure?: string[];
+  };
 }
 
 interface ReportPageProps {
@@ -86,7 +93,7 @@ export default function ReportPage({
   // Fetch homestays data
   useEffect(() => {
     const fetchHomestays = async () => {
-      if (type !== 'geographical-classification') return;
+      if (type !== 'geographical-classification' && type !== 'tourism-attractions') return;
       
       try {
         setLoading(true);
@@ -94,21 +101,19 @@ export default function ReportPage({
         // Build query string from filters
         const queryParams = new URLSearchParams();
         
-        // Add filtering parameters using correct field names
-        if (filters.province) {
-          queryParams.append('province', filters.province);
-        }
-        if (filters.district) {
-          queryParams.append('district', filters.district);
-        }
-        if (filters.municipality) {
-          queryParams.append('municipality', filters.municipality);
-        }
-        if (filters.homestayType) {
-          queryParams.append('homestayType', filters.homestayType);
-        }
-        if (filters.status) {
-          queryParams.append('status', filters.status);
+        // Add standard filtering parameters
+        if (filters.province) queryParams.append('province', filters.province);
+        if (filters.district) queryParams.append('district', filters.district);
+        if (filters.municipality) queryParams.append('municipality', filters.municipality);
+        if (filters.homestayType) queryParams.append('homestayType', filters.homestayType);
+        if (filters.status) queryParams.append('status', filters.status);
+        
+        // Add attraction filter if applicable
+        if (type === 'tourism-attractions' && filters.selectedAttractions && filters.selectedAttractions.length > 0) {
+          queryParams.append('attractions', filters.selectedAttractions.join(','));
+          queryParams.append('includeFeatures', 'true'); // Ensure features are included when filtering by attractions
+        } else if (type === 'tourism-attractions') {
+          queryParams.append('includeFeatures', 'true');
         }
         
         // Add admin username from props
@@ -203,14 +208,14 @@ export default function ReportPage({
     fetchHomestays();
   // Separate individual filter properties to ensure proper dependency tracking
   }, [type, filters.province, filters.district, filters.municipality, 
-      filters.homestayType, filters.status, username, userType]);
+      filters.homestayType, filters.status, filters.selectedAttractions, username, userType]);
   
   const goBack = () => {
     const basePath = userType === 'admin' ? `/admin/${username}` : `/officer/${username}`;
     router.push(basePath);
   };
   
-  const handleFilterChange = (name: keyof FilterOptions, value: string) => {
+  const handleFilterChange = (name: keyof FilterOptions, value: string, e?: React.ChangeEvent<HTMLSelectElement> | React.ChangeEvent<HTMLInputElement>) => {
     // Reset dependent filters when parent filter changes
     if (name === 'province') {
       setFilters({
@@ -230,6 +235,26 @@ export default function ReportPage({
       });
       // Clear dependent dropdown
       setMunicipalities([]);
+    } else if (name === 'selectedAttractions') {
+      // Handle checkbox array for attractions
+      const currentSelection = filters.selectedAttractions || [];
+      const target = e?.target as HTMLInputElement;
+      if (!target) return;
+
+      const isChecked = target.checked;
+      const attractionValue = target.value;
+      
+      let updatedSelection;
+      if (isChecked) {
+        updatedSelection = [...currentSelection, attractionValue];
+      } else {
+        updatedSelection = currentSelection.filter(item => item !== attractionValue);
+      }
+      
+      setFilters({
+        ...filters,
+        selectedAttractions: updatedSelection
+      });
     } else {
       setFilters({
         ...filters,
@@ -277,6 +302,23 @@ export default function ReportPage({
   const sortedHomestays = [...homestays].sort((a, b) => {
     if (!sortConfig) return 0;
     
+    // Special handling for attractions field
+    if (sortConfig.key === 'features.localAttractions') {
+      const aAttractions = a.features?.localAttractions || [];
+      const bAttractions = b.features?.localAttractions || [];
+      
+      const aValue = aAttractions.length;
+      const bValue = bAttractions.length;
+      
+      if (aValue < bValue) {
+        return sortConfig.direction === 'asc' ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === 'asc' ? 1 : -1;
+      }
+      return 0;
+    }
+    
     let aValue: any = getValue(a, sortConfig.key);
     let bValue: any = getValue(b, sortConfig.key);
     
@@ -296,6 +338,80 @@ export default function ReportPage({
     }
     return 0;
   });
+
+  // Helper function to format attractions for display
+  const formatAttractions = (attractions: string[] | undefined) => {
+    if (!attractions || attractions.length === 0) return 'None';
+    
+    // Count attractions by category
+    const categories = {
+      natural: 0,
+      cultural: 0,
+      products: 0,
+      forest: 0,
+      wildlife: 0,
+      adventure: 0,
+      other: 0
+    };
+    
+    // Categorize each attraction
+    attractions.forEach(attr => {
+      if (attr.startsWith('natural:')) {
+        categories.natural++;
+      } else if (attr.startsWith('cultural:')) {
+        categories.cultural++;
+      } else if (attr.startsWith('products:')) {
+        categories.products++;
+      } else if (attr.startsWith('forest:')) {
+        categories.forest++;
+      } else if (attr.startsWith('wildlife:')) {
+        categories.wildlife++;
+      } else if (attr.startsWith('adventure:')) {
+        categories.adventure++;
+      } else if (attr.includes('Park') || attr.includes('National') || attr.includes('River')) {
+        categories.natural++;
+      } else if (attr.includes('Museum') || attr.includes('Heritage') || attr.includes('Traditional')) {
+        categories.cultural++;
+      } else {
+        categories.other++;
+      }
+    });
+    
+    // Format as a summary string
+    const parts = [];
+    if (categories.natural > 0) parts.push(`${categories.natural} natural`);
+    if (categories.cultural > 0) parts.push(`${categories.cultural} cultural`);
+    if (categories.products > 0) parts.push(`${categories.products} product`);
+    if (categories.forest > 0) parts.push(`${categories.forest} forest`);
+    if (categories.wildlife > 0) parts.push(`${categories.wildlife} wildlife`);
+    if (categories.adventure > 0) parts.push(`${categories.adventure} adventure`);
+    if (categories.other > 0) parts.push(`${categories.other} other`);
+    
+    return `${attractions.length} attractions (${parts.join(', ')})`;
+  };
+  
+  // Helper function to extract English and Nepali parts from attraction string
+  const extractBilingualParts = (attraction: string) => {
+    // Handle attractions with category prefix (e.g., "natural:Attraction Name")
+    const parts = attraction.split(':');
+    const valueWithoutPrefix = parts.length > 1 ? parts[1] : attraction;
+    
+    // Handle attractions with slash format (English/Nepali)
+    const bilingualParts = valueWithoutPrefix.split('/');
+    
+    if (bilingualParts.length > 1) {
+      return {
+        en: bilingualParts[0].trim(),
+        ne: bilingualParts[1].trim()
+      };
+    }
+    
+    // If no Nepali translation exists, return the original value for both
+    return {
+      en: valueWithoutPrefix.trim(),
+      ne: valueWithoutPrefix.trim()
+    };
+  };
 
   // For downloading the report data in various formats
   const handleExport = async (format: 'pdf' | 'excel' | 'csv') => {
@@ -326,8 +442,75 @@ export default function ReportPage({
         // Set wider column width for branding
         brandingWorksheet['!cols'] = [{ wch: 80 }];
         
-        // Create data worksheet from json data
-        const worksheet = XLSX.utils.json_to_sheet(
+        // Create data worksheet based on report type
+        let worksheet;
+        
+        if (type === 'tourism-attractions') {
+          // For tourism attractions, normalize the data with one attraction per row
+          const normalizedData: Array<{
+            'S.N.': number;
+            'Homestay Name': string;
+            'DHSR No': string;
+            'Type': string;
+            'Formatted Address': string;
+            'Local Attraction': string;
+            'Homes': number;
+            'Rooms': number;
+            'Beds': number;
+          }> = [];
+          let rowCounter = 1;
+          
+          dataToExport.forEach((homestay, index) => {
+            // Get all basic homestay information
+            const homestayInfo = {
+              'S.N.': index + 1,
+              'Homestay Name': getValue(homestay, 'homeStayName') || 'N/A',
+              'DHSR No': getValue(homestay, 'dhsrNo') || 'N/A',
+              'Type': getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private',
+              'Formatted Address': getValue(homestay, 'address.formattedAddress.en') || 'N/A',
+              'Homes': parseInt(getValue(homestay, 'homeCount')) || 0,
+              'Rooms': parseInt(getValue(homestay, 'roomCount')) || 0,
+              'Beds': parseInt(getValue(homestay, 'bedCount')) || 0
+            };
+            
+            // If no attractions, add one row with "None" as attraction
+            if (!homestay.features?.localAttractions || homestay.features.localAttractions.length === 0) {
+              normalizedData.push({
+                ...homestayInfo,
+                'Local Attraction': 'None'
+              });
+              rowCounter++;
+              return;
+            }
+            
+            // For each attraction, create a separate row with the same homestay info
+            homestay.features.localAttractions.forEach(attraction => {
+              const { en } = extractBilingualParts(attraction);
+              normalizedData.push({
+                ...homestayInfo,
+                'Local Attraction': en
+              });
+              rowCounter++;
+            });
+          });
+          
+          worksheet = XLSX.utils.json_to_sheet(normalizedData);
+          
+          // Set column widths for tourism attractions
+          worksheet['!cols'] = [
+            { wch: 5 },   // S.N.
+            { wch: 25 },  // Homestay Name
+            { wch: 15 },  // DHSR No
+            { wch: 12 },  // Type
+            { wch: 40 },  // Formatted Address
+            { wch: 60 },  // Local Attraction
+            { wch: 10 },  // Homes
+            { wch: 10 },  // Rooms
+            { wch: 10 }   // Beds
+          ];
+        } else {
+          // Original geographical-classification columns
+          worksheet = XLSX.utils.json_to_sheet(
           dataToExport.map((homestay, index) => ({
             'S.N.': index + 1,
             'Homestay Name': getValue(homestay, 'homeStayName') || 'N/A',
@@ -347,8 +530,8 @@ export default function ReportPage({
           }))
         );
         
-        // Set column widths
-        const colWidths = [
+          // Set column widths for geographical classification
+          worksheet['!cols'] = [
           { wch: 5 },  // S.N.
           { wch: 25 }, // Homestay Name
           { wch: 15 }, // DHSR No
@@ -365,16 +548,17 @@ export default function ReportPage({
           { wch: 10 }, // Rooms
           { wch: 10 }  // Beds
         ];
-        worksheet['!cols'] = colWidths;
+        }
         
         // Create workbook and add the worksheets
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, brandingWorksheet, 'Report Info');
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Homestays');
         
-        // Generate filename with date
+        // Generate filename with date and report type
         const today = new Date().toISOString().slice(0, 10);
-        const filename = `Homestay_Geographical_Report_${today}.xlsx`;
+        const reportType = type.charAt(0).toUpperCase() + type.slice(1).replace(/-/g, '_');
+        const filename = `Homestay_${reportType}_Report_${today}.xlsx`;
         
         // Write and download
         XLSX.writeFile(workbook, filename);
@@ -432,17 +616,47 @@ export default function ReportPage({
           doc.setFont('helvetica', 'bold');
           doc.text(`${branding.brandName || 'Department of Tourism'}`, centerX, 40, { align: 'center' });
           
+          // Add contact information immediately after brand name
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'normal');
+          let contactY = 46;
+          
+          if (branding.contactInfo?.address) {
+            doc.text(`${branding.contactInfo.address}`, centerX, contactY, { align: 'center' });
+            contactY += 4;
+          }
+          
+          // Add email and phone on the same line if both exist
+          if (branding.contactInfo?.email || branding.contactInfo?.phone) {
+            let contactText = '';
+            if (branding.contactInfo?.email) {
+              contactText += branding.contactInfo.email;
+            }
+            if (branding.contactInfo?.email && branding.contactInfo?.phone) {
+              contactText += ' | ';
+            }
+            if (branding.contactInfo?.phone) {
+              contactText += branding.contactInfo.phone;
+            }
+            doc.text(contactText, centerX, contactY, { align: 'center' });
+            contactY += 6; // Add more space after contact info
+          }
+          
+          // Government and system info after contact info
           doc.setFontSize(12);
-          doc.text('Government of Nepal', centerX, 46, { align: 'center' });
-          doc.text('Homestay Management System', centerX, 52, { align: 'center' });
+          doc.text('Government of Nepal', centerX, contactY, { align: 'center' });
+          contactY += 6;
+          doc.text('Homestay Management System', centerX, contactY, { align: 'center' });
+          contactY += 8;
           
           // Add report title and description
           doc.setFontSize(14);
-          doc.text(`Report: ${title}`, centerX, 62, { align: 'center' });
+          doc.setFont('helvetica', 'bold');
+          doc.text(`Report: ${title}`, centerX, contactY, { align: 'center' });
           
           doc.setFontSize(10);
           doc.setFont('helvetica', 'normal');
-          doc.text(description, centerX, 68, { align: 'center' });
+          doc.text(description, centerX, contactY + 6, { align: 'center' });
           
           // Add date and reference number
           doc.text(`Date: ${currentDate}`, pageWidth - 20, 15, { align: 'right' });
@@ -451,11 +665,190 @@ export default function ReportPage({
           const timestamp = Date.now().toString().slice(-6);
           doc.text(`Ref. No: HMS/${reportType}/${new Date().getFullYear()}/${timestamp}`, 20, 15);
           
-          // Generate table with data
+          // Calculate table start Y position based on content above
+          const tableStartY = contactY + 15; // Add more space after the description
+          
+          // Generate table with data based on report type
+          if (type === 'tourism-attractions') {
+            // For tourism attractions, normalize the data with one attraction per row
+            const normalizedData: Array<(string | number)[]> = [];
+            const normalizedHeaders = ['S.N.', 'Homestay Name', 'DHSR No', 'Type', 'Formatted Address', 'Local Attraction', 'Homes', 'Rooms', 'Beds'];
+            
+            dataToExport.forEach((homestay, index) => {
+              // Only process homestays with complete essential data
+              if (!getValue(homestay, 'homeStayName') || !getValue(homestay, 'address.formattedAddress.en')) {
+                return; // Skip this homestay if it's missing essential data
+              }
+              
+              // If no attractions, add one row with "None"
+              if (!homestay.features?.localAttractions || homestay.features.localAttractions.length === 0) {
+                normalizedData.push([
+                  index + 1,
+                  getValue(homestay, 'homeStayName') || 'N/A',
+                  getValue(homestay, 'dhsrNo') || 'N/A',
+                  getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private',
+                  getValue(homestay, 'address.formattedAddress.en') || 'N/A',
+                  'None',
+                  Number(getValue(homestay, 'homeCount')) || 0,
+                  Number(getValue(homestay, 'roomCount')) || 0,
+                  Number(getValue(homestay, 'bedCount')) || 0
+                ]);
+                return;
+              }
+              
+              // For each attraction, create a separate row
+              homestay.features.localAttractions.forEach((attraction, attrIndex) => {
+                const { en } = extractBilingualParts(attraction);
+                
+                // Skip empty attractions
+                if (!en || en.trim() === '') return;
+                
+                normalizedData.push([
+                  index + 1, // Keep the same S.N. for all rows of the same homestay
+                  getValue(homestay, 'homeStayName') || 'N/A',
+                  getValue(homestay, 'dhsrNo') || 'N/A',
+                  getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private',
+                  getValue(homestay, 'address.formattedAddress.en') || 'N/A',
+                  en || 'N/A', // Ensure we always have a value
+                  Number(getValue(homestay, 'homeCount')) || 0,
+                  Number(getValue(homestay, 'roomCount')) || 0,
+                  Number(getValue(homestay, 'bedCount')) || 0
+                ]);
+              });
+            });
+            
+            // Make sure data rows are filtered to remove any with empty values
+            const filteredData = normalizedData.filter(row => 
+              row[1] !== 'N/A' && 
+              row[1] !== '' && 
+              row[4] !== 'N/A' && 
+              row[4] !== '' && 
+              row[5] !== 'N/A' && 
+              row[5] !== ''
+            );
+            
+            autoTable(doc, {
+              startY: tableStartY,
+              head: [normalizedHeaders],
+              body: filteredData,
+              styles: {
+                fontSize: 8,
+                cellPadding: 2,
+                lineColor: [0, 0, 0],
+                lineWidth: 0.1,
+                halign: 'left',
+                valign: 'middle',
+                overflow: 'ellipsize',
+                cellWidth: 'auto',
+                font: 'helvetica'
+              },
+              columnStyles: {
+                0: { cellWidth: 10 },   // S.N.
+                1: { cellWidth: 28 },  // Homestay Name
+                2: { cellWidth: 20 },  // DHSR No
+                3: { cellWidth: 22 },  // Type - increased width
+                4: { cellWidth: 70, overflow: 'linebreak' }, // Formatted Address
+                5: { cellWidth: 85, overflow: 'linebreak' },  // Local Attraction (increased width)
+                6: { cellWidth: 15 },  // Homes
+                7: { cellWidth: 15 },  // Rooms
+                8: { cellWidth: 12 }   // Beds
+              },
+              headStyles: {
+                fillColor: [220, 220, 220],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                halign: 'center'
+              },
+              alternateRowStyles: {
+                fillColor: [245, 245, 245]
+              },
+              margin: { top: 60 },
+              didDrawPage: function(pageData) {
+                // Add header to continuation pages
+                if (pageData.pageNumber > 1) {
+                  // Add branding first
+                  doc.setFontSize(12);
+                  doc.setFont('helvetica', 'bold');
+                  doc.text(`${branding.brandName || 'Department of Tourism'}`, centerX, 15, { align: 'center' });
+                  
+                  // Add logo to continuation pages - use a synchronous approach
+                  if (branding.logoPath) {
+                    try {
+                      // Create a temporary image element to get dimensions
+                      const tmpImg = document.createElement('img');
+                      tmpImg.src = getImageUrl(branding.logoPath);
+                      
+                      // Default dimensions if image not loaded yet
+                      const imgWidth = 20;
+                      const imgHeight = 20;
+                      
+                      // Add the image directly without waiting for onload
+                      doc.addImage(
+                        getImageUrl(branding.logoPath), 
+                        'JPEG', 
+                        centerX - 55, 
+                        5, 
+                        imgWidth, 
+                        imgHeight
+                      );
+                    } catch (error) {
+                      console.error('Error adding logo to continuation page:', error);
+                    }
+                  }
+                  
+                  // Add contact information on continuation pages
+                  doc.setFontSize(8);
+                  doc.setFont('helvetica', 'normal');
+                  let contPageContactY = 20;
+                  
+                  if (branding.contactInfo?.address) {
+                    doc.text(`${branding.contactInfo.address}`, centerX, contPageContactY, { align: 'center' });
+                    contPageContactY += 4;
+                  }
+                  
+                  if (branding.contactInfo?.email || branding.contactInfo?.phone) {
+                    let contactText = '';
+                    if (branding.contactInfo?.email) {
+                      contactText += branding.contactInfo.email;
+                    }
+                    if (branding.contactInfo?.email && branding.contactInfo?.phone) {
+                      contactText += ' | ';
+                    }
+                    if (branding.contactInfo?.phone) {
+                      contactText += branding.contactInfo.phone;
+                    }
+                    doc.text(contactText, centerX, contPageContactY, { align: 'center' });
+                    contPageContactY += 4;
+                  }
+                  
+                  doc.setFontSize(10);
+                  doc.text('Government of Nepal', centerX, contPageContactY + 2, { align: 'center' });
+                  doc.text('Homestay Management System', centerX, contPageContactY + 7, { align: 'center' });
+                  
+                  doc.setFont('helvetica', 'bold');
+                  doc.text(`Tourism Attractions Report - Continued`, centerX, contPageContactY + 12, { align: 'center' });
+                  doc.setDrawColor(0);
+                  doc.setLineWidth(0.5);
+                  doc.line(20, contPageContactY + 15, pageWidth - 20, contPageContactY + 15);
+                }
+                
+                // Move page numbers to bottom left corner
+                doc.setFontSize(8);
+                doc.text(`Page ${doc.getNumberOfPages()}`, 20, doc.internal.pageSize.getHeight() - 10);
+              }
+            });
+          } else {
+            // Original geographical-classification table
+            // Filter out any data with missing values
+            const filteredData = dataToExport.filter(homestay => 
+              getValue(homestay, 'homeStayName') && 
+              getValue(homestay, 'address.formattedAddress.en')
+            );
+            
           autoTable(doc, {
-            startY: 80,
+            startY: tableStartY,
             head: [['S.N.', 'Homestay Name', 'DHSR No', 'Type', 'Status', 'Province', 'District', 'Municipality', 'Ward', 'Village', 'Homes', 'Rooms', 'Beds']],
-            body: dataToExport.map((homestay, index) => [
+            body: filteredData.map((homestay, index) => [
               index + 1,
               getValue(homestay, 'homeStayName') || 'N/A',
               getValue(homestay, 'dhsrNo') || 'N/A',
@@ -475,16 +868,16 @@ export default function ReportPage({
               cellPadding: 2,
               lineColor: [0, 0, 0],
               lineWidth: 0.1,
-              halign: 'left', // Left-align text
-              valign: 'middle', // Center vertically
-              overflow: 'ellipsize', // Prevent text from wrapping
-              cellWidth: 'auto' // Auto cell width
+                halign: 'left',
+                valign: 'middle',
+                overflow: 'ellipsize',
+                cellWidth: 'auto'
             },
             headStyles: {
               fillColor: [220, 220, 220],
               textColor: [0, 0, 0],
               fontStyle: 'bold',
-              halign: 'center' // Center align headers
+                halign: 'center'
             },
             alternateRowStyles: {
               fillColor: [245, 245, 245]
@@ -493,16 +886,69 @@ export default function ReportPage({
             didDrawPage: function(pageData) {
               // Add header to continuation pages
               if (pageData.pageNumber > 1) {
-                doc.setFontSize(10);
+                doc.setFontSize(12);
                 doc.setFont('helvetica', 'bold');
                 doc.text(`${branding.brandName || 'Department of Tourism'}`, centerX, 15, { align: 'center' });
-                doc.setFont('helvetica', 'normal');
+                
+                // Add logo to continuation pages - use a synchronous approach
+                if (branding.logoPath) {
+                  try {
+                    // Create a temporary image element to get dimensions
+                    const tmpImg = document.createElement('img');
+                    tmpImg.src = getImageUrl(branding.logoPath);
+                    
+                    // Default dimensions if image not loaded yet
+                    const imgWidth = 20;
+                    const imgHeight = 20;
+                    
+                    // Add the image directly without waiting for onload
+                    doc.addImage(
+                      getImageUrl(branding.logoPath), 
+                      'JPEG', 
+                      centerX - 55, 
+                      5, 
+                      imgWidth, 
+                      imgHeight
+                    );
+                  } catch (error) {
+                    console.error('Error adding logo to continuation page:', error);
+                  }
+                }
+                
+                // Add contact information on continuation pages
                 doc.setFontSize(8);
-                doc.text('Homestay Management System', centerX, 22, { align: 'center' });
-                doc.text(`Geographical Classification Report - Continued`, centerX, 27, { align: 'center' });
+                doc.setFont('helvetica', 'normal');
+                let contPageContactY = 20;
+                
+                if (branding.contactInfo?.address) {
+                  doc.text(`${branding.contactInfo.address}`, centerX, contPageContactY, { align: 'center' });
+                  contPageContactY += 4;
+                }
+                
+                if (branding.contactInfo?.email || branding.contactInfo?.phone) {
+                  let contactText = '';
+                  if (branding.contactInfo?.email) {
+                    contactText += branding.contactInfo.email;
+                  }
+                  if (branding.contactInfo?.email && branding.contactInfo?.phone) {
+                    contactText += ' | ';
+                  }
+                  if (branding.contactInfo?.phone) {
+                    contactText += branding.contactInfo.phone;
+                  }
+                  doc.text(contactText, centerX, contPageContactY, { align: 'center' });
+                  contPageContactY += 4;
+                }
+                
+                doc.setFontSize(10);
+                doc.text('Government of Nepal', centerX, contPageContactY + 2, { align: 'center' });
+                doc.text('Homestay Management System', centerX, contPageContactY + 7, { align: 'center' });
+                
+                doc.setFont('helvetica', 'bold');
+                doc.text(`Geographical Classification Report - Continued`, centerX, contPageContactY + 12, { align: 'center' });
                 doc.setDrawColor(0);
                 doc.setLineWidth(0.5);
-                doc.line(20, 30, pageWidth - 20, 30);
+                doc.line(20, contPageContactY + 15, pageWidth - 20, contPageContactY + 15);
               }
               
               // Move page numbers to bottom left corner
@@ -510,22 +956,25 @@ export default function ReportPage({
               doc.text(`Page ${doc.getNumberOfPages()}`, 20, doc.internal.pageSize.getHeight() - 10);
             }
           });
+          }
           
           // Add footer with signature
           const lastPage = doc.getNumberOfPages();
           doc.setPage(lastPage);
           
           const pageHeight = doc.internal.pageSize.getHeight();
-          const footerY = pageHeight - 30;
+          // Increase vertical space for signature area - moved up higher on the page
+          const footerY = pageHeight - 50;  
           doc.setFontSize(10);
           
-          // Center align the signature properly
+          // Center align the signature properly with more space
           doc.text('Authorized Signature', pageWidth - 50, footerY, { align: 'center' });
-          doc.line(pageWidth - 90, footerY + 10, pageWidth - 10, footerY + 10);
-          doc.text('Tourism Officer', pageWidth - 50, footerY + 18, { align: 'center' });
+          doc.line(pageWidth - 90, footerY + 15, pageWidth - 10, footerY + 15);
+          doc.text('Tourism Officer', pageWidth - 50, footerY + 25, { align: 'center' });
           
-          // Save the PDF
-          doc.save(`Homestay_Geographical_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
+          // Save the PDF with appropriate name based on report type
+          const reportTypeName = type.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('_');
+          doc.save(`Homestay_${reportTypeName}_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
         }
       }
       
@@ -870,26 +1319,211 @@ export default function ReportPage({
             )}
             
             {type === 'tourism-attractions' && (
-              <div className="border rounded-lg p-5">
-                <h2 className="text-lg font-medium mb-4">Local Tourism Attractions</h2>
-                <div className="aspect-video bg-gray-100 flex items-center justify-center">
-                  <p className="text-gray-500">Tourism attraction map will appear here</p>
+              <>
+                {/* Filters Section */}
+                <div className="mb-8 border p-4 rounded-lg print:hidden">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-medium">Filter Homestays</h2>
+                    <button 
+                      onClick={resetFilters}
+                      className="text-sm text-primary hover:underline flex items-center"
+                    >
+                      <Filter className="h-4 w-4 mr-1" />
+                      Reset Filters
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                    {/* Province Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Province</label>
+                      <select
+                        value={filters.province || ''}
+                        onChange={(e) => handleFilterChange('province', e.target.value)}
+                        className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary/20 transition-colors"
+                      >
+                        <option value="">All Provinces</option>
+                        {provinces.map(province => (
+                          <option key={province} value={province}>{province}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {/* District Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">District</label>
+                      <select
+                        value={filters.district || ''}
+                        onChange={(e) => handleFilterChange('district', e.target.value)}
+                        className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary/20 transition-colors"
+                        disabled={!filters.province}
+                      >
+                        <option value="">All Districts</option>
+                        {districts.map(district => (
+                          <option key={district} value={district}>{district}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {/* Municipality Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Municipality</label>
+                      <select
+                        value={filters.municipality || ''}
+                        onChange={(e) => handleFilterChange('municipality', e.target.value)}
+                        className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary/20 transition-colors"
+                        disabled={!filters.district}
+                      >
+                        <option value="">All Municipalities</option>
+                        {municipalities.map(municipality => (
+                          <option key={municipality} value={municipality}>{municipality}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {/* Homestay Type Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Homestay Type</label>
+                      <select
+                        value={filters.homestayType || ''}
+                        onChange={(e) => handleFilterChange('homestayType', e.target.value as any)}
+                        className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary/20 transition-colors"
+                      >
+                        <option value="">All Types</option>
+                        <option value="community">Community</option>
+                        <option value="private">Private</option>
+                      </select>
+                    </div>
+                    
+                    {/* Status Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                      <select
+                        value={filters.status || ''}
+                        onChange={(e) => handleFilterChange('status', e.target.value as any)}
+                        className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary/20 transition-colors"
+                      >
+                        <option value="">All Statuses</option>
+                        <option value="approved">Approved</option>
+                        <option value="pending">Pending</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  {/* Attraction Filters */}
+                  <div className="border-t pt-4">
+                    <h3 className="text-md font-medium mb-3">Filter by Attractions</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2">
+                      {attractionsCategories.flatMap((category: { options: any[]; }) => category.options)
+                        .map((option: { value?: string | number | readonly string[] }) => {
+                          // Ensure option.value is treated as a string, default to empty string if undefined/null
+                          const optionValueStr = String(option.value ?? '');
+                          const optionLabel = optionValueStr.split('/')[0] || optionValueStr; // Use full value if no slash
+
+                          return (
+                            <div key={optionValueStr} className="flex items-center">
+                              <input
+                                type="checkbox"
+                                id={`attraction-filter-${optionValueStr}`}
+                                value={optionValueStr}
+                                checked={filters.selectedAttractions?.includes(optionValueStr) || false}
+                                onChange={(e) => handleFilterChange('selectedAttractions', e.target.value, e)}
+                                className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                              />
+                              <label
+                                htmlFor={`attraction-filter-${optionValueStr}`}
+                                className="ml-2 text-sm text-gray-600 truncate"
+                                title={optionLabel} // Tooltip for English name
+                              >
+                                {optionLabel} {/* Show only English name */}
+                              </label>
+                            </div>
+                          );
+                      })}
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                
+                {/* Data Table */}
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-100 text-gray-700 text-xs font-medium border-b">
+                      <tr>
+                        <th className="px-4 py-3 text-left w-12">S.N.</th>
+                        {renderColumnHeader('Homestay Name', 'homeStayName')}
+                        {renderColumnHeader('DHSR No', 'dhsrNo')}
+                        {renderColumnHeader('Type', 'homeStayType')}
+                        {renderColumnHeader('Formatted Address', 'address.formattedAddress.en')}
+                        {renderColumnHeader('Local Attractions', 'features.localAttractions')}
+                        {renderColumnHeader('Homes', 'homeCount')}
+                        {renderColumnHeader('Rooms', 'roomCount')}
+                        {renderColumnHeader('Beds', 'bedCount')}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {sortedHomestays.length > 0 ? (
+                        sortedHomestays.map((homestay, index) => (
+                          <tr 
+                            key={homestay._id} 
+                            className="text-xs hover:bg-gray-50 transition-colors"
+                          >
+                            <td className="px-4 py-3 text-gray-900">{index + 1}</td>
+                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'dhsrNo') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900">
+                              {getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private'}
+                            </td>
+                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'address.formattedAddress.en') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900">
+                              {formatAttractions(homestay.features?.localAttractions)}
+                            </td>
+                            <td className="px-4 py-3 text-gray-900">{Number(getValue(homestay, 'homeCount')) || 0}</td>
+                            <td className="px-4 py-3 text-gray-900">{Number(getValue(homestay, 'roomCount')) || 0}</td>
+                            <td className="px-4 py-3 text-gray-900">{Number(getValue(homestay, 'bedCount')) || 0}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={9} className="px-4 py-6 text-center text-gray-500">
+                            <div className="flex flex-col items-center justify-center py-8">
+                              <BarChart2 className="h-10 w-10 text-gray-300 mb-3" />
+                              <h3 className="text-sm font-semibold text-gray-600 mb-1">No homestays found</h3>
+                              <p className="text-xs text-gray-500">Try changing your filters or try again later</p>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Summary Section */}
+                <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-gray-50 p-4 rounded-md">
                     <p className="font-medium">Popular Attractions</p>
-                    <p className="text-sm text-gray-500 mt-2">Most visited local attractions</p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      {homestays.reduce((count, h) => count + (h.features?.localAttractions?.length || 0), 0)} attractions across {homestays.length} homestays
+                    </p>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-md">
                     <p className="font-medium">Cultural Sites</p>
-                    <p className="text-sm text-gray-500 mt-2">Cultural and historical sites near homestays</p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      {homestays.reduce((count, h) => {
+                        return count + (h.features?.localAttractions?.filter(a => a.startsWith('cultural:') || a.includes('Museum') || a.includes('संग्रहालय')).length || 0);
+                      }, 0)} cultural sites listed
+                    </p>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-md">
                     <p className="font-medium">Natural Attractions</p>
-                    <p className="text-sm text-gray-500 mt-2">Natural attractions and scenic spots</p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      {homestays.reduce((count, h) => {
+                        return count + (h.features?.localAttractions?.filter(a => a.startsWith('natural:') || a.includes('Park') || a.includes('River') || a.includes('नदी')).length || 0);
+                      }, 0)} natural attractions
+                    </p>
                   </div>
                 </div>
-              </div>
+              </>
             )}
             
             {type === 'infrastructure' && (

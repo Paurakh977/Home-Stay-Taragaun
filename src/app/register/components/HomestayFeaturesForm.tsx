@@ -14,7 +14,7 @@ type HomestayFeaturesFormProps = {
 };
 
 // Categorized local attractions with English/Nepali translations
-const attractionsCategories = [
+export const attractionsCategories = [
   {
     id: 'natural',
     name: 'Natural Attractions / प्राकृतिक सम्पदा',

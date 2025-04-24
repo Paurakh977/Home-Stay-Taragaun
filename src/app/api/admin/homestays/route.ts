@@ -21,6 +21,8 @@ export async function GET(request: NextRequest) {
     const municipality = searchParams.get('municipality');
     const homestayType = searchParams.get('homestayType');
     const status = searchParams.get('status');
+    const includeFeatures = searchParams.get('includeFeatures') === 'true';
+    const attractionsParam = searchParams.get('attractions');
     
     // Validate adminUsername
     if (!adminUsername) {
@@ -54,11 +56,19 @@ export async function GET(request: NextRequest) {
       query.status = status;
     }
     
+    // Add attraction filter if provided
+    if (attractionsParam) {
+      const selectedAttractions = attractionsParam.split(',');
+      if (selectedAttractions.length > 0) {
+        query['features.localAttractions'] = { $all: selectedAttractions };
+      }
+    }
+    
     console.log('API Query:', JSON.stringify(query));
 
     // Select all fields needed for the admin overview table and filtering
     const homestays = await HomestaySingle.find(query)
-      .select('_id homestayId homeStayName villageName address dhsrNo status homeStayType description contactIds roomCount bedCount homeCount')
+      .select(`_id homestayId homeStayName villageName address dhsrNo status homeStayType description contactIds roomCount bedCount homeCount ${includeFeatures ? 'features' : ''}`)
       .sort({ createdAt: -1 })
       .lean();
 
