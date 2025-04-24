@@ -31,6 +31,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const adminUsername = searchParams.get('adminUsername');
     
+    // Get filter parameters
+    const province = searchParams.get('province');
+    const district = searchParams.get('district');
+    const municipality = searchParams.get('municipality');
+    const homestayType = searchParams.get('homestayType');
+    const status = searchParams.get('status');
+    
     // Validate adminUsername
     if (!adminUsername) {
       console.log('API: Missing admin username parameter');
@@ -77,13 +84,34 @@ export async function GET(request: NextRequest) {
       }
       
       // Build query to filter by the parent admin username
-      const query = { adminUsername };
+      const query: any = { adminUsername };
       
-      console.log('API: Fetching homestays for admin', { adminUsername });
+      // Add filters if provided
+      if (province) {
+        query['address.province.en'] = province;
+      }
+      
+      if (district) {
+        query['address.district.en'] = district;
+      }
+      
+      if (municipality) {
+        query['address.municipality.en'] = municipality;
+      }
+      
+      if (homestayType) {
+        query.homeStayType = homestayType;
+      }
+      
+      if (status) {
+        query.status = status;
+      }
+      
+      console.log('API: Fetching homestays for admin with filters:', { adminUsername, query });
       
       // Select all fields needed for the officer overview table and filtering
       const homestays = await HomestaySingle.find(query)
-        .select('_id homestayId homeStayName villageName address dhsrNo status homeStayType description contactIds')
+        .select('_id homestayId homeStayName villageName address dhsrNo status homeStayType description contactIds roomCount bedCount homeCount')
         .sort({ createdAt: -1 })
         .lean();
       

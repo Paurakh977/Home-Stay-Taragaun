@@ -13,6 +13,69 @@ type HomestayFeaturesFormProps = {
   updateFormData: (data: Partial<HomestayFeaturesData>) => void;
 };
 
+// Categorized local attractions with English/Nepali translations
+const attractionsCategories = [
+  {
+    id: 'natural',
+    name: 'Natural Attractions / प्राकृतिक सम्पदा',
+    options: [
+      { value: "Chitwan National Park/चितवन राष्ट्रिय निकुञ्ज", checked: false },
+      { value: "Nepal's deepest and widest Narayani River/नेपालकै गहिरो तथा विशाल नारायणी नदी", checked: false },
+      { value: "Fish Pond/माछा पोखरी", checked: false },
+      { value: "Viewpoint Tower/दृश्यावलोकन स्थल (भ्यू टावर)", checked: false },
+      { value: "Watchtowers, wetlands, and grasslands/मचान तथा सिमसार क्षेत्र, घासे मैदान", checked: false },
+    ]
+  },
+  {
+    id: 'cultural',
+    name: 'Ethnic & Cultural Heritage / जातीय/सांस्कृतिक सम्पदा',
+    options: [
+      { value: "Indigenous Tharu Museum/आदिवासी थारू संग्रहालय", checked: false },
+      { value: "Culture of local Tharu, Bote, and Musahar communities/स्थानीय थारू, बोटे र मुसहर समुदायको संस्कृति", checked: false },
+      { value: "Traditional food and culture of the Tharu community/थारू समुदायको परम्परागत भोजन र संस्कृति", checked: false },
+    ]
+  },
+  {
+    id: 'products',
+    name: 'Organic & Local Products / जैविक उत्पादन तथा स्थानीय भोजन',
+    options: [
+      { value: "Organic Food/Organic खाना", checked: false },
+      { value: "Traditional Dishes: Chichar, Dhikri, Ghoghi, Mod, Nijai, etc./परम्परागत खाना: चिचर, ढिकरी, घोगी, मोद, निजई आदि", checked: false },
+    ]
+  },
+  {
+    id: 'forest',
+    name: 'Community Forest & Trails / सामुदायिक वन तथा पदयात्रा',
+    options: [
+      { value: "Gunddahi Dhakaha Community Forest/गुन्द्धही ढकाहा सामुदायिक वन", checked: false },
+      { value: "Community Forest Trekking Trail/सामुदायिक वन पदयात्रा मार्ग", checked: false },
+    ]
+  },
+  {
+    id: 'wildlife',
+    name: 'Wildlife & Birdwatching / वन्यजन्तु तथा चराचुरुङ्गी',
+    options: [
+      { value: "One-horned Rhinoceros/एक सिङ्गे गैडा", checked: false },
+      { value: "Royal Bengal Tiger/पाटेबाघ", checked: false },
+      { value: "Gharial Crocodile/घडियाल", checked: false },
+      { value: "Other endangered wildlife and birds/अन्य लोपोन्मुख वन्यजन्तु तथा चराचुरुङ्गी", checked: false },
+    ]
+  },
+  {
+    id: 'adventure',
+    name: 'Adventure & Eco-tourism Activities / साहसिक तथा पारिस्थितिक पर्यटन',
+    options: [
+      { value: "Himalayan Climbing and Trekking/हिमाली आरोहण तथा ट्रेकिङ", checked: false },
+      { value: "Eco-tourism based exploration/Eco-tourism based exploration", checked: false },
+      { value: "Adventure Sports like: Boating, Hiking, Jungle Walk, Elephant Safari, Jeep Safari/साहसिक खेलहरू (जस्तै: बोटिङ, हाइकिङ, जंगल वाक, हात्ती सफारी, जीप सफारी)", checked: false },
+      { value: "Fishing in the fish pond/माछा पोखरीमा फिसिङ", checked: false },
+      { value: "Tharu village tour, cycling, mobile cart ride/थारू गाउँ सयर (भिलेज वाक), साइकल यात्रा, मोबाइल गाडा सयर", checked: false },
+      { value: "Sunset viewing from the Narayani riverside/नारायणी नदीको किनारबाट सूर्यास्त दृश्य अवलोकन", checked: false },
+      { value: "Elephant Bathing/हात्ती बाथ", checked: false },
+    ]
+  }
+];
+
 // Common tourism services with English/Nepali translations
 const commonTourismServices = [
   { value: "Welcome and Farewell/स्वागत तथा विदाई", checked: false },
@@ -36,10 +99,23 @@ const commonInfrastructure = [
 const HomestayFeaturesForm: React.FC<HomestayFeaturesFormProps> = ({ formData, updateFormData }) => {
   // State for new items
   const [newAttraction, setNewAttraction] = useState("");
+  const [categoryNewAttractions, setCategoryNewAttractions] = useState<{[key: string]: string}>(
+    Object.fromEntries(attractionsCategories.map(cat => [cat.id, ""]))
+  );
   const [newService, setNewService] = useState("");
   const [newInfrastructure, setNewInfrastructure] = useState("");
   
   // State for checkboxes
+  const [attractionCheckboxesByCategory, setAttractionCheckboxesByCategory] = useState(
+    attractionsCategories.map(category => ({
+      ...category,
+      options: category.options.map(option => ({
+        ...option,
+        checked: formData.localAttractions.includes(option.value)
+      }))
+    }))
+  );
+  
   const [tourismServiceCheckboxes, setTourismServiceCheckboxes] = useState(
     commonTourismServices.map(service => ({
       ...service,
@@ -56,6 +132,16 @@ const HomestayFeaturesForm: React.FC<HomestayFeaturesFormProps> = ({ formData, u
   
   // Update checkbox states when formData changes
   useEffect(() => {
+    setAttractionCheckboxesByCategory(
+      attractionsCategories.map(category => ({
+        ...category,
+        options: category.options.map(option => ({
+          ...option,
+          checked: formData.localAttractions.includes(option.value)
+        }))
+      }))
+    );
+    
     setTourismServiceCheckboxes(
       commonTourismServices.map(service => ({
         ...service,
@@ -69,7 +155,7 @@ const HomestayFeaturesForm: React.FC<HomestayFeaturesFormProps> = ({ formData, u
         checked: formData.infrastructure.includes(infra.value)
       }))
     );
-  }, [formData.tourismServices, formData.infrastructure]);
+  }, [formData.tourismServices, formData.infrastructure, formData.localAttractions]);
 
   // Make sure arrays exist
   const attractions = Array.isArray(formData.localAttractions) ? formData.localAttractions : [];
@@ -83,6 +169,25 @@ const HomestayFeaturesForm: React.FC<HomestayFeaturesFormProps> = ({ formData, u
       localAttractions: [...attractions, newAttraction]
     });
     setNewAttraction("");
+  };
+
+  // Handle adding category-specific attraction
+  const handleAddCategoryAttraction = (categoryId: string) => {
+    const customValue = categoryNewAttractions[categoryId];
+    if (customValue.trim() === "") return;
+    
+    // Create a prefixed value that includes the category for easier filtering later
+    const categorizedValue = `${categoryId}:${customValue}`;
+    
+    updateFormData({
+      localAttractions: [...attractions, categorizedValue]
+    });
+    
+    // Reset the input field
+    setCategoryNewAttractions({
+      ...categoryNewAttractions,
+      [categoryId]: ""
+    });
   };
 
   // Handle adding services
@@ -172,6 +277,34 @@ const HomestayFeaturesForm: React.FC<HomestayFeaturesFormProps> = ({ formData, u
     });
   };
 
+  // Handle checkbox change for attractions
+  const handleAttractionCheckboxChange = (categoryIndex: number, optionIndex: number) => {
+    const updatedCategories = [...attractionCheckboxesByCategory];
+    updatedCategories[categoryIndex].options[optionIndex].checked = 
+      !updatedCategories[categoryIndex].options[optionIndex].checked;
+    setAttractionCheckboxesByCategory(updatedCategories);
+    
+    // Update form data based on checked boxes
+    const checkedValues = updatedCategories.flatMap(category => 
+      category.options
+        .filter(option => option.checked)
+        .map(option => option.value)
+    );
+    
+    // Combine checked values with custom entries (excluding common ones)
+    const allCommonValues = attractionsCategories.flatMap(category => 
+      category.options.map(option => option.value)
+    );
+    
+    const customAttractions = attractions.filter(
+      attraction => !allCommonValues.includes(attraction)
+    );
+    
+    updateFormData({
+      localAttractions: [...checkedValues, ...customAttractions]
+    });
+  };
+
   return (
     <div className="space-y-8">
       {/* Local Tourism Attractions/Products */}
@@ -181,13 +314,89 @@ const HomestayFeaturesForm: React.FC<HomestayFeaturesFormProps> = ({ formData, u
           <span className="text-red-500 ml-1">*</span>
         </h3>
         <p className="text-sm text-gray-600">At least one attraction is required.</p>
+        
+        {/* Categories and their checkboxes */}
+        <div className="space-y-6 mb-4">
+          {attractionCheckboxesByCategory.map((category, categoryIndex) => (
+            <div key={category.id} className="space-y-2 border-l-4 border-primary pl-4 py-2">
+              <h4 className="text-sm font-medium text-gray-700">{category.name}</h4>
+              <div className="grid grid-cols-1 gap-2">
+                {category.options.map((option, optionIndex) => (
+                  <div key={optionIndex} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id={`attraction-${category.id}-${optionIndex}`}
+                      checked={option.checked}
+                      onChange={() => handleAttractionCheckboxChange(categoryIndex, optionIndex)}
+                      className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                    />
+                    <label 
+                      htmlFor={`attraction-${category.id}-${optionIndex}`} 
+                      className="ml-2 text-sm text-gray-700"
+                    >
+                      {option.value.split('/')[0]} / {option.value.split('/')[1]}
+                    </label>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Custom entry field for this category */}
+              <div className="mt-2">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="text"
+                    value={categoryNewAttractions[category.id]}
+                    onChange={(e) => setCategoryNewAttractions({
+                      ...categoryNewAttractions,
+                      [category.id]: e.target.value
+                    })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCategoryAttraction(category.id);
+                      }
+                    }}
+                    placeholder={`Add custom ${category.name.split('/')[0].toLowerCase()} / कस्टम ${category.name.split('/')[1].toLowerCase()} थप्नुहोस्`}
+                    className="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleAddCategoryAttraction(category.id)}
+                    className="px-3 py-2 bg-primary text-white rounded-md hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary text-sm"
+                  >
+                    Add / थप्नुहोस्
+                  </button>
+                </div>
+              </div>
+              
+              {/* List of custom entries for this category */}
+              <div className="space-y-2 mt-2">
+                {attractions
+                  .filter(attraction => attraction.startsWith(`${category.id}:`))
+                  .map((attraction, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 border border-gray-200 rounded-md bg-gray-50">
+                      <span className="text-sm">{attraction.substring(attraction.indexOf(':') + 1)}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAttraction(attractions.indexOf(attraction))}
+                        className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        
         <div className="flex items-center space-x-2">
           <input
             type="text"
             value={newAttraction}
             onChange={(e) => setNewAttraction(e.target.value)}
             onKeyDown={(e) => handleKeyDown(e, handleAddAttraction)}
-            placeholder="Add attraction / आकर्षण थप्नुहोस्"
+            placeholder="Add general attraction / सामान्य आकर्षण थप्नुहोस्"
             className="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
           />
           <button
@@ -199,21 +408,25 @@ const HomestayFeaturesForm: React.FC<HomestayFeaturesFormProps> = ({ formData, u
           </button>
         </div>
         
-        {/* List of added attractions */}
+        {/* List of added custom attractions (general) */}
         <div className="space-y-2">
-          {attractions.map((attraction, index) => (
-            <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-md">
-              <span>{attraction}</span>
-              <button
-                type="button"
-                onClick={() => handleRemoveAttraction(index)}
-                className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
-                disabled={attractions.length === 1}
-              >
-                ✕
-              </button>
-            </div>
-          ))}
+          {attractions
+            .filter(attraction => 
+              !attractionsCategories.flatMap(cat => cat.options.map(opt => opt.value)).includes(attraction) && 
+              !attraction.includes(':')
+            )
+            .map((attraction, index) => (
+              <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-md">
+                <span>{attraction}</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveAttraction(attractions.indexOf(attraction))}
+                  className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
           {attractions.length === 0 && (
             <p className="text-sm text-red-500 italic">No attractions added yet. Please add at least one.</p>
           )}
