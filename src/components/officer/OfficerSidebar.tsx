@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Hotel, LogOut, PlusCircle, ListFilter, KeyRound, BarChart2, ChevronDown, ChevronUp, MapPin, Star, Map, Home } from 'lucide-react';
+import { Hotel, LogOut, PlusCircle, ListFilter, KeyRound, BarChart2, ChevronDown, ChevronUp, MapPin, Star, Map, Home, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { useBranding } from '@/context/BrandingContext';
@@ -54,6 +54,11 @@ const reportItems = [
     title: "Physical Infrastructure",
     href: "/officer/report/infrastructure",
     icon: Home,
+  },
+  {
+    title: "Homestay Services",
+    href: "/officer/report/homestay-services",
+    icon: Users,
   }
 ];
 

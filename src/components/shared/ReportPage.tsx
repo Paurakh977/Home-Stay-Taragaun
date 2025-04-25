@@ -17,6 +17,8 @@ interface FilterOptions {
   homestayType?: 'community' | 'private' | '';
   status?: 'approved' | 'pending' | 'rejected' | '';
   selectedAttractions?: string[];
+  selectedInfrastructure?: string[];
+  selectedServices?: string[];
 }
 
 interface Homestay {
@@ -62,10 +64,30 @@ interface Homestay {
 interface ReportPageProps {
   title: string;
   description: string;
-  type: 'geographical-classification' | 'service-ratings' | 'tourism-attractions' | 'infrastructure';
+  type: 'geographical-classification' | 'service-ratings' | 'tourism-attractions' | 'infrastructure' | 'homestay-services';
   userType: 'admin' | 'officer';
   username: string;
 }
+
+// Add infrastructure constants (should match HomestayFeaturesForm)
+const commonInfrastructure = [
+  { value: "Community Building/सामुदायिक भवन", checked: false },
+  { value: "Guest Room, Toilet, Bathroom/पाहुना कोठा, शौचालय, स्नानघर", checked: false },
+  { value: "Transportation Facility/यातायात सुविधा", checked: false },
+  { value: "Drinking Water and Solar Lighting/खानेपानी तथा सोलार बत्ती", checked: false },
+  { value: "Security Post (Nepaltar)/सुरक्षा चौकी (नेपालटार)", checked: false },
+  { value: "Health Post (Udayapurgadhi)/स्वास्थ्य चौकी (उदयपुरगढी)", checked: false },
+  { value: "Communication Facility (Mobile)/सञ्चार सुविधा (मोबाइल)", checked: false },
+];
+
+// Add tourism services constants (should match HomestayFeaturesForm)
+const commonTourismServices = [
+  { value: "Welcome and Farewell/स्वागत तथा विदाई", checked: false },
+  { value: "Comfortable Accommodation/आरामदायी आवास", checked: false },
+  { value: "Gift or Souvenir/मायाको चिनो (उपहार)", checked: false },
+  { value: "Traditional Cultural Program/परम्परागत सांस्कृतिक कार्यक्रम", checked: false },
+  { value: "Local Dishes/स्थानीय परिकारहरू", checked: false },
+];
 
 export default function ReportPage({ 
   title, 
@@ -93,7 +115,7 @@ export default function ReportPage({
   // Fetch homestays data
   useEffect(() => {
     const fetchHomestays = async () => {
-      if (type !== 'geographical-classification' && type !== 'tourism-attractions') return;
+      if (type !== 'geographical-classification' && type !== 'tourism-attractions' && type !== 'infrastructure' && type !== 'homestay-services') return;
       
       try {
         setLoading(true);
@@ -114,6 +136,24 @@ export default function ReportPage({
           queryParams.append('includeFeatures', 'true'); // Ensure features are included when filtering by attractions
         } else if (type === 'tourism-attractions') {
           queryParams.append('includeFeatures', 'true');
+        }
+        
+        // Add infrastructure filter if applicable
+        if (type === 'infrastructure') {
+          queryParams.append('includeFeatures', 'true'); // Always include features for infrastructure report
+          
+          if (filters.selectedInfrastructure && filters.selectedInfrastructure.length > 0) {
+            queryParams.append('infrastructure', filters.selectedInfrastructure.join(','));
+          }
+        }
+        
+        // Add tourism services filter if applicable
+        if (type === 'homestay-services') {
+          queryParams.append('includeFeatures', 'true'); // Always include features for homestay services report
+          
+          if (filters.selectedServices && filters.selectedServices.length > 0) {
+            queryParams.append('services', filters.selectedServices.join(','));
+          }
         }
         
         // Add admin username from props
@@ -208,59 +248,52 @@ export default function ReportPage({
     fetchHomestays();
   // Separate individual filter properties to ensure proper dependency tracking
   }, [type, filters.province, filters.district, filters.municipality, 
-      filters.homestayType, filters.status, filters.selectedAttractions, username, userType]);
+      filters.homestayType, filters.status, filters.selectedAttractions, 
+      filters.selectedInfrastructure, filters.selectedServices, username, userType]);
   
   const goBack = () => {
     const basePath = userType === 'admin' ? `/admin/${username}` : `/officer/${username}`;
     router.push(basePath);
   };
   
+  // Handle filter change for various filter types
   const handleFilterChange = (name: keyof FilterOptions, value: string, e?: React.ChangeEvent<HTMLSelectElement> | React.ChangeEvent<HTMLInputElement>) => {
-    // Reset dependent filters when parent filter changes
-    if (name === 'province') {
-      setFilters({
-        ...filters,
-        province: value,
-        district: '',
-        municipality: ''
-      });
-      // Clear dependent dropdowns
-      setDistricts([]);
-      setMunicipalities([]);
-    } else if (name === 'district') {
-      setFilters({
-        ...filters,
-        district: value,
-        municipality: ''
-      });
-      // Clear dependent dropdown
-      setMunicipalities([]);
-    } else if (name === 'selectedAttractions') {
-      // Handle checkbox array for attractions
-      const currentSelection = filters.selectedAttractions || [];
-      const target = e?.target as HTMLInputElement;
-      if (!target) return;
-
-      const isChecked = target.checked;
-      const attractionValue = target.value;
+    // Special handling for checkboxes (attractions and infrastructure)
+    if ((name === 'selectedAttractions' || name === 'selectedInfrastructure' || name === 'selectedServices') && e?.target.type === 'checkbox') {
+      const isChecked = e.target.checked;
       
-      let updatedSelection;
-      if (isChecked) {
-        updatedSelection = [...currentSelection, attractionValue];
-      } else {
-        updatedSelection = currentSelection.filter(item => item !== attractionValue);
+      setFilters(prevFilters => {
+        // Get the current array or initialize it
+        const currentArray = prevFilters[name] || [];
+        
+        // Add or remove the value
+        if (isChecked) {
+          return { ...prevFilters, [name]: [...currentArray, value] };
+        } else {
+          return { ...prevFilters, [name]: currentArray.filter(item => item !== value) };
+        }
+      });
+      
+      return;
+    }
+    
+    // Regular handling for other filters
+    setFilters((prev) => {
+      const newFilters = { ...prev, [name]: value };
+      
+      // When province changes, reset district and municipality
+      if (name === 'province') {
+        newFilters.district = '';
+        newFilters.municipality = '';
       }
       
-      setFilters({
-        ...filters,
-        selectedAttractions: updatedSelection
-      });
-    } else {
-      setFilters({
-        ...filters,
-        [name]: value
-      });
-    }
+      // When district changes, reset municipality
+      if (name === 'district') {
+        newFilters.municipality = '';
+      }
+      
+      return newFilters;
+    });
   };
   
   const resetFilters = () => {
@@ -837,6 +870,345 @@ export default function ReportPage({
                 doc.text(`Page ${doc.getNumberOfPages()}`, 20, doc.internal.pageSize.getHeight() - 10);
               }
             });
+          } else if (type === 'infrastructure') {
+            // For infrastructure report, normalize the data with one infrastructure item per row
+            const normalizedData: Array<(string | number)[]> = [];
+            const normalizedHeaders = ['S.N.', 'Homestay Name', 'DHSR No', 'Type', 'Formatted Address', 'Infrastructure Item', 'Homes', 'Rooms', 'Beds'];
+            
+            dataToExport.forEach((homestay, index) => {
+              // Only process homestays with complete essential data
+              if (!getValue(homestay, 'homeStayName') || !getValue(homestay, 'address.formattedAddress.en')) {
+                return; // Skip this homestay if it's missing essential data
+              }
+              
+              // If no infrastructure items, add one row with "None"
+              if (!homestay.features?.infrastructure || homestay.features.infrastructure.length === 0) {
+                normalizedData.push([
+                  index + 1,
+                  getValue(homestay, 'homeStayName') || 'N/A',
+                  getValue(homestay, 'dhsrNo') || 'N/A',
+                  getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private',
+                  getValue(homestay, 'address.formattedAddress.en') || 'N/A',
+                  'None',
+                  Number(getValue(homestay, 'homeCount')) || 0,
+                  Number(getValue(homestay, 'roomCount')) || 0,
+                  Number(getValue(homestay, 'bedCount')) || 0
+                ]);
+                return;
+              }
+              
+              // For each infrastructure item, create a separate row
+              homestay.features.infrastructure.forEach((infrastructure, infraIndex) => {
+                // Handle bilingual infrastructure items (English/Nepali format)
+                const parts = infrastructure.split('/');
+                const infraEn = parts[0]?.trim() || infrastructure;
+                
+                // Skip empty infrastructure
+                if (!infraEn || infraEn.trim() === '') return;
+                
+                normalizedData.push([
+                  index + 1, // Keep the same S.N. for all rows of the same homestay
+                  getValue(homestay, 'homeStayName') || 'N/A',
+                  getValue(homestay, 'dhsrNo') || 'N/A',
+                  getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private',
+                  getValue(homestay, 'address.formattedAddress.en') || 'N/A',
+                  infraEn || 'N/A', // English part of infrastructure name
+                  Number(getValue(homestay, 'homeCount')) || 0,
+                  Number(getValue(homestay, 'roomCount')) || 0,
+                  Number(getValue(homestay, 'bedCount')) || 0
+                ]);
+              });
+            });
+            
+            // Make sure data rows are filtered to remove any with empty values
+            const filteredData = normalizedData.filter(row => 
+              row[1] !== 'N/A' && 
+              row[1] !== '' && 
+              row[4] !== 'N/A' && 
+              row[4] !== '' && 
+              row[5] !== 'N/A' && 
+              row[5] !== ''
+            );
+            
+            autoTable(doc, {
+              startY: tableStartY,
+              head: [normalizedHeaders],
+              body: filteredData,
+              styles: {
+                fontSize: 8,
+                cellPadding: 2,
+                lineColor: [0, 0, 0],
+                lineWidth: 0.1,
+                halign: 'left',
+                valign: 'middle',
+                overflow: 'ellipsize',
+                cellWidth: 'auto',
+                font: 'helvetica'
+              },
+              columnStyles: {
+                0: { cellWidth: 10 },   // S.N.
+                1: { cellWidth: 28 },  // Homestay Name
+                2: { cellWidth: 20 },  // DHSR No
+                3: { cellWidth: 22 },  // Type
+                4: { cellWidth: 70, overflow: 'linebreak' }, // Formatted Address
+                5: { cellWidth: 65, overflow: 'linebreak' },  // Infrastructure Item - reduced from 95 to 65
+                6: { cellWidth: 15 },  // Homes
+                7: { cellWidth: 15 },  // Rooms
+                8: { cellWidth: 12 }   // Beds
+              },
+              headStyles: {
+                fillColor: [220, 220, 220],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                halign: 'center'
+              },
+              alternateRowStyles: {
+                fillColor: [245, 245, 245]
+              },
+              margin: { top: 60 },
+              didDrawPage: function(pageData) {
+                // Add header to continuation pages
+                if (pageData.pageNumber > 1) {
+                  // Add branding first
+                  doc.setFontSize(12);
+                  doc.setFont('helvetica', 'bold');
+                  doc.text(`${branding.brandName || 'Department of Tourism'}`, centerX, 15, { align: 'center' });
+                  
+                  // Add logo to continuation pages - use a synchronous approach
+                  if (branding.logoPath) {
+                    try {
+                      // Create a temporary image element to get dimensions
+                      const tmpImg = document.createElement('img');
+                      tmpImg.src = getImageUrl(branding.logoPath);
+                      
+                      // Default dimensions if image not loaded yet
+                      const imgWidth = 20;
+                      const imgHeight = 20;
+                      
+                      // Add the image directly without waiting for onload
+                      doc.addImage(
+                        getImageUrl(branding.logoPath), 
+                        'JPEG', 
+                        centerX - 55, 
+                        5, 
+                        imgWidth, 
+                        imgHeight
+                      );
+                    } catch (error) {
+                      console.error('Error adding logo to continuation page:', error);
+                    }
+                  }
+                  
+                  // Add contact information on continuation pages
+                  doc.setFontSize(8);
+                  doc.setFont('helvetica', 'normal');
+                  let contPageContactY = 20;
+                  
+                  if (branding.contactInfo?.address) {
+                    doc.text(`${branding.contactInfo.address}`, centerX, contPageContactY, { align: 'center' });
+                    contPageContactY += 4;
+                  }
+                  
+                  if (branding.contactInfo?.email || branding.contactInfo?.phone) {
+                    let contactText = '';
+                    if (branding.contactInfo?.email) {
+                      contactText += branding.contactInfo.email;
+                    }
+                    if (branding.contactInfo?.email && branding.contactInfo?.phone) {
+                      contactText += ' | ';
+                    }
+                    if (branding.contactInfo?.phone) {
+                      contactText += branding.contactInfo.phone;
+                    }
+                    doc.text(contactText, centerX, contPageContactY, { align: 'center' });
+                    contPageContactY += 4;
+                  }
+                  
+                  doc.setFontSize(10);
+                  doc.text('Government of Nepal', centerX, contPageContactY + 2, { align: 'center' });
+                  doc.text('Homestay Management System', centerX, contPageContactY + 7, { align: 'center' });
+                  
+                  doc.setFont('helvetica', 'bold');
+                  doc.text(`Infrastructure Report - Continued`, centerX, contPageContactY + 12, { align: 'center' });
+                  doc.setDrawColor(0);
+                  doc.setLineWidth(0.5);
+                  doc.line(20, contPageContactY + 15, pageWidth - 20, contPageContactY + 15);
+                }
+                
+                // Move page numbers to bottom left corner
+                doc.setFontSize(8);
+                doc.text(`Page ${doc.getNumberOfPages()}`, 20, doc.internal.pageSize.getHeight() - 10);
+              }
+            });
+          } else if (type === 'homestay-services') {
+            // For tourism services, normalize the data with one service per row
+            const normalizedData: Array<(string | number)[]> = [];
+            const normalizedHeaders = ['S.N.', 'Homestay Name', 'DHSR No', 'Type', 'Formatted Address', 'Tourism Service', 'Homes', 'Rooms', 'Beds'];
+            
+            dataToExport.forEach((homestay, index) => {
+              // Only process homestays with complete essential data
+              if (!getValue(homestay, 'homeStayName') || !getValue(homestay, 'address.formattedAddress.en')) {
+                return; // Skip this homestay if it's missing essential data
+              }
+              
+              // If no tourism services, add one row with "None"
+              if (!homestay.features?.tourismServices || homestay.features.tourismServices.length === 0) {
+                normalizedData.push([
+                  index + 1,
+                  getValue(homestay, 'homeStayName') || 'N/A',
+                  getValue(homestay, 'dhsrNo') || 'N/A',
+                  getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private',
+                  getValue(homestay, 'address.formattedAddress.en') || 'N/A',
+                  'None',
+                  Number(getValue(homestay, 'homeCount')) || 0,
+                  Number(getValue(homestay, 'roomCount')) || 0,
+                  Number(getValue(homestay, 'bedCount')) || 0
+                ]);
+                return;
+              }
+              
+              // For each tourism service, create a separate row
+              homestay.features.tourismServices.forEach((service) => {
+                const parts = service.split('/');
+                const serviceEn = parts[0].trim();
+                
+                // Skip empty services
+                if (!serviceEn || serviceEn.trim() === '') return;
+                
+                normalizedData.push([
+                  index + 1, // Keep the same S.N. for all rows of the same homestay
+                  getValue(homestay, 'homeStayName') || 'N/A',
+                  getValue(homestay, 'dhsrNo') || 'N/A',
+                  getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private',
+                  getValue(homestay, 'address.formattedAddress.en') || 'N/A',
+                  serviceEn || 'N/A', // Ensure we always have a value
+                  Number(getValue(homestay, 'homeCount')) || 0,
+                  Number(getValue(homestay, 'roomCount')) || 0,
+                  Number(getValue(homestay, 'bedCount')) || 0
+                ]);
+              });
+            });
+            
+            // Filter data to remove rows with empty values
+            const filteredData = normalizedData.filter(row => 
+              row[1] !== 'N/A' && 
+              row[1] !== '' && 
+              row[4] !== 'N/A' && 
+              row[4] !== '' && 
+              row[5] !== 'N/A' && 
+              row[5] !== ''
+            );
+            
+            autoTable(doc, {
+              startY: tableStartY,
+              head: [normalizedHeaders],
+              body: filteredData,
+              styles: {
+                fontSize: 8,
+                cellPadding: 2,
+                lineColor: [0, 0, 0],
+                lineWidth: 0.1,
+                halign: 'left',
+                valign: 'middle',
+                overflow: 'ellipsize',
+                cellWidth: 'auto',
+                font: 'helvetica'
+              },
+              columnStyles: {
+                0: { cellWidth: 10 },   // S.N.
+                1: { cellWidth: 28 },  // Homestay Name
+                2: { cellWidth: 20 },  // DHSR No
+                3: { cellWidth: 22 },  // Type
+                4: { cellWidth: 70, overflow: 'linebreak' }, // Formatted Address
+                5: { cellWidth: 85, overflow: 'linebreak' },  // Tourism Service
+                6: { cellWidth: 15 },  // Homes
+                7: { cellWidth: 15 },  // Rooms
+                8: { cellWidth: 12 }   // Beds
+              },
+              headStyles: {
+                fillColor: [220, 220, 220],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                halign: 'center'
+              },
+              alternateRowStyles: {
+                fillColor: [245, 245, 245]
+              },
+              margin: { top: 60 },
+              didDrawPage: function(pageData) {
+                // Add header to continuation pages
+                if (pageData.pageNumber > 1) {
+                  // Add branding first
+                  doc.setFontSize(12);
+                  doc.setFont('helvetica', 'bold');
+                  doc.text(`${branding.brandName || 'Department of Tourism'}`, centerX, 15, { align: 'center' });
+                  
+                  // Add logo to continuation pages - use a synchronous approach
+                  if (branding.logoPath) {
+                    try {
+                      // Create a temporary image element to get dimensions
+                      const tmpImg = document.createElement('img');
+                      tmpImg.src = getImageUrl(branding.logoPath);
+                      
+                      // Default dimensions if image not loaded yet
+                      const imgWidth = 20;
+                      const imgHeight = 20;
+                      
+                      // Add the image directly without waiting for onload
+                      doc.addImage(
+                        getImageUrl(branding.logoPath), 
+                        'JPEG', 
+                        centerX - 55, 
+                        5, 
+                        imgWidth, 
+                        imgHeight
+                      );
+                    } catch (error) {
+                      console.error('Error adding logo to continuation page:', error);
+                    }
+                  }
+                  
+                  // Add contact information on continuation pages
+                  doc.setFontSize(8);
+                  doc.setFont('helvetica', 'normal');
+                  let contPageContactY = 20;
+                  
+                  if (branding.contactInfo?.address) {
+                    doc.text(`${branding.contactInfo.address}`, centerX, contPageContactY, { align: 'center' });
+                    contPageContactY += 4;
+                  }
+                  
+                  if (branding.contactInfo?.email || branding.contactInfo?.phone) {
+                    let contactText = '';
+                    if (branding.contactInfo?.email) {
+                      contactText += branding.contactInfo.email;
+                    }
+                    if (branding.contactInfo?.email && branding.contactInfo?.phone) {
+                      contactText += ' | ';
+                    }
+                    if (branding.contactInfo?.phone) {
+                      contactText += branding.contactInfo.phone;
+                    }
+                    doc.text(contactText, centerX, contPageContactY, { align: 'center' });
+                    contPageContactY += 4;
+                  }
+                  
+                  doc.setFontSize(10);
+                  doc.text('Government of Nepal', centerX, contPageContactY + 2, { align: 'center' });
+                  doc.text('Homestay Management System', centerX, contPageContactY + 7, { align: 'center' });
+                  
+                  doc.setFont('helvetica', 'bold');
+                  doc.text(`Homestay Services Report - Continued`, centerX, contPageContactY + 12, { align: 'center' });
+                  doc.setDrawColor(0);
+                  doc.setLineWidth(0.5);
+                  doc.line(20, contPageContactY + 15, pageWidth - 20, contPageContactY + 15);
+                }
+                
+                // Move page numbers to bottom left corner
+                doc.setFontSize(8);
+                doc.text(`Page ${doc.getNumberOfPages()}`, 20, doc.internal.pageSize.getHeight() - 10);
+              }
+            });
           } else {
             // Original geographical-classification table
             // Filter out any data with missing values
@@ -1001,6 +1373,98 @@ export default function ReportPage({
         </div>
       </th>
     );
+  };
+  
+  // Helper function to format infrastructure for display
+  const formatInfrastructure = (infrastructure: string[] | undefined) => {
+    if (!infrastructure || infrastructure.length === 0) return 'None';
+    
+    // Get the English parts of each infrastructure item
+    const items = infrastructure.map(item => {
+      const parts = item.split('/');
+      return parts[0].trim(); // Return the English part
+    });
+    
+    if (items.length <= 2) {
+      return items.join(', ');
+    }
+    
+    return `${items.length} items (${items[0]}, ${items[1]}, ...)`;
+  };
+  
+  // Helper function to format tourism services for display
+  const formatServices = (services: string[] | undefined) => {
+    if (!services || services.length === 0) return 'None';
+    
+    // Get the English parts of each service
+    const items = services.map(item => {
+      const parts = item.split('/');
+      return parts[0].trim(); // Return the English part
+    });
+    
+    if (items.length <= 2) {
+      return items.join(', ');
+    }
+    
+    return `${items.length} services (${items[0]}, ${items[1]}, ...)`;
+  };
+  
+  // Helper function to get the most common infrastructure item
+  const getMostCommonInfrastructure = (homestays: Homestay[]) => {
+    const counts: Record<string, number> = {};
+    
+    // Count each infrastructure item
+    homestays.forEach(homestay => {
+      if (homestay.features?.infrastructure) {
+        homestay.features.infrastructure.forEach(item => {
+          const parts = item.split('/');
+          const infraEn = parts[0].trim();
+          counts[infraEn] = (counts[infraEn] || 0) + 1;
+        });
+      }
+    });
+    
+    // Find the item with the highest count
+    let maxCount = 0;
+    let mostCommon = 'None';
+    
+    Object.entries(counts).forEach(([item, count]) => {
+      if (count > maxCount) {
+        maxCount = count;
+        mostCommon = item;
+      }
+    });
+    
+    return mostCommon === 'None' ? 'None found' : mostCommon;
+  };
+  
+  // Helper function to get the most common tourism service
+  const getMostCommonService = (homestays: Homestay[]) => {
+    const counts: Record<string, number> = {};
+    
+    // Count each tourism service
+    homestays.forEach(homestay => {
+      if (homestay.features?.tourismServices) {
+        homestay.features.tourismServices.forEach(service => {
+          const parts = service.split('/');
+          const serviceEn = parts[0].trim();
+          counts[serviceEn] = (counts[serviceEn] || 0) + 1;
+        });
+      }
+    });
+    
+    // Find the service with the highest count
+    let maxCount = 0;
+    let mostCommon = 'None';
+    
+    Object.entries(counts).forEach(([service, count]) => {
+      if (count > maxCount) {
+        maxCount = count;
+        mostCommon = service;
+      }
+    });
+    
+    return mostCommon === 'None' ? 'None found' : mostCommon;
   };
   
   return (
@@ -1527,26 +1991,397 @@ export default function ReportPage({
             )}
             
             {type === 'infrastructure' && (
-              <div className="border rounded-lg p-5">
-                <h2 className="text-lg font-medium mb-4">Physical Infrastructure and Amenities</h2>
-                <div className="aspect-video bg-gray-100 flex items-center justify-center">
-                  <p className="text-gray-500">Infrastructure data visualization will appear here</p>
+              <>
+                {/* Filters Section */}
+                <div className="mb-8 border p-4 rounded-lg print:hidden">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-medium">Filter Homestays</h2>
+                    <button 
+                      onClick={resetFilters}
+                      className="text-sm text-primary hover:underline flex items-center"
+                    >
+                      <Filter className="h-4 w-4 mr-1" />
+                      Reset Filters
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                    {/* Province Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Province</label>
+                      <select
+                        value={filters.province || ''}
+                        onChange={(e) => handleFilterChange('province', e.target.value)}
+                        className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary/20 transition-colors"
+                      >
+                        <option value="">All Provinces</option>
+                        {provinces.map(province => (
+                          <option key={province} value={province}>{province}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {/* District Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">District</label>
+                      <select
+                        value={filters.district || ''}
+                        onChange={(e) => handleFilterChange('district', e.target.value)}
+                        className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary/20 transition-colors"
+                        disabled={!filters.province}
+                      >
+                        <option value="">All Districts</option>
+                        {districts.map(district => (
+                          <option key={district} value={district}>{district}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {/* Municipality Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Municipality</label>
+                      <select
+                        value={filters.municipality || ''}
+                        onChange={(e) => handleFilterChange('municipality', e.target.value)}
+                        className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary/20 transition-colors"
+                        disabled={!filters.district}
+                      >
+                        <option value="">All Municipalities</option>
+                        {municipalities.map(municipality => (
+                          <option key={municipality} value={municipality}>{municipality}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {/* Homestay Type Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Homestay Type</label>
+                      <select
+                        value={filters.homestayType || ''}
+                        onChange={(e) => handleFilterChange('homestayType', e.target.value as any)}
+                        className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary/20 transition-colors"
+                      >
+                        <option value="">All Types</option>
+                        <option value="community">Community</option>
+                        <option value="private">Private</option>
+                      </select>
+                    </div>
+                    
+                    {/* Status Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                      <select
+                        value={filters.status || ''}
+                        onChange={(e) => handleFilterChange('status', e.target.value as any)}
+                        className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary/20 transition-colors"
+                      >
+                        <option value="">All Statuses</option>
+                        <option value="approved">Approved</option>
+                        <option value="pending">Pending</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  {/* Infrastructure Filters */}
+                  <div className="border-t pt-4">
+                    <h3 className="text-md font-medium mb-3">Filter by Infrastructure</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2">
+                      {commonInfrastructure.map((item, index) => {
+                        // Get English part for the label
+                        const parts = item.value.split('/');
+                        const labelEN = parts[0] || item.value;
+
+                        return (
+                          <div key={index} className="flex items-center">
+                            <input
+                              type="checkbox"
+                              id={`infrastructure-filter-${index}`}
+                              value={item.value}
+                              checked={filters.selectedInfrastructure?.includes(item.value) || false}
+                              onChange={(e) => handleFilterChange('selectedInfrastructure', e.target.value, e)}
+                              className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                            />
+                            <label
+                              htmlFor={`infrastructure-filter-${index}`}
+                              className="ml-2 text-sm text-gray-600 truncate"
+                              title={labelEN}
+                            >
+                              {labelEN}
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                
+                {/* Data Table */}
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-100 text-gray-700 text-xs font-medium border-b">
+                      <tr>
+                        <th className="px-4 py-3 text-left w-12">S.N.</th>
+                        {renderColumnHeader('Homestay Name', 'homeStayName')}
+                        {renderColumnHeader('DHSR No', 'dhsrNo')}
+                        {renderColumnHeader('Type', 'homeStayType')}
+                        {renderColumnHeader('Formatted Address', 'address.formattedAddress.en')}
+                        {renderColumnHeader('Infrastructure', 'features.infrastructure')}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {sortedHomestays.length > 0 ? (
+                        sortedHomestays.map((homestay, index) => (
+                          <tr 
+                            key={homestay._id} 
+                            className="text-xs hover:bg-gray-50 transition-colors"
+                          >
+                            <td className="px-4 py-3 text-gray-900">{index + 1}</td>
+                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'dhsrNo') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900">
+                              {getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private'}
+                            </td>
+                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'address.formattedAddress.en') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900">
+                              {formatInfrastructure(homestay.features?.infrastructure)}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-6 text-center text-gray-500">
+                            <div className="flex flex-col items-center justify-center py-8">
+                              <BarChart2 className="h-10 w-10 text-gray-300 mb-3" />
+                              <h3 className="text-sm font-semibold text-gray-600 mb-1">No homestays found</h3>
+                              <p className="text-xs text-gray-500">Try changing your filters or try again later</p>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Summary Section */}
+                <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-gray-50 p-4 rounded-md">
-                    <p className="font-medium">Room Facilities</p>
-                    <p className="text-sm text-gray-500 mt-2">Common room facilities across homestays</p>
+                    <p className="font-medium">Infrastructure Overview</p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      {homestays.reduce((count, h) => count + (h.features?.infrastructure?.length || 0), 0)} infrastructure items across {homestays.length} homestays
+                    </p>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-md">
-                    <p className="font-medium">Accessibility</p>
-                    <p className="text-sm text-gray-500 mt-2">Accessibility features and transportation</p>
+                    <p className="font-medium">Common Infrastructure</p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      Most common: {getMostCommonInfrastructure(homestays)}
+                    </p>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-md">
-                    <p className="font-medium">Amenities</p>
-                    <p className="text-sm text-gray-500 mt-2">Available amenities by homestay type</p>
+                    <p className="font-medium">Infrastructure Types</p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      {new Set(homestays.flatMap(h => h.features?.infrastructure || [])).size} unique types
+                    </p>
                   </div>
                 </div>
-              </div>
+              </>
+            )}
+            
+            {type === 'homestay-services' && (
+              <>
+                {/* Filters Section */}
+                <div className="mb-8 border p-4 rounded-lg print:hidden">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-medium">Filter Homestays</h2>
+                    <button 
+                      onClick={resetFilters}
+                      className="text-sm text-primary hover:underline flex items-center"
+                    >
+                      <Filter className="h-4 w-4 mr-1" />
+                      Reset Filters
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                    {/* Province Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Province</label>
+                      <select
+                        value={filters.province || ''}
+                        onChange={(e) => handleFilterChange('province', e.target.value)}
+                        className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary/20 transition-colors"
+                      >
+                        <option value="">All Provinces</option>
+                        {provinces.map(province => (
+                          <option key={province} value={province}>{province}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {/* District Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">District</label>
+                      <select
+                        value={filters.district || ''}
+                        onChange={(e) => handleFilterChange('district', e.target.value)}
+                        className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary/20 transition-colors"
+                        disabled={!filters.province}
+                      >
+                        <option value="">All Districts</option>
+                        {districts.map(district => (
+                          <option key={district} value={district}>{district}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {/* Municipality Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Municipality</label>
+                      <select
+                        value={filters.municipality || ''}
+                        onChange={(e) => handleFilterChange('municipality', e.target.value)}
+                        className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary/20 transition-colors"
+                        disabled={!filters.district}
+                      >
+                        <option value="">All Municipalities</option>
+                        {municipalities.map(municipality => (
+                          <option key={municipality} value={municipality}>{municipality}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {/* Homestay Type Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Homestay Type</label>
+                      <select
+                        value={filters.homestayType || ''}
+                        onChange={(e) => handleFilterChange('homestayType', e.target.value as any)}
+                        className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary/20 transition-colors"
+                      >
+                        <option value="">All Types</option>
+                        <option value="community">Community</option>
+                        <option value="private">Private</option>
+                      </select>
+                    </div>
+                    
+                    {/* Status Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                      <select
+                        value={filters.status || ''}
+                        onChange={(e) => handleFilterChange('status', e.target.value as any)}
+                        className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary/20 transition-colors"
+                      >
+                        <option value="">All Statuses</option>
+                        <option value="approved">Approved</option>
+                        <option value="pending">Pending</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  {/* Tourism Services Filters */}
+                  <div className="border-t pt-4">
+                    <h3 className="text-md font-medium mb-3">Filter by Tourism Services</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2">
+                      {commonTourismServices.map((item, index) => {
+                        // Get English part for the label
+                        const parts = item.value.split('/');
+                        const labelEN = parts[0] || item.value;
+
+                        return (
+                          <div key={index} className="flex items-center">
+                            <input
+                              type="checkbox"
+                              id={`tourism-services-filter-${index}`}
+                              value={item.value}
+                              checked={filters.selectedServices?.includes(item.value) || false}
+                              onChange={(e) => handleFilterChange('selectedServices', e.target.value, e)}
+                              className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                            />
+                            <label
+                              htmlFor={`tourism-services-filter-${index}`}
+                              className="ml-2 text-sm text-gray-600 truncate"
+                              title={labelEN}
+                            >
+                              {labelEN}
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Data Table */}
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-100 text-gray-700 text-xs font-medium border-b">
+                      <tr>
+                        <th className="px-4 py-3 text-left w-12">S.N.</th>
+                        {renderColumnHeader('Homestay Name', 'homeStayName')}
+                        {renderColumnHeader('DHSR No', 'dhsrNo')}
+                        {renderColumnHeader('Type', 'homeStayType')}
+                        {renderColumnHeader('Formatted Address', 'address.formattedAddress.en')}
+                        {renderColumnHeader('Tourism Services', 'features.tourismServices')}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {sortedHomestays.length > 0 ? (
+                        sortedHomestays.map((homestay, index) => (
+                          <tr 
+                            key={homestay._id} 
+                            className="text-xs hover:bg-gray-50 transition-colors"
+                          >
+                            <td className="px-4 py-3 text-gray-900">{index + 1}</td>
+                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'dhsrNo') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900">
+                              {getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private'}
+                            </td>
+                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'address.formattedAddress.en') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900">
+                              {formatServices(homestay.features?.tourismServices)}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-6 text-center text-gray-500">
+                            <div className="flex flex-col items-center justify-center py-8">
+                              <BarChart2 className="h-10 w-10 text-gray-300 mb-3" />
+                              <h3 className="text-sm font-semibold text-gray-600 mb-1">No homestays found</h3>
+                              <p className="text-xs text-gray-500">Try changing your filters or try again later</p>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Summary Section */}
+                <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gray-50 p-4 rounded-md">
+                    <p className="font-medium">Tourism Services Overview</p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      {homestays.reduce((count, h) => count + (h.features?.tourismServices?.length || 0), 0)} services available across {homestays.length} homestays
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-md">
+                    <p className="font-medium">Common Tourism Services</p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      Most common: {getMostCommonService(homestays)}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-md">
+                    <p className="font-medium">Tourism Service Types</p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      {new Set(homestays.flatMap(h => h.features?.tourismServices || [])).size} unique types
+                    </p>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         )}

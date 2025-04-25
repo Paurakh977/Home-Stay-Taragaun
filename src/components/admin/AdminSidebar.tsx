@@ -69,6 +69,11 @@ const reportItems = [
     title: "Physical Infrastructure",
     href: "/admin/report/infrastructure",
     icon: Home,
+  },
+  {
+    title: "Homestay Services",
+    href: "/admin/report/homestay-services",
+    icon: Users,
   }
 ];
 

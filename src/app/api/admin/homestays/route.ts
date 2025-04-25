@@ -23,6 +23,8 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const includeFeatures = searchParams.get('includeFeatures') === 'true';
     const attractionsParam = searchParams.get('attractions');
+    const infrastructureParam = searchParams.get('infrastructure');
+    const servicesParam = searchParams.get('services');
     
     // Validate adminUsername
     if (!adminUsername) {
@@ -61,6 +63,22 @@ export async function GET(request: NextRequest) {
       const selectedAttractions = attractionsParam.split(',');
       if (selectedAttractions.length > 0) {
         query['features.localAttractions'] = { $all: selectedAttractions };
+      }
+    }
+    
+    // Add infrastructure filter if provided
+    if (infrastructureParam) {
+      const selectedInfrastructure = infrastructureParam.split(',');
+      if (selectedInfrastructure.length > 0) {
+        query['features.infrastructure'] = { $all: selectedInfrastructure };
+      }
+    }
+    
+    // Add tourism services filter if provided
+    if (servicesParam) {
+      const selectedServices = servicesParam.split(',');
+      if (selectedServices.length > 0) {
+        query['features.tourismServices'] = { $all: selectedServices };
       }
     }
     
