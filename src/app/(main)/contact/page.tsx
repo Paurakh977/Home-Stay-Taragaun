@@ -67,7 +67,7 @@ export default function Contact() {
       <section className="py-24 bg-gray-50 relative overflow-hidden">
         <div className="absolute inset-0 opacity-5">
           <Image
-            src="https://images.unsplash.com/photo-1563387852576-964bc31b73af?q=80&w=2574&auto=format&fit=crop"
+            src="/images/contact/contact-map.jpg"
             alt="Nepal Map"
             fill
             className="object-cover"
@@ -279,7 +279,7 @@ export default function Contact() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="rounded-2xl overflow-hidden shadow-sm h-[500px] relative border border-gray-100">
             <Image
-              src="https://images.unsplash.com/photo-1580977251946-c5f757b89cb8?q=80&w=2574&auto=format&fit=crop"
+              src="/images/contact/nepal-map.jpg"
               alt="Nepal Map"
               fill
               className="object-cover"

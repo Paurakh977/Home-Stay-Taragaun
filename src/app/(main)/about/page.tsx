@@ -9,7 +9,7 @@ export default function About() {
       <section className="py-24 bg-gray-50 relative overflow-hidden">
         <div className="absolute inset-0 opacity-5">
           <Image
-            src="https://images.unsplash.com/photo-1625050789384-f6698e5d3afd?q=80&w=2574&auto=format&fit=crop"
+            src="/images/about/nepal-story.jpg"
             alt="Nepal StayLink Story"
             fill
             className="object-cover"
@@ -34,7 +34,7 @@ export default function About() {
           <div className="grid md:grid-cols-2 gap-16 items-center">
             <div className="relative h-80 md:h-full min-h-[400px] rounded-2xl overflow-hidden shadow-sm border border-gray-100">
               <Image
-                src="https://images.unsplash.com/photo-1625050789384-f6698e5d3afd?q=80&w=2574&auto=format&fit=crop"
+                src="/images/about/nepal-story.jpg"
                 alt="Nepal StayLink Story"
                 fill
                 className="object-cover"
@@ -117,7 +117,7 @@ export default function About() {
             <div className="text-center group">
               <div className="relative mx-auto w-36 h-36 rounded-full overflow-hidden mb-5 shadow-sm border-2 border-white group-hover:shadow-md transition-all">
                 <Image
-                  src="https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?q=80&w=2670&auto=format&fit=crop"
+                  src="/images/team/team-1.jpg"
                   alt="Asha Tamang"
                   fill
                   className="object-cover group-hover:scale-105 transition-transform duration-500"
@@ -131,7 +131,7 @@ export default function About() {
             <div className="text-center group">
               <div className="relative mx-auto w-36 h-36 rounded-full overflow-hidden mb-5 shadow-sm border-2 border-white group-hover:shadow-md transition-all">
                 <Image
-                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=2574&auto=format&fit=crop"
+                  src="/images/team/team-2.jpg"
                   alt="Rajesh Sharma"
                   fill
                   className="object-cover group-hover:scale-105 transition-transform duration-500"
@@ -145,7 +145,7 @@ export default function About() {
             <div className="text-center group">
               <div className="relative mx-auto w-36 h-36 rounded-full overflow-hidden mb-5 shadow-sm border-2 border-white group-hover:shadow-md transition-all">
                 <Image
-                  src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=2574&auto=format&fit=crop"
+                  src="/images/team/team-3.jpg"
                   alt="Sunita Rai"
                   fill
                   className="object-cover group-hover:scale-105 transition-transform duration-500"
@@ -159,7 +159,7 @@ export default function About() {
             <div className="text-center group">
               <div className="relative mx-auto w-36 h-36 rounded-full overflow-hidden mb-5 shadow-sm border-2 border-white group-hover:shadow-md transition-all">
                 <Image
-                  src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=2574&auto=format&fit=crop"
+                  src="/images/team/team-4.jpg"
                   alt="Deepak Gurung"
                   fill
                   className="object-cover group-hover:scale-105 transition-transform duration-500"
@@ -308,7 +308,7 @@ export default function About() {
             
             <div className="relative h-[450px] rounded-2xl overflow-hidden shadow-sm border border-gray-100">
               <Image
-                src="https://images.unsplash.com/photo-1604710745236-d96fe5fc6d2d?q=80&w=2574&auto=format&fit=crop"
+                src="/images/about/nepal-impact.jpg"
                 alt="Nepal StayLink Impact"
                 fill
                 className="object-cover"

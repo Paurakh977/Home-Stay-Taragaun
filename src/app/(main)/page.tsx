@@ -10,7 +10,7 @@ export default function Home() {
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <Image
-            src="https://images.unsplash.com/photo-1544735716-392fe2489ffa?q=80&w=2574&auto=format&fit=crop"
+            src="/images/home/hero-bg.jpg"
             alt="Beautiful Himalayan view with traditional Nepali homestay"
             fill
             priority
@@ -139,7 +139,7 @@ export default function Home() {
             <div className="group rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-gray-100">
               <div className="relative h-72 w-full">
                 <Image
-                  src="https://images.unsplash.com/photo-1605640840605-14ac1855827b?q=80&w=2574&auto=format&fit=crop"
+                  src="/images/destinations/pokhara.jpg"
                   alt="Pokhara"
                   fill
                   className="object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out"
@@ -159,7 +159,7 @@ export default function Home() {
             <div className="group rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-gray-100">
               <div className="relative h-72 w-full">
                 <Image
-                  src="https://images.unsplash.com/photo-1605640156360-e668f07cce9c?q=80&w=2670&auto=format&fit=crop"
+                  src="/images/destinations/kathmandu.jpg"
                   alt="Kathmandu Valley"
                   fill
                   className="object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out"
@@ -179,7 +179,7 @@ export default function Home() {
             <div className="group rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-gray-100">
               <div className="relative h-72 w-full">
                 <Image
-                  src="https://images.unsplash.com/photo-1584332944027-9b0310160cb3?q=80&w=2574&auto=format&fit=crop"
+                  src="/images/destinations/chitwan.jpg"
                   alt="Chitwan"
                   fill
                   className="object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out"
@@ -260,7 +260,7 @@ export default function Home() {
             
             <div className="relative h-[500px] rounded-xl overflow-hidden shadow-2xl border border-gray-800">
               <Image
-                src="https://images.unsplash.com/photo-1470770841072-f978cf4d019e?q=80&w=2670&auto=format&fit=crop"
+                src="/images/home/homestay-owner.jpg"
                 alt="Nepali homestay owner"
                 fill
                 className="object-cover"
@@ -296,7 +296,14 @@ export default function Home() {
                 "Finding a homestay through Nepal StayLink made our trip so much more meaningful. Our hosts were incredible and gave us insights into Nepali culture we would have missed otherwise."
               </p>
               <div className="flex items-center">
-                <div className="h-12 w-12 rounded-full bg-gray-200 flex-shrink-0"></div>
+                <div className="h-12 w-12 rounded-full bg-gray-200 flex-shrink-0 relative overflow-hidden">
+                  <Image 
+                    src="/images/testimonials/sarah.jpg" 
+                    alt="Sarah Johnson"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
                 <div className="ml-4">
                   <h4 className="font-medium text-gray-900">Sarah Johnson</h4>
                   <p className="text-sm text-gray-500">USA</p>
@@ -317,7 +324,14 @@ export default function Home() {
                 "As a homestay owner, joining Nepal StayLink has been transformative. The platform is easy to use, and I've connected with wonderful guests from around the world."
               </p>
               <div className="flex items-center">
-                <div className="h-12 w-12 rounded-full bg-gray-200 flex-shrink-0"></div>
+                <div className="h-12 w-12 rounded-full bg-gray-200 flex-shrink-0 relative overflow-hidden">
+                  <Image 
+                    src="/images/testimonials/ramesh.jpg" 
+                    alt="Ramesh Tamang"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
                 <div className="ml-4">
                   <h4 className="font-medium text-gray-900">Ramesh Tamang</h4>
                   <p className="text-sm text-gray-500">Pokhara, Nepal</p>
@@ -338,7 +352,14 @@ export default function Home() {
                 "Nepal StayLink helped us discover hidden gems in Nepal that we'd never have found otherwise. The homestay experience was the highlight of our trip!"
               </p>
               <div className="flex items-center">
-                <div className="h-12 w-12 rounded-full bg-gray-200 flex-shrink-0"></div>
+                <div className="h-12 w-12 rounded-full bg-gray-200 flex-shrink-0 relative overflow-hidden">
+                  <Image 
+                    src="/images/testimonials/akiko.jpg" 
+                    alt="Akiko Tanaka"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
                 <div className="ml-4">
                   <h4 className="font-medium text-gray-900">Akiko Tanaka</h4>
                   <p className="text-sm text-gray-500">Japan</p>
@@ -353,7 +374,7 @@ export default function Home() {
       <section className="py-20 bg-gray-900 relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
           <Image 
-            src="https://images.unsplash.com/photo-1544735716-392fe2489ffa?q=80&w=2574&auto=format&fit=crop"
+            src="/images/home/hero-bg.jpg"
             alt="Nepal background"
             fill
             className="object-cover"
