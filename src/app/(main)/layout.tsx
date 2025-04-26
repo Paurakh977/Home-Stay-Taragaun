@@ -1,5 +1,5 @@
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
+import PlatformNavbar from "@/components/platform/PlatformNavbar";
+import PlatformFooter from "@/components/platform/PlatformFooter";
 
 export default function MainLayout({
   children,
@@ -8,9 +8,9 @@ export default function MainLayout({
 }) {
   return (
     <>
-      <Navbar />
+      <PlatformNavbar />
       <main className="flex-grow">{children}</main>
-      <Footer />
+      <PlatformFooter />
     </>
   );
 } 
