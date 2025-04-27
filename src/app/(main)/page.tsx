@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Search, Star, Home as HomeIcon, Users, Shield, MapPin } from "lucide-react";
+import { ArrowRight, Search, Star, Home as HomeIcon, Users, Shield, MapPin, Quote } from "lucide-react";
 import { useWebContent } from "@/context/WebContentContext";
 
 // Helper function to get the correct icon component
@@ -42,6 +42,13 @@ interface IFeature {
   icon: string;
   title: string;
   description: string;
+}
+
+interface ITestimonial {
+  name: string;
+  location: string;
+  quote: string;
+  photoPath: string;
 }
 
 export default function Home() {
@@ -147,6 +154,30 @@ export default function Home() {
         }
       }
     : content.homePage;
+
+  // Default testimonials if not available in content
+  const testimonials = content?.testimonials && content.testimonials.length > 0
+    ? content.testimonials
+    : [
+        {
+          name: "Sarah Johnson",
+          location: "United States",
+          quote: "My stay with a local family in Pokhara was the highlight of my Nepal trip. The cultural immersion and home-cooked meals were incredible!",
+          photoPath: "/images/testimonials/sarah.jpg"
+        },
+        {
+          name: "Ramesh Patel",
+          location: "India",
+          quote: "As a neighboring country visitor, I appreciated the authentic experience and warm hospitality of my homestay hosts in Kathmandu Valley.",
+          photoPath: "/images/testimonials/ramesh.jpg"
+        },
+        {
+          name: "Akiko Tanaka",
+          location: "Japan",
+          quote: "The community homestay in Chitwan gave me unique insights into Nepali village life. I even participated in a traditional cooking class!",
+          photoPath: "/images/testimonials/akiko.jpg"
+        }
+      ];
 
   return (
     <div className="flex flex-col w-full">
@@ -324,6 +355,44 @@ export default function Home() {
               />
               <div className="absolute inset-0 bg-gradient-to-r from-gray-900/80 to-transparent"></div>
             </div>
+          </div>
+        </div>
+      </section>
+      
+      {/* Testimonials Section */}
+      <section className="py-24 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-20">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">What Our Guests Say</h2>
+            <div className="w-16 h-1 bg-gray-200 mx-auto mb-6"></div>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Read what travelers from around the world have to say about their authentic homestay experiences
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {testimonials.map((testimonial: ITestimonial, index: number) => (
+              <div key={index} className="bg-gray-50 p-8 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative">
+                <Quote className="absolute top-6 right-6 h-8 w-8 text-gray-200" />
+                <div className="mb-6">
+                  <p className="text-gray-600 italic leading-relaxed">"{testimonial.quote}"</p>
+                </div>
+                <div className="flex items-center mt-4">
+                  <div className="relative h-14 w-14 rounded-full overflow-hidden mr-4 border-2 border-white shadow-sm">
+                    <Image
+                      src={testimonial.photoPath}
+                      alt={testimonial.name}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900">{testimonial.name}</h4>
+                    <p className="text-sm text-gray-500">{testimonial.location}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>

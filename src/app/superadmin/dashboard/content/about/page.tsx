@@ -21,12 +21,13 @@ import {
 } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash, Upload, Image as ImageIcon } from "lucide-react";
+import { Plus, Trash, Upload, Image as ImageIcon, GripVertical } from "lucide-react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { toast } from "sonner";
 import Image from "next/image";
+import Link from "next/link";
 
 // Define the schema for the About page
 const aboutPageSchema = z.object({
@@ -57,6 +58,21 @@ const aboutPageSchema = z.object({
   })
 });
 
+// Define team member schema
+const teamMemberSchema = z.object({
+  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
+  position: z.string().min(2, { message: "Position must be at least 2 characters" }),
+  photoPath: z.string().min(1, { message: "Photo is required" }),
+  order: z.number().min(0, { message: "Order must be a positive number" })
+});
+
+// Define team schema
+const teamSchema = z.object({
+  title: z.string().min(2, { message: "Title must be at least 2 characters" }),
+  subtitle: z.string().min(5, { message: "Subtitle must be at least 5 characters" }),
+  members: z.array(teamMemberSchema).min(1, { message: "At least one team member is required" })
+});
+
 // Define about page interface
 interface IAboutPage {
   aboutPage?: any;
@@ -68,6 +84,7 @@ export default function AboutPageEditor() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingTeamImage, setUploadingTeamImage] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState("hero");
 
   // Initialize the form with React Hook Form
@@ -102,6 +119,24 @@ export default function AboutPageEditor() {
     }
   });
 
+  // Initialize team form
+  const teamForm = useForm<z.infer<typeof teamSchema>>({
+    resolver: zodResolver(teamSchema),
+    defaultValues: {
+      title: "Meet Our Team",
+      subtitle: "The passionate individuals behind Nepal StayLink who work tirelessly to connect travelers with authentic Nepali experiences.",
+      members: [
+        { name: "", position: "", photoPath: "", order: 0 }
+      ]
+    },
+  });
+
+  // Set up field array for team members
+  const { fields, append, remove } = useFieldArray({
+    control: teamForm.control,
+    name: "members"
+  });
+
   // Fetch content on component mount
   useEffect(() => {
     const fetchContent = async () => {
@@ -116,6 +151,20 @@ export default function AboutPageEditor() {
         // Populate form with fetched data
         if (data.aboutPage) {
           form.reset(data.aboutPage);
+          
+          // Populate team form if team data exists
+          if (data.aboutPage.team) {
+            const { title, subtitle, members } = data.aboutPage.team;
+            
+            // Sort members by order
+            const sortedMembers = [...members].sort((a, b) => a.order - b.order);
+            
+            teamForm.reset({ 
+              title, 
+              subtitle, 
+              members: sortedMembers.length > 0 ? sortedMembers : [{ name: "", position: "", photoPath: "", order: 0 }]
+            });
+          }
         }
       } catch (err) {
         console.error('Error fetching content:', err);
@@ -126,7 +175,7 @@ export default function AboutPageEditor() {
     };
 
     fetchContent();
-  }, [form]);
+  }, [form, teamForm]);
 
   // Handle form submission
   const onSubmit = async (data: z.infer<typeof aboutPageSchema>) => {
@@ -150,6 +199,45 @@ export default function AboutPageEditor() {
     } catch (err) {
       console.error('Error updating content:', err);
       toast.error('Failed to update about page content');
+    } finally {
+      setSaving(false);
+    }
+  };
+  
+  // Handle team form submission
+  const onTeamSubmit = async (data: z.infer<typeof teamSchema>) => {
+    try {
+      setSaving(true);
+      
+      // Sort members by order
+      const sortedMembers = [...data.members].sort((a, b) => a.order - b.order);
+      
+      // Update the aboutPage.team section
+      const response = await fetch('/api/web-content?adminUsername=main&section=aboutPage', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...content?.aboutPage,
+          team: {
+            title: data.title,
+            subtitle: data.subtitle,
+            members: sortedMembers
+          }
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update team section');
+      }
+      
+      const updatedContent = await response.json();
+      setContent({...content, aboutPage: updatedContent});
+      toast.success('Team section updated successfully');
+    } catch (err) {
+      console.error('Error updating team section:', err);
+      toast.error('Failed to update team section');
     } finally {
       setSaving(false);
     }
@@ -192,6 +280,48 @@ export default function AboutPageEditor() {
     }
   };
 
+  // Team image upload handler
+  const handleTeamImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    try {
+      setUploadingTeamImage(index);
+      
+      // Create a FormData instance
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', 'team'); // Specify folder to save in
+      
+      // Use fetch to upload the image
+      const response = await fetch('/api/superadmin/uploads/image', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to upload image');
+      }
+      
+      const data = await response.json();
+      
+      // Set the image path to the form field
+      teamForm.setValue(`members.${index}.photoPath`, data.imagePath, { shouldValidate: true });
+      toast.success('Image uploaded successfully');
+      
+    } catch (err) {
+      console.error('Error uploading image:', err);
+      toast.error('Failed to upload image');
+    } finally {
+      setUploadingTeamImage(null);
+    }
+  };
+
+  // Handle reordering
+  const handleReorder = (index: number, newOrder: number) => {
+    teamForm.setValue(`members.${index}.order`, newOrder, { shouldValidate: true });
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center h-64">Loading about page content...</div>;
   }
@@ -200,10 +330,11 @@ export default function AboutPageEditor() {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <Tabs defaultValue="hero" value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-4 mb-6">
+          <TabsList className="grid grid-cols-5 mb-6">
             <TabsTrigger value="hero">Hero</TabsTrigger>
             <TabsTrigger value="story">Our Story</TabsTrigger>
             <TabsTrigger value="mission">Mission</TabsTrigger>
+            <TabsTrigger value="team">Team</TabsTrigger>
             <TabsTrigger value="cta">CTA</TabsTrigger>
           </TabsList>
           
@@ -408,6 +539,209 @@ export default function AboutPageEditor() {
                     </FormItem>
                   )}
                 />
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Team Section */}
+          <TabsContent value="team" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Team Members</CardTitle>
+                <CardDescription>
+                  Manage your team section with team members, roles, and photos
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Form {...teamForm}>
+                  <form onSubmit={teamForm.handleSubmit(onTeamSubmit)} className="space-y-6">
+                    {/* Team Section Title and Subtitle */}
+                    <div className="space-y-4">
+                      <FormField
+                        control={teamForm.control}
+                        name="title"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Section Title</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Meet Our Team" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={teamForm.control}
+                        name="subtitle"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Section Subtitle</FormLabel>
+                            <FormControl>
+                              <Input placeholder="The passionate individuals behind Nepal StayLink" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-medium">Team Members</h3>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            const highestOrder = Math.max(
+                              0, 
+                              ...fields.map(field => field.order)
+                            );
+                            append({ 
+                              name: "", 
+                              position: "", 
+                              photoPath: "", 
+                              order: highestOrder + 1 
+                            });
+                          }}
+                        >
+                          <Plus className="h-4 w-4 mr-2" /> Add Team Member
+                        </Button>
+                      </div>
+                      
+                      {fields.map((field, index) => (
+                        <Card key={field.id} className="border-dashed">
+                          <CardHeader className="pb-2">
+                            <div className="flex justify-between items-center">
+                              <CardTitle className="text-lg">Member {index + 1}</CardTitle>
+                              <Button 
+                                type="button" 
+                                variant="outline" 
+                                size="icon" 
+                                onClick={() => remove(index)}
+                                disabled={fields.length === 1}
+                              >
+                                <Trash className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Name */}
+                              <FormField
+                                control={teamForm.control}
+                                name={`members.${index}.name`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Name</FormLabel>
+                                    <FormControl>
+                                      <Input placeholder="John Doe" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              
+                              {/* Position */}
+                              <FormField
+                                control={teamForm.control}
+                                name={`members.${index}.position`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Position</FormLabel>
+                                    <FormControl>
+                                      <Input placeholder="CEO" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Order */}
+                              <FormField
+                                control={teamForm.control}
+                                name={`members.${index}.order`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Display Order</FormLabel>
+                                    <FormControl>
+                                      <Input 
+                                        type="number" 
+                                        min="0" 
+                                        placeholder="1" 
+                                        {...field}
+                                        onChange={(e) => {
+                                          const value = parseInt(e.target.value);
+                                          field.onChange(value);
+                                          handleReorder(index, value);
+                                        }}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      Lower numbers appear first
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            
+                            {/* Photo */}
+                            <FormField
+                              control={teamForm.control}
+                              name={`members.${index}.photoPath`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Photo</FormLabel>
+                                  <FormControl>
+                                    <div className="flex flex-col gap-4">
+                                      <div className="flex gap-2">
+                                        <Input placeholder="/path/to/photo.jpg" {...field} />
+                                        <div className="relative">
+                                          <Input
+                                            type="file"
+                                            accept="image/*"
+                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                            onChange={(e) => handleTeamImageUpload(e, index)}
+                                            disabled={uploadingTeamImage !== null}
+                                          />
+                                          <Button type="button" variant="outline" disabled={uploadingTeamImage !== null}>
+                                            <Upload className="h-4 w-4 mr-2" />
+                                            {uploadingTeamImage === index ? "Uploading..." : "Upload"}
+                                          </Button>
+                                        </div>
+                                      </div>
+                                      {field.value && (
+                                        <div className="relative h-36 w-36 bg-gray-50 border rounded-full overflow-hidden">
+                                          <Image
+                                            src={field.value}
+                                            alt="Team Member Photo"
+                                            fill
+                                            className="object-cover"
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                    
+                    {/* Submit Button */}
+                    <div className="flex justify-end">
+                      <Button type="submit" disabled={saving}>
+                        {saving ? "Saving..." : "Save Team"}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
               </CardContent>
             </Card>
           </TabsContent>
