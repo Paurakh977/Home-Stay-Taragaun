@@ -1,19 +1,47 @@
-import { Suspense } from "react";
-import { Metadata } from "next";
+'use client';
+
+import { Suspense, useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-
-export const metadata: Metadata = {
-  title: "Website Content Management",
-  description: "Manage all website content for your Hamro Home Stay platform.",
-};
+import { usePathname, useRouter } from "next/navigation";
 
 export default function ContentLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [activeTab, setActiveTab] = useState("home");
+
+  // Set the active tab based on the current path
+  useEffect(() => {
+    if (pathname.includes("/content/home")) {
+      setActiveTab("home");
+    } else if (pathname.includes("/content/about")) {
+      setActiveTab("about");
+    } else if (pathname.includes("/content/contact")) {
+      setActiveTab("contact");
+    } else if (pathname.includes("/content/footer")) {
+      setActiveTab("footer");
+    } else if (pathname.includes("/content/testimonials")) {
+      setActiveTab("testimonials");
+    } else if (pathname.includes("/content/siteInfo")) {
+      setActiveTab("siteInfo");
+    } else if (pathname === "/superadmin/dashboard/content") {
+      setActiveTab("dashboard");
+    }
+  }, [pathname]);
+
+  const handleTabChange = (value: string) => {
+    if (value === "dashboard") {
+      router.push("/superadmin/dashboard/content");
+    } else {
+      router.push(`/superadmin/dashboard/content/${value}`);
+    }
+  };
+
   return (
     <div className="space-y-6 p-6 lg:p-10">
       <div>
@@ -25,12 +53,12 @@ export default function ContentLayout({
       <Separator className="my-6" />
       
       <div className="flex-1 space-y-4">
-        <Tabs defaultValue="home" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsList className="flex flex-wrap h-auto bg-muted text-muted-foreground">
+            <TabsTrigger value="dashboard">Overview</TabsTrigger>
             <TabsTrigger value="home">Home Page</TabsTrigger>
             <TabsTrigger value="about">About Page</TabsTrigger>
             <TabsTrigger value="contact">Contact Page</TabsTrigger>
-            <TabsTrigger value="navigation">Navigation</TabsTrigger>
             <TabsTrigger value="footer">Footer</TabsTrigger>
             <TabsTrigger value="testimonials">Testimonials</TabsTrigger>
             <TabsTrigger value="siteInfo">Site Info</TabsTrigger>

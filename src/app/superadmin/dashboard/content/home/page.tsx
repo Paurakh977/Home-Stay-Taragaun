@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { 
   Card, 
@@ -265,6 +265,17 @@ export default function HomePageEditor() {
 
   return (
     <Tabs defaultValue="hero">
+      <div className="mb-4">
+        <TabsList className="grid grid-cols-6 w-full">
+          <TabsTrigger value="hero">Hero</TabsTrigger>
+          <TabsTrigger value="stats">Stats</TabsTrigger>
+          <TabsTrigger value="how">How It Works</TabsTrigger>
+          <TabsTrigger value="destinations">Destinations</TabsTrigger>
+          <TabsTrigger value="join">Join Network</TabsTrigger>
+          <TabsTrigger value="cta">CTA</TabsTrigger>
+        </TabsList>
+      </div>
+
       <TabsContent value="hero" className="space-y-4">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
@@ -377,7 +388,20 @@ export default function HomePageEditor() {
               </CardContent>
             </Card>
             
-            {/* Stats Section */}
+            {/* Submit Button */}
+            <div className="flex justify-end">
+              <Button type="submit" disabled={saving}>
+                {saving ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </TabsContent>
+      
+      {/* Stats Section */}
+      <TabsContent value="stats" className="space-y-4">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             <Card>
               <CardHeader>
                 <CardTitle>Stats</CardTitle>
@@ -438,6 +462,727 @@ export default function HomePageEditor() {
                   <Plus className="h-4 w-4 mr-2" />
                   Add Stat
                 </Button>
+              </CardContent>
+            </Card>
+            
+            {/* Submit Button */}
+            <div className="flex justify-end">
+              <Button type="submit" disabled={saving}>
+                {saving ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </TabsContent>
+      
+      {/* "How It Works" section will be added next */}
+      <TabsContent value="how" className="space-y-4">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>How It Works Section</CardTitle>
+                <CardDescription>
+                  Explain the process of using your platform
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Section Title & Subtitle */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="howItWorks.title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Section Title</FormLabel>
+                        <FormControl>
+                          <Input placeholder="How It Works" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="howItWorks.subtitle"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Section Subtitle</FormLabel>
+                        <FormControl>
+                          <Input placeholder="A simple process..." {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                {/* Steps */}
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-medium">Process Steps</h3>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => stepsArray.append({ 
+                        icon: "", 
+                        title: "", 
+                        description: "", 
+                        linkText: "", 
+                        linkUrl: "" 
+                      })}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Step
+                    </Button>
+                  </div>
+                  
+                  {stepsArray.fields.map((field, index) => (
+                    <Card key={field.id} className="border-dashed">
+                      <CardHeader className="pb-2">
+                        <div className="flex justify-between items-center">
+                          <h4 className="text-md font-medium">Step {index + 1}</h4>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => stepsArray.remove(index)}
+                            disabled={stepsArray.fields.length === 1}
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name={`howItWorks.steps.${index}.icon`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Icon Name</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Search, HomeIcon, Star, etc." {...field} />
+                                </FormControl>
+                                <FormDescription>
+                                  Use icon names like Search, HomeIcon, Star, Users, Shield
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={form.control}
+                            name={`howItWorks.steps.${index}.title`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Title</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Find Your Stay" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        
+                        <FormField
+                          control={form.control}
+                          name={`howItWorks.steps.${index}.description`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Description</FormLabel>
+                              <FormControl>
+                                <Textarea placeholder="Browse our curated selection..." rows={2} {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name={`howItWorks.steps.${index}.linkText`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Link Text</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Explore Homestays" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={form.control}
+                            name={`howItWorks.steps.${index}.linkUrl`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Link URL</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="/homestays" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Submit Button */}
+            <div className="flex justify-end">
+              <Button type="submit" disabled={saving}>
+                {saving ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </TabsContent>
+      
+      {/* Add other sections next */}
+      <TabsContent value="destinations" className="space-y-4">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Destinations Section</CardTitle>
+                <CardDescription>
+                  Featured homestay destinations on the homepage
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Section Title & Subtitle */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="destinations.title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Section Title</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Popular Destinations" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="destinations.subtitle"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Section Subtitle</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Discover our most sought-after locations" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <FormField
+                  control={form.control}
+                  name="destinations.viewAllLink"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>View All Link URL</FormLabel>
+                      <FormControl>
+                        <Input placeholder="/homestays" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        URL for the "View All" button
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                {/* Destination Items */}
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-medium">Destinations</h3>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => destinationsArray.append({ 
+                        name: "", 
+                        imagePath: "", 
+                        homestayCount: 0 
+                      })}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Destination
+                    </Button>
+                  </div>
+                  
+                  {destinationsArray.fields.map((field, index) => (
+                    <Card key={field.id} className="border-dashed">
+                      <CardHeader className="pb-2">
+                        <div className="flex justify-between items-center">
+                          <h4 className="text-md font-medium">Destination {index + 1}</h4>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => destinationsArray.remove(index)}
+                            disabled={destinationsArray.fields.length === 1}
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name={`destinations.items.${index}.name`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Name</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Pokhara" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={form.control}
+                            name={`destinations.items.${index}.homestayCount`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Homestay Count</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    placeholder="32" 
+                                    {...field} 
+                                    onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        
+                        <FormField
+                          control={form.control}
+                          name={`destinations.items.${index}.imagePath`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Destination Image</FormLabel>
+                              <FormControl>
+                                <div className="flex flex-col gap-4">
+                                  <div className="flex gap-2">
+                                    <Input placeholder="/path/to/image.jpg" {...field} />
+                                    <div className="relative">
+                                      <Input
+                                        type="file"
+                                        accept="image/*"
+                                        className="absolute inset-0 opacity-0 cursor-pointer"
+                                        onChange={(e) => handleImageUpload(e, `destinations.items.${index}.imagePath`)}
+                                        disabled={uploadingImage}
+                                      />
+                                      <Button type="button" variant="outline" disabled={uploadingImage}>
+                                        <Upload className="h-4 w-4 mr-2" />
+                                        Upload
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  {field.value && (
+                                    <div className="relative h-32 w-full rounded-md overflow-hidden border">
+                                      <Image
+                                        src={field.value}
+                                        alt="Destination Preview"
+                                        fill
+                                        className="object-cover"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Submit Button */}
+            <div className="flex justify-end">
+              <Button type="submit" disabled={saving}>
+                {saving ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </TabsContent>
+      
+      {/* Add remaining sections here */}
+      <TabsContent value="join" className="space-y-4">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Join Network Section</CardTitle>
+                <CardDescription>
+                  Section for encouraging homestay owners to join your platform
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Title & Description */}
+                <FormField
+                  control={form.control}
+                  name="join.title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Section Title</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Join Our Network of Homestays" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="join.description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Connect with travelers from around the world..." 
+                          rows={3}
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                {/* Background Image */}
+                <FormField
+                  control={form.control}
+                  name="join.backgroundImage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Background Image</FormLabel>
+                      <FormControl>
+                        <div className="flex flex-col gap-4">
+                          <div className="flex gap-2">
+                            <Input placeholder="/path/to/image.jpg" {...field} />
+                            <div className="relative">
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                className="absolute inset-0 opacity-0 cursor-pointer"
+                                onChange={(e) => handleImageUpload(e, 'join.backgroundImage')}
+                                disabled={uploadingImage}
+                              />
+                              <Button type="button" variant="outline" disabled={uploadingImage}>
+                                <Upload className="h-4 w-4 mr-2" />
+                                Upload
+                              </Button>
+                            </div>
+                          </div>
+                          {field.value && (
+                            <div className="relative h-40 w-full rounded-md overflow-hidden border">
+                              <Image
+                                src={field.value}
+                                alt="Background Preview"
+                                fill
+                                className="object-cover"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                {/* Features */}
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-medium">Features</h3>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => featuresArray.append({ 
+                        icon: "", 
+                        title: "", 
+                        description: "" 
+                      })}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Feature
+                    </Button>
+                  </div>
+                  
+                  {featuresArray.fields.map((field, index) => (
+                    <Card key={field.id} className="border-dashed">
+                      <CardHeader className="pb-2">
+                        <div className="flex justify-between items-center">
+                          <h4 className="text-md font-medium">Feature {index + 1}</h4>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => featuresArray.remove(index)}
+                            disabled={featuresArray.fields.length === 1}
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name={`join.features.${index}.icon`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Icon Name</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Shield, Award, etc." {...field} />
+                                </FormControl>
+                                <FormDescription>
+                                  Use icon names like Shield, Award, Star, Users
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={form.control}
+                            name={`join.features.${index}.title`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Title</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Free Registration" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        
+                        <FormField
+                          control={form.control}
+                          name={`join.features.${index}.description`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Description</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Easy setup process with no upfront costs" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Submit Button */}
+            <div className="flex justify-end">
+              <Button type="submit" disabled={saving}>
+                {saving ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </TabsContent>
+      
+      {/* CTA Section */}
+      <TabsContent value="cta" className="space-y-4">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Call to Action Section</CardTitle>
+                <CardDescription>
+                  Final section that encourages visitors to take action
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Title & Subtitle */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="cta.title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Title</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ready to Experience Authentic Nepal?" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="cta.subtitle"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Subtitle</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Start your journey today..." {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                {/* Background Image */}
+                <FormField
+                  control={form.control}
+                  name="cta.backgroundImage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Background Image</FormLabel>
+                      <FormControl>
+                        <div className="flex flex-col gap-4">
+                          <div className="flex gap-2">
+                            <Input placeholder="/path/to/image.jpg" {...field} />
+                            <div className="relative">
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                className="absolute inset-0 opacity-0 cursor-pointer"
+                                onChange={(e) => handleImageUpload(e, 'cta.backgroundImage')}
+                                disabled={uploadingImage}
+                              />
+                              <Button type="button" variant="outline" disabled={uploadingImage}>
+                                <Upload className="h-4 w-4 mr-2" />
+                                Upload
+                              </Button>
+                            </div>
+                          </div>
+                          {field.value && (
+                            <div className="relative h-40 w-full rounded-md overflow-hidden border">
+                              <Image
+                                src={field.value}
+                                alt="Background Preview"
+                                fill
+                                className="object-cover"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                {/* Primary Button */}
+                <Card className="border-dashed">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-md">Primary Button</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="cta.primaryButton.text"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Button Text</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Find Homestays" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="cta.primaryButton.link"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Button Link</FormLabel>
+                            <FormControl>
+                              <Input placeholder="/homestays" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Secondary Button */}
+                <Card className="border-dashed">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-md">Secondary Button</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="cta.secondaryButton.text"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Button Text</FormLabel>
+                            <FormControl>
+                              <Input placeholder="List Your Property" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="cta.secondaryButton.link"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Button Link</FormLabel>
+                            <FormControl>
+                              <Input placeholder="/register" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
               </CardContent>
             </Card>
             
