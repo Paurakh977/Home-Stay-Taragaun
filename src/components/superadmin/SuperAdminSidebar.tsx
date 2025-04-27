@@ -61,7 +61,8 @@ const menuItems: MenuSection[] = [
       { href: '/superadmin/dashboard/analytics', label: 'Analytics', icon: LineChart },
       { href: '/superadmin/dashboard/reports', label: 'Reports', icon: FileText, badge: '3', badgeColor: 'bg-amber-500' },
       { href: '/superadmin/dashboard/homestays', label: 'Homestays', icon: Mountain, badge: '12', badgeColor: 'bg-blue-500' },
-      { href: '/superadmin/dashboard/custom-fields', label: 'Custom Fields', icon: CircleDashed }
+      { href: '/superadmin/dashboard/custom-fields', label: 'Custom Fields', icon: CircleDashed },
+      { href: '/superadmin/dashboard/content', label: 'Website Content', icon: FileText, badge: 'New', badgeColor: 'bg-green-500' }
     ]
   },
   {

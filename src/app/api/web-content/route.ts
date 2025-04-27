@@ -1,88 +1,70 @@
 import { NextRequest, NextResponse } from 'next/server';
 import WebContentService from '@/lib/services/webContentService';
-import { connectToDatabase } from '@/lib/db';
-import { WebContent } from '@/lib/models';
 
-export async function GET(req: NextRequest) {
+const DEFAULT_ADMIN = 'main';
+
+// Get web content
+export async function GET(request: NextRequest) {
   try {
-    // Get the admin username from query parameters
-    const url = new URL(req.url);
-    const adminUsername = url.searchParams.get('adminUsername') || 'main';
+    // Get admin username from query params
+    const { searchParams } = new URL(request.url);
+    const adminUsername = searchParams.get('adminUsername') || DEFAULT_ADMIN;
+    const section = searchParams.get('section');
     
-    // Fetch the content for this admin (or default if none exists)
-    const content = await WebContentService.getAdminWebContent(adminUsername);
+    // Get content from database
+    const content = await WebContentService.getContent(adminUsername);
     
-    return NextResponse.json(content, { status: 200 });
-  } catch (error: any) {
+    // If specific section is requested, return only that section
+    if (section && content && content[section as keyof typeof content]) {
+      return NextResponse.json(content[section as keyof typeof content]);
+    }
+    
+    return NextResponse.json(content || {});
+  } catch (error) {
     console.error('Error fetching web content:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch web content', details: error.message },
+      { error: 'Failed to fetch web content' },
       { status: 500 }
     );
   }
 }
 
-export async function PATCH(req: NextRequest) {
+// Update web content
+export async function PATCH(request: NextRequest) {
   try {
-    // Get the admin username from query parameters
-    const url = new URL(req.url);
-    const adminUsername = url.searchParams.get('adminUsername') || 'main';
+    // Get admin username from query params
+    const { searchParams } = new URL(request.url);
+    const adminUsername = searchParams.get('adminUsername') || DEFAULT_ADMIN;
+    const section = searchParams.get('section');
     
-    // Get update data from request body
-    const requestData = await req.json();
-    
-    // Check if we're updating a specific section
-    const section = url.searchParams.get('section');
+    // Get request body
+    const body = await request.json();
     
     let updatedContent;
+    
+    // Update specific section or whole content
     if (section) {
-      // Update only specified section
-      updatedContent = await WebContentService.updateContentSection(
+      updatedContent = await WebContentService.updateSection(
         adminUsername,
-        section,
-        requestData
+        section as any,
+        body
       );
     } else {
-      // Update multiple sections
-      updatedContent = await WebContentService.updateWebContent(
+      updatedContent = await WebContentService.updateContent(
         adminUsername,
-        requestData
+        body
       );
     }
     
-    return NextResponse.json(updatedContent, { status: 200 });
-  } catch (error: any) {
+    return NextResponse.json({
+      success: true,
+      message: 'Content updated successfully',
+      content: updatedContent
+    });
+  } catch (error) {
     console.error('Error updating web content:', error);
     return NextResponse.json(
-      { error: 'Failed to update web content', details: error.message },
-      { status: error.message === 'Content not found' ? 404 : 500 }
-    );
-  }
-}
-
-export async function DELETE(req: NextRequest) {
-  try {
-    await connectToDatabase();
-    
-    // Get the admin username from query parameters
-    const url = new URL(req.url);
-    const adminUsername = url.searchParams.get('adminUsername') || 'main';
-    
-    // Delete the content for this admin
-    const result = await WebContent.deleteOne({ adminUsername });
-    
-    if (result.deletedCount === 0) {
-      return NextResponse.json({ message: `No content found for '${adminUsername}'` }, { status: 404 });
-    }
-    
-    return NextResponse.json({ 
-      message: `Content for '${adminUsername}' deleted successfully`,
-      deleted: result.deletedCount
-    }, { status: 200 });
-  } catch (error: any) {
-    console.error('Error deleting web content:', error);
-    return NextResponse.json(
-      { error: 'Failed to delete web content', details: error.message },
+      { error: 'Failed to update web content' },
       { status: 500 }
     );
   }
