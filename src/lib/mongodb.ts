@@ -40,6 +40,8 @@ async function dbConnect() {
       serverSelectionTimeoutMS: 20000, // Increase timeout to 20 seconds
       connectTimeoutMS: 30000, // Connection timeout
       socketTimeoutMS: 45000, // Socket timeout
+      useNewUrlParser: true, // Fix deprecation warning
+      useUnifiedTopology: true, // Fix deprecation warning
     };
 
     console.log(`Connecting to MongoDB at ${MONGODB_URI}`);

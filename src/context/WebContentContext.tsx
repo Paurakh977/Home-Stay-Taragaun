@@ -2,10 +2,11 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useParams } from 'next/navigation';
+import { IWebContent } from '@/lib/models';
 
 // Define the type of the context value
 interface WebContentContextValue {
-  content: any;
+  content: IWebContent | null;
   loading: boolean;
   error: string | null;
 }
@@ -22,7 +23,7 @@ export const useWebContent = () => useContext(WebContentContext);
 
 // Context provider component
 export function WebContentProvider({ children }: { children: ReactNode }) {
-  const [content, setContent] = useState<any>(null);
+  const [content, setContent] = useState<IWebContent | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const params = useParams();

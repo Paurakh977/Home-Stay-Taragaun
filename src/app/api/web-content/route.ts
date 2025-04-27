@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import WebContentService from '@/lib/services/webContentService';
+import { connectToDatabase } from '@/lib/db';
+import { WebContent } from '@/lib/models';
 
 export async function GET(req: NextRequest) {
   try {
@@ -54,6 +56,34 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json(
       { error: 'Failed to update web content', details: error.message },
       { status: error.message === 'Content not found' ? 404 : 500 }
+    );
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    await connectToDatabase();
+    
+    // Get the admin username from query parameters
+    const url = new URL(req.url);
+    const adminUsername = url.searchParams.get('adminUsername') || 'main';
+    
+    // Delete the content for this admin
+    const result = await WebContent.deleteOne({ adminUsername });
+    
+    if (result.deletedCount === 0) {
+      return NextResponse.json({ message: `No content found for '${adminUsername}'` }, { status: 404 });
+    }
+    
+    return NextResponse.json({ 
+      message: `Content for '${adminUsername}' deleted successfully`,
+      deleted: result.deletedCount
+    }, { status: 200 });
+  } catch (error: any) {
+    console.error('Error deleting web content:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete web content', details: error.message },
+      { status: 500 }
     );
   }
 } 

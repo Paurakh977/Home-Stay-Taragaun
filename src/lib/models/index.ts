@@ -6,6 +6,7 @@ import Location from './Location';
 import User from './User';
 import CustomField from './CustomField';
 import WebContent from './WebContent';
+import Navigation from './Navigation';
 
 export {
   HomestaySingle,
@@ -14,5 +15,10 @@ export {
   Location,
   User,
   CustomField,
-  WebContent
+  WebContent,
+  Navigation
 };
+
+// Export types
+export type { IWebContent } from './WebContent';
+export type { INavigation } from './Navigation';
