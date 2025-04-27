@@ -3,9 +3,75 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Facebook, Instagram, Twitter, Mail, Phone, MapPin } from "lucide-react";
+import { useWebContent } from "@/context/WebContentContext";
 
 const PlatformFooter = () => {
-  const currentYear = new Date().getFullYear();
+  const { content, loading } = useWebContent();
+  
+  // Get footer data from content or use default
+  const footerData = loading || !content?.footer
+    ? {
+        description: "The ultimate platform that connects travelers with authentic Nepali homestays. Experience Nepal like a local and create memories that last a lifetime.",
+        quickLinks: [
+          { name: "Home", path: "/", order: 1 },
+          { name: "About Us", path: "/about", order: 2 },
+          { name: "Explore Homestays", path: "/homestays", order: 3 },
+          { name: "Contact Us", path: "/contact", order: 4 },
+          { name: "List Your Property", path: "/register", order: 5 }
+        ],
+        hostLinks: [
+          { name: "Register Your Homestay", path: "/register", order: 1 },
+          { name: "Login to Dashboard", path: "/login", order: 2 },
+          { name: "Host Resources", path: "/resources", order: 3 },
+          { name: "Success Stories", path: "/success-stories", order: 4 },
+          { name: "Host Support", path: "/support", order: 5 }
+        ],
+        contactInfo: {
+          address: "Thamel, Kathmandu, Nepal",
+          email: "info@nepalstaylink.com",
+          phone: "+977 1234567890",
+          workingHours: "Monday - Friday: 9:00 AM - 6:00 PM\nSaturday: 10:00 AM - 4:00 PM\nSunday: Closed"
+        },
+        socialLinks: [
+          { platform: "Facebook", url: "https://facebook.com", icon: "Facebook" },
+          { platform: "Instagram", url: "https://instagram.com", icon: "Instagram" },
+          { platform: "Twitter", url: "https://twitter.com", icon: "Twitter" }
+        ],
+        copyright: `© ${new Date().getFullYear()} Nepal StayLink. All rights reserved.`,
+        policyLinks: [
+          { name: "Privacy Policy", path: "/privacy-policy", order: 1 },
+          { name: "Terms of Service", path: "/terms-of-service", order: 2 },
+          { name: "Sitemap", path: "/sitemap", order: 3 }
+        ]
+      }
+    : content.footer;
+  
+  // Get site info
+  const siteInfo = loading || !content?.siteInfo
+    ? {
+        siteName: "Nepal StayLink",
+        logoPath: "/Logo.png"
+      }
+    : content.siteInfo;
+  
+  // Sort links by order
+  const quickLinks = footerData.quickLinks.sort((a: any, b: any) => a.order - b.order);
+  const hostLinks = footerData.hostLinks.sort((a: any, b: any) => a.order - b.order);
+  const policyLinks = footerData.policyLinks.sort((a: any, b: any) => a.order - b.order);
+  
+  // Helper function to render social icons
+  const renderSocialIcon = (icon: string) => {
+    switch(icon) {
+      case 'Facebook':
+        return <Facebook size={20} />;
+      case 'Instagram':
+        return <Instagram size={20} />;
+      case 'Twitter':
+        return <Twitter size={20} />;
+      default:
+        return <Facebook size={20} />;
+    }
+  };
   
   return (
     <footer className="bg-gray-100 text-gray-800">
@@ -17,29 +83,30 @@ const PlatformFooter = () => {
             <div className="flex items-center">
               <div className="relative h-12 w-12 mr-3 overflow-hidden rounded-full bg-white shadow-sm">
                 <Image 
-                  src="/Logo.png" 
-                  alt="Nepal StayLink" 
+                  src={siteInfo.logoPath} 
+                  alt={siteInfo.siteName} 
                   width={48}
                   height={48}
                   className="object-contain"
                 />
               </div>
-              <span className="text-xl font-bold">Nepal StayLink</span>
+              <span className="text-xl font-bold">{siteInfo.siteName}</span>
             </div>
             <p className="text-gray-600 text-sm mt-2">
-              The ultimate platform that connects travelers with authentic Nepali homestays.
-              Experience Nepal like a local and create memories that last a lifetime.
+              {footerData.description}
             </p>
             <div className="flex space-x-4 mt-4">
-              <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-800 transition-colors">
-                <Facebook size={20} />
-              </a>
-              <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-800 transition-colors">
-                <Instagram size={20} />
-              </a>
-              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-800 transition-colors">
-                <Twitter size={20} />
-              </a>
+              {footerData.socialLinks.map((social: any, index: number) => (
+                <a 
+                  key={index}
+                  href={social.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="text-gray-500 hover:text-gray-800 transition-colors"
+                >
+                  {renderSocialIcon(social.icon)}
+                </a>
+              ))}
             </div>
           </div>
           
@@ -47,31 +114,13 @@ const PlatformFooter = () => {
           <div>
             <h3 className="text-lg font-medium mb-4 text-gray-900">Quick Links</h3>
             <ul className="space-y-2">
-              <li>
-                <Link href="/" className="text-gray-600 hover:text-gray-900 transition-colors">
-                  Home
-                </Link>
-              </li>
-              <li>
-                <Link href="/about" className="text-gray-600 hover:text-gray-900 transition-colors">
-                  About Us
-                </Link>
-              </li>
-              <li>
-                <Link href="/homestays" className="text-gray-600 hover:text-gray-900 transition-colors">
-                  Explore Homestays
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="text-gray-600 hover:text-gray-900 transition-colors">
-                  Contact Us
-                </Link>
-              </li>
-              <li>
-                <Link href="/register" className="text-gray-600 hover:text-gray-900 transition-colors">
-                  List Your Property
-                </Link>
-              </li>
+              {quickLinks.map((link: any, index: number) => (
+                <li key={index}>
+                  <Link href={link.path} className="text-gray-600 hover:text-gray-900 transition-colors">
+                    {link.name}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
           
@@ -79,31 +128,13 @@ const PlatformFooter = () => {
           <div>
             <h3 className="text-lg font-medium mb-4 text-gray-900">For Homestay Owners</h3>
             <ul className="space-y-2">
-              <li>
-                <Link href="/register" className="text-gray-600 hover:text-gray-900 transition-colors">
-                  Register Your Homestay
-                </Link>
-              </li>
-              <li>
-                <Link href="/login" className="text-gray-600 hover:text-gray-900 transition-colors">
-                  Login to Dashboard
-                </Link>
-              </li>
-              <li>
-                <Link href="/resources" className="text-gray-600 hover:text-gray-900 transition-colors">
-                  Host Resources
-                </Link>
-              </li>
-              <li>
-                <Link href="/success-stories" className="text-gray-600 hover:text-gray-900 transition-colors">
-                  Success Stories
-                </Link>
-              </li>
-              <li>
-                <Link href="/support" className="text-gray-600 hover:text-gray-900 transition-colors">
-                  Host Support
-                </Link>
-              </li>
+              {hostLinks.map((link: any, index: number) => (
+                <li key={index}>
+                  <Link href={link.path} className="text-gray-600 hover:text-gray-900 transition-colors">
+                    {link.name}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
           
@@ -114,19 +145,19 @@ const PlatformFooter = () => {
               <li className="flex items-start">
                 <MapPin className="h-5 w-5 mr-2 text-gray-700 flex-shrink-0 mt-0.5" />
                 <span className="text-gray-600">
-                  Thamel, Kathmandu, Nepal
+                  {footerData.contactInfo.address}
                 </span>
               </li>
               <li className="flex items-start">
                 <Phone className="h-5 w-5 mr-2 text-gray-700 flex-shrink-0 mt-0.5" />
                 <span className="text-gray-600">
-                  +977 1234567890
+                  {footerData.contactInfo.phone}
                 </span>
               </li>
               <li className="flex items-start">
                 <Mail className="h-5 w-5 mr-2 text-gray-700 flex-shrink-0 mt-0.5" />
                 <span className="text-gray-600">
-                  info@nepalstaylink.com
+                  {footerData.contactInfo.email}
                 </span>
               </li>
             </ul>
@@ -153,18 +184,18 @@ const PlatformFooter = () => {
       <div className="bg-gray-200 py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center">
           <p className="text-sm text-gray-600">
-            © {currentYear} Nepal StayLink. All rights reserved.
+            {footerData.copyright}
           </p>
           <div className="flex space-x-6 mt-4 md:mt-0">
-            <Link href="/privacy-policy" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-              Privacy Policy
-            </Link>
-            <Link href="/terms-of-service" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-              Terms of Service
-            </Link>
-            <Link href="/sitemap" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-              Sitemap
-            </Link>
+            {policyLinks.map((link: any, index: number) => (
+              <Link 
+                key={index}
+                href={link.path} 
+                className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                {link.name}
+              </Link>
+            ))}
           </div>
         </div>
       </div>

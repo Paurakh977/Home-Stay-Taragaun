@@ -6,11 +6,13 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useWebContent } from "@/context/WebContentContext";
 
 const PlatformNavbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const pathname = usePathname();
+  const { content, loading } = useWebContent();
 
   // Handle scroll effect
   useEffect(() => {
@@ -30,12 +32,27 @@ const PlatformNavbar = () => {
     setIsMenuOpen(!isMenuOpen);
   };
 
-  const navLinks = [
+  // Use fallback navigation links if content is still loading
+  const defaultNavLinks = [
     { name: 'Home', path: '/' },
     { name: 'About', path: '/about' },
     { name: 'Explore Homestays', path: '/homestays' },
     { name: 'Contact', path: '/contact' },
   ];
+
+  // Get navigation links from content or use default
+  const navLinks = loading || !content?.navigation?.links 
+    ? defaultNavLinks 
+    : content.navigation.links.sort((a: any, b: any) => a.order - b.order);
+
+  // Get site info
+  const siteInfo = loading || !content?.siteInfo
+    ? {
+        siteName: "Nepal StayLink",
+        tagline: "Your Gateway to Authentic Homestays",
+        logoPath: "/Logo.png"
+      }
+    : content.siteInfo;
 
   return (
     <nav className={`sticky top-0 z-50 w-full transition-all duration-300 ${
@@ -47,22 +64,22 @@ const PlatformNavbar = () => {
           <Link href="/" className="flex-shrink-0 flex items-center">
             <div className="relative h-12 w-12 mr-3 overflow-hidden rounded-full bg-white shadow-sm">
               <Image 
-                src="/Logo.png" 
-                alt="Nepal StayLink" 
+                src={siteInfo.logoPath} 
+                alt={siteInfo.siteName} 
                 width={48}
                 height={48}
                 className="object-contain"
               />
             </div>
             <div className="flex flex-col">
-              <span className="text-xl font-bold text-gray-800">Nepal StayLink</span>
-              <span className="text-xs text-gray-500">Your Gateway to Authentic Homestays</span>
+              <span className="text-xl font-bold text-gray-800">{siteInfo.siteName}</span>
+              <span className="text-xs text-gray-500">{siteInfo.tagline}</span>
             </div>
           </Link>
           
           {/* Desktop menu */}
           <div className="hidden md:flex items-center space-x-8">
-            {navLinks.map((link) => (
+            {navLinks.map((link: any) => (
               <Link
                 key={link.path}
                 href={link.path}
@@ -101,7 +118,7 @@ const PlatformNavbar = () => {
       {isMenuOpen && (
         <div className="md:hidden bg-white absolute top-20 left-0 right-0 shadow-lg z-50">
           <div className="px-4 pt-2 pb-4 space-y-3">
-            {navLinks.map((link) => (
+            {navLinks.map((link: any) => (
               <Link
                 key={link.path}
                 href={link.path}

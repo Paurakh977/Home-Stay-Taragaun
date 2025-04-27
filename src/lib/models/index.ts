@@ -5,6 +5,7 @@ import Contact from './Contact';
 import Location from './Location';
 import User from './User';
 import CustomField from './CustomField';
+import WebContent from './WebContent';
 
 export {
   HomestaySingle,
@@ -12,5 +13,6 @@ export {
   Contact,
   Location,
   User,
-  CustomField
+  CustomField,
+  WebContent
 };

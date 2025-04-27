@@ -3,8 +3,63 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Mail, Phone, MapPin, Send, Clock } from "lucide-react";
+import { useWebContent } from "@/context/WebContentContext";
 
 export default function Contact() {
+  const { content, loading } = useWebContent();
+  
+  // Use default content if still loading or content not available
+  const contactContent = loading || !content?.contactPage
+    ? {
+        hero: {
+          title: "Contact Us",
+          subtitle: "Have questions or feedback? We'd love to hear from you. Reach out to our team using the contact information below.",
+          backgroundImage: "/images/contact/contact-map.jpg"
+        },
+        form: {
+          title: "Send Us a Message",
+          nameLabel: "Your Name *",
+          emailLabel: "Your Email *",
+          subjectLabel: "Subject *",
+          messageLabel: "Your Message *",
+          submitButtonText: "Send Message",
+          subjects: [
+            "General Inquiry",
+            "Homestay Listing",
+            "Booking Help",
+            "Partnership Opportunity",
+            "Technical Support",
+            "Feedback"
+          ]
+        },
+        info: {
+          title: "Get In Touch",
+          location: {
+            title: "Our Location",
+            address: "Thamel, Kathmandu 44600, Nepal"
+          },
+          email: {
+            title: "Email Us",
+            general: "info@nepalstaylink.com",
+            support: "support@nepalstaylink.com"
+          },
+          phone: {
+            title: "Call Us",
+            office: "+977 1 4123456",
+            support: "+977 1 4123457"
+          },
+          hours: {
+            title: "Working Hours",
+            schedule: "Monday - Friday: 9:00 AM - 6:00 PM\nSaturday: 10:00 AM - 4:00 PM\nSunday: Closed"
+          }
+        },
+        map: {
+          imagePath: "/images/contact/nepal-map.jpg",
+          markerText: "Nepal StayLink Headquarters"
+        }
+      }
+    : content.contactPage;
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -67,7 +122,7 @@ export default function Contact() {
       <section className="py-24 bg-gray-50 relative overflow-hidden">
         <div className="absolute inset-0 opacity-5">
           <Image
-            src="/images/contact/contact-map.jpg"
+            src={contactContent.hero.backgroundImage}
             alt="Nepal Map"
             fill
             className="object-cover"
@@ -76,11 +131,11 @@ export default function Contact() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 relative z-10">
           <div className="max-w-3xl mx-auto text-center">
             <h1 className="text-3xl md:text-4xl font-bold mb-6 text-gray-900">
-              Contact Us
+              {contactContent.hero.title}
             </h1>
             <div className="w-16 h-1 bg-gray-300 mx-auto mb-6"></div>
             <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-              Have questions or feedback? We'd love to hear from you. Reach out to our team using the contact information below.
+              {contactContent.hero.subtitle}
             </p>
           </div>
         </div>
@@ -93,13 +148,13 @@ export default function Contact() {
             <div className="grid md:grid-cols-2 gap-0">
               {/* Contact Form */}
               <div className="p-8 md:p-12">
-                <h2 className="text-2xl font-bold mb-8 text-gray-900">Send Us a Message</h2>
+                <h2 className="text-2xl font-bold mb-8 text-gray-900">{contactContent.form.title}</h2>
                 
                 <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Name Field */}
                   <div>
                     <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                      Your Name *
+                      {contactContent.form.nameLabel}
                     </label>
                     <input
                       type="text"
@@ -116,7 +171,7 @@ export default function Contact() {
                   {/* Email Field */}
                   <div>
                     <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                      Your Email *
+                      {contactContent.form.emailLabel}
                     </label>
                     <input
                       type="email"
@@ -133,7 +188,7 @@ export default function Contact() {
                   {/* Subject Field */}
                   <div>
                     <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-1">
-                      Subject *
+                      {contactContent.form.subjectLabel}
                     </label>
                     <select
                       id="subject"
@@ -144,19 +199,16 @@ export default function Contact() {
                       className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-gray-400 transition-colors"
                     >
                       <option value="">Please select a subject</option>
-                      <option value="General Inquiry">General Inquiry</option>
-                      <option value="Homestay Listing">Homestay Listing</option>
-                      <option value="Booking Help">Booking Help</option>
-                      <option value="Partnership Opportunity">Partnership Opportunity</option>
-                      <option value="Technical Support">Technical Support</option>
-                      <option value="Feedback">Feedback</option>
+                      {contactContent.form.subjects.map((subject: string, index: number) => (
+                        <option key={index} value={subject}>{subject}</option>
+                      ))}
                     </select>
                   </div>
                   
                   {/* Message Field */}
                   <div>
                     <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-1">
-                      Your Message *
+                      {contactContent.form.messageLabel}
                     </label>
                     <textarea
                       id="message"
@@ -202,7 +254,7 @@ export default function Contact() {
                     ) : (
                       <>
                         <Send className="mr-2 h-5 w-5" />
-                        Send Message
+                        {contactContent.form.submitButtonText}
                       </>
                     )}
                   </button>
@@ -211,7 +263,7 @@ export default function Contact() {
               
               {/* Contact Information */}
               <div className="bg-gray-50 p-8 md:p-12">
-                <h2 className="text-2xl font-bold mb-8 text-gray-900">Get In Touch</h2>
+                <h2 className="text-2xl font-bold mb-8 text-gray-900">{contactContent.info.title}</h2>
                 
                 {/* Contact Cards */}
                 <div className="space-y-8">
@@ -220,10 +272,9 @@ export default function Contact() {
                       <MapPin className="h-6 w-6 text-gray-700" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-medium mb-2 text-gray-900">Our Location</h3>
+                      <h3 className="text-lg font-medium mb-2 text-gray-900">{contactContent.info.location.title}</h3>
                       <p className="text-gray-600">
-                        Thamel, Kathmandu 44600<br />
-                        Nepal
+                        {contactContent.info.location.address}
                       </p>
                     </div>
                   </div>
@@ -233,10 +284,10 @@ export default function Contact() {
                       <Mail className="h-6 w-6 text-gray-700" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-medium mb-2 text-gray-900">Email Us</h3>
+                      <h3 className="text-lg font-medium mb-2 text-gray-900">{contactContent.info.email.title}</h3>
                       <p className="text-gray-600">
-                        General Inquiries: <a href="mailto:info@nepalstaylink.com" className="text-gray-700 hover:text-black hover:underline transition-colors">info@nepalstaylink.com</a><br />
-                        Support: <a href="mailto:support@nepalstaylink.com" className="text-gray-700 hover:text-black hover:underline transition-colors">support@nepalstaylink.com</a>
+                        General Inquiries: <a href={`mailto:${contactContent.info.email.general}`} className="text-gray-700 hover:text-black hover:underline transition-colors">{contactContent.info.email.general}</a><br />
+                        Support: <a href={`mailto:${contactContent.info.email.support}`} className="text-gray-700 hover:text-black hover:underline transition-colors">{contactContent.info.email.support}</a>
                       </p>
                     </div>
                   </div>
@@ -246,10 +297,10 @@ export default function Contact() {
                       <Phone className="h-6 w-6 text-gray-700" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-medium mb-2 text-gray-900">Call Us</h3>
+                      <h3 className="text-lg font-medium mb-2 text-gray-900">{contactContent.info.phone.title}</h3>
                       <p className="text-gray-600">
-                        Office: <a href="tel:+97714123456" className="text-gray-700 hover:text-black hover:underline transition-colors">+977 1 4123456</a><br />
-                        Support: <a href="tel:+97714123457" className="text-gray-700 hover:text-black hover:underline transition-colors">+977 1 4123457</a>
+                        Office: <a href={`tel:${contactContent.info.phone.office}`} className="text-gray-700 hover:text-black hover:underline transition-colors">{contactContent.info.phone.office}</a><br />
+                        Support: <a href={`tel:${contactContent.info.phone.support}`} className="text-gray-700 hover:text-black hover:underline transition-colors">{contactContent.info.phone.support}</a>
                       </p>
                     </div>
                   </div>
@@ -259,11 +310,9 @@ export default function Contact() {
                       <Clock className="h-6 w-6 text-gray-700" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-medium mb-2 text-gray-900">Working Hours</h3>
-                      <p className="text-gray-600">
-                        Monday - Friday: 9:00 AM - 6:00 PM<br />
-                        Saturday: 10:00 AM - 4:00 PM<br />
-                        Sunday: Closed
+                      <h3 className="text-lg font-medium mb-2 text-gray-900">{contactContent.info.hours.title}</h3>
+                      <p className="text-gray-600 whitespace-pre-line">
+                        {contactContent.info.hours.schedule}
                       </p>
                     </div>
                   </div>
@@ -279,7 +328,7 @@ export default function Contact() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="rounded-2xl overflow-hidden shadow-sm h-[500px] relative border border-gray-100">
             <Image
-              src="/images/contact/nepal-map.jpg"
+              src={contactContent.map.imagePath}
               alt="Nepal Map"
               fill
               className="object-cover"
@@ -287,7 +336,7 @@ export default function Contact() {
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="bg-white px-6 py-4 rounded-lg shadow-lg text-gray-900 font-medium flex items-center">
                 <MapPin className="h-5 w-5 text-gray-700 mr-2" />
-                <span>Nepal StayLink Headquarters</span>
+                <span>{contactContent.map.markerText}</span>
               </div>
             </div>
           </div>
