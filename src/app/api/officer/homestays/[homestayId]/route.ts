@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { jwtVerify } from 'jose';
 import dbConnect from '@/lib/mongodb';
 import { HomestaySingle, Official, Contact, Location } from '@/lib/models';
+import { hashPassword } from '@/lib/utils';
 
 // Use the JWT_SECRET from environment or fallback for development
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_for_development';
@@ -180,9 +181,9 @@ export async function PATCH(
     // Update the status
     homestay.status = status;
     
-    // Add audit information
-    homestay.lastUpdatedBy = payload.username;
-    homestay.lastUpdatedAt = new Date();
+    // Audit information is handled by Mongoose timestamps
+    // homestay.lastUpdatedBy and lastUpdatedAt aren't defined in the model
+    // Using the built-in updatedAt field instead
     
     // Save the updated homestay
     await homestay.save();
@@ -197,6 +198,105 @@ export async function PATCH(
     
   } catch (error: any) {
     console.error('Error in officer homestay status update API:', error);
+    return NextResponse.json({ 
+      success: false, 
+      message: error.message || 'Internal server error' 
+    }, { status: 500 });
+  }
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { homestayId: string } }
+) {
+  try {
+    // Connect to database
+    await dbConnect();
+    
+    const { homestayId } = params;
+    console.log(`API: Officer resetting password for homestay with ID: ${homestayId}`);
+    
+    // Get the auth token from cookies
+    const cookieStore = await cookies();
+    const token = cookieStore.get('officer_token')?.value;
+    
+    if (!token) {
+      console.log('API: No officer token found');
+      return NextResponse.json(
+        { success: false, message: 'Not authenticated' },
+        { status: 401 }
+      );
+    }
+    
+    // Verify the token
+    const { payload } = await jwtVerify(token, secret);
+    
+    if (!payload || !payload.userId || payload.role !== 'officer' || !payload.isOfficer) {
+      console.log('API: Invalid token or not officer role', { payload });
+      return NextResponse.json(
+        { success: false, message: 'Invalid or expired token' },
+        { status: 401 }
+      );
+    }
+    
+    // Check if officer belongs to an admin
+    const parentAdmin = payload.parentAdmin;
+    
+    if (!parentAdmin) {
+      console.log('API: No parent admin in token');
+      return NextResponse.json(
+        { success: false, message: 'Invalid token data' },
+        { status: 401 }
+      );
+    }
+    
+    // Get new password from request body
+    const { newPassword } = await request.json();
+    
+    if (!newPassword || newPassword.length < 8) {
+      console.log('API: Invalid password');
+      return NextResponse.json(
+        { success: false, message: 'Password must be at least 8 characters long' },
+        { status: 400 }
+      );
+    }
+    
+    // Find the homestay and ensure it belongs to the parent admin
+    const homestay = await HomestaySingle.findOne({ 
+      homestayId, 
+      adminUsername: parentAdmin 
+    });
+    
+    if (!homestay) {
+      console.log(`API: Homestay not found or doesn't belong to admin: ${parentAdmin}`);
+      return NextResponse.json(
+        { success: false, message: 'Homestay not found' },
+        { status: 404 }
+      );
+    }
+    
+    // Hash the new password
+    const hashedPassword = hashPassword(newPassword);
+    
+    // Update the password
+    homestay.password = hashedPassword;
+    
+    // Save the updated homestay
+    await homestay.save();
+    
+    console.log(`API: Successfully reset password for homestay ID: ${homestayId}`);
+    
+    return NextResponse.json({
+      success: true,
+      message: 'Homestay password has been reset successfully',
+      data: {
+        homestayId: homestay.homestayId,
+        homeStayName: homestay.homeStayName
+      }
+    });
+    
+  } catch (error: any) {
+    console.error('Error in officer homestay password reset API:', error);
     return NextResponse.json({ 
       success: false, 
       message: error.message || 'Internal server error' 

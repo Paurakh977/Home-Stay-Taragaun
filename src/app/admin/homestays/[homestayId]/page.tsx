@@ -7,7 +7,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 // Remove the import from '@/types/homestay' if HomestayData is defined below
 // import { HomestayData } from '@/types/homestay'; 
-import { CheckCircle, XCircle, ArrowLeft, FileText, Loader2, ExternalLink, MapPin, Phone, User, Mail, Building, Globe, Image as ImageIcon, File as FileIcon, List, Edit, Plus, X, Upload, Eye, Download, Trash2, AlertCircle } from 'lucide-react';
+import { CheckCircle, XCircle, ArrowLeft, FileText, Loader2, ExternalLink, MapPin, Phone, User, Mail, Building, Globe, Image as ImageIcon, File as FileIcon, List, Edit, Plus, X, Upload, Eye, Download, Trash2, AlertCircle, Key as KeyIcon } from 'lucide-react';
 import { useAdminOfficer } from '@/context/AdminOfficerContext';
 
 // --- Comprehensive Type Definition (Move to types/homestay.ts if preferred) ---
@@ -271,6 +271,17 @@ export default function AdminHomestayDetailPage() {
   }>({});
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [resetPassword, setResetPassword] = useState<{
+    loading: boolean;
+    error: string | null;
+    success: boolean;
+  }>({
+    loading: false,
+    error: null,
+    success: false
+  });
   
   // Use the AdminOfficerContext to check if we're in officer context
   const { isOfficer, officerData } = useAdminOfficer();
@@ -1544,6 +1555,73 @@ export default function AdminHomestayDetailPage() {
   // Get primary contact using updated field names
   const primaryApiContact = homestay.contacts?.[0];
 
+  // Handle password reset
+  const handlePasswordReset = async () => {
+    if (!homestay) return;
+    
+    // Validate password
+    if (!newPassword || newPassword.length < 8) {
+      setResetPassword(prev => ({
+        ...prev,
+        error: 'Password must be at least 8 characters long'
+      }));
+      return;
+    }
+    
+    setResetPassword({
+      loading: true,
+      error: null,
+      success: false
+    });
+    
+    try {
+      // Use appropriate API endpoint based on user role
+      const apiUrl = isOfficer && officerData 
+        ? `/api/officer/homestays/${homestayId}`
+        : `/api/admin/homestays/${homestayId}`;
+      
+      const response = await fetch(apiUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || data.message || `Failed to reset password: ${response.statusText}`);
+      }
+      
+      if (data.success) {
+        setResetPassword({
+          loading: false,
+          error: null,
+          success: true
+        });
+        
+        // Close the modal after 2 seconds
+        setTimeout(() => {
+          setShowPasswordResetModal(false);
+          setNewPassword('');
+          setResetPassword({
+            loading: false,
+            error: null,
+            success: false
+          });
+        }, 2000);
+      } else {
+        throw new Error(data.error || data.message || 'Failed to reset password');
+      }
+    } catch (err) {
+      console.error("Password reset error:", err);
+      setResetPassword({
+        loading: false,
+        error: err instanceof Error ? err.message : 'Failed to reset password',
+        success: false
+      });
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto py-8 px-4 bg-gray-50 min-h-screen">
       {/* Header: Back Button, Title, Status Badge */}
@@ -2388,6 +2466,15 @@ export default function AdminHomestayDetailPage() {
                           Reject Homestay
                         </button>
                       )}
+                      
+                      {/* Password Reset Button */}
+                      <button 
+                        onClick={() => setShowPasswordResetModal(true)}
+                        className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center justify-center transition-colors"
+                      >
+                        <KeyIcon className="h-4 w-4 mr-2" />
+                        Reset Password
+                      </button>
                     </>
                   )}
                 </div>
@@ -2923,6 +3010,81 @@ export default function AdminHomestayDetailPage() {
 
         </div>
       </div>
+      
+      {/* Password Reset Modal */}
+      {showPasswordResetModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Reset Homestay Password</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Enter a new password for {homestay?.homeStayName}. Password must be at least 8 characters long.
+            </p>
+            
+            {resetPassword.error && (
+              <div className="mb-4 bg-red-50 border border-red-200 p-3 rounded-lg text-red-800 text-sm">
+                {resetPassword.error}
+              </div>
+            )}
+            
+            {resetPassword.success && (
+              <div className="mb-4 bg-green-50 border border-green-200 p-3 rounded-lg text-green-800 text-sm flex items-center">
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Password reset successfully!
+              </div>
+            )}
+            
+            <div className="mb-4">
+              <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 mb-1">
+                New Password
+              </label>
+              <input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-md"
+                placeholder="Enter new password"
+                disabled={resetPassword.loading || resetPassword.success}
+              />
+            </div>
+            
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowPasswordResetModal(false);
+                  setNewPassword('');
+                  setResetPassword({
+                    loading: false,
+                    error: null,
+                    success: false
+                  });
+                }}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                disabled={resetPassword.loading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePasswordReset}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+                disabled={resetPassword.loading || resetPassword.success || !newPassword}
+              >
+                {resetPassword.loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Resetting...
+                  </>
+                ) : (
+                  <>
+                    <KeyIcon className="h-4 w-4 mr-2" />
+                    Reset Password
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
