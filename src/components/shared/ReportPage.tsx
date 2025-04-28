@@ -490,6 +490,7 @@ export default function ReportPage({
             'Homes': number;
             'Rooms': number;
             'Beds': number;
+            'Remarks': string;
           }> = [];
           let rowCounter = 1;
           
@@ -503,7 +504,8 @@ export default function ReportPage({
               'Formatted Address': getValue(homestay, 'address.formattedAddress.en') || 'N/A',
               'Homes': parseInt(getValue(homestay, 'homeCount')) || 0,
               'Rooms': parseInt(getValue(homestay, 'roomCount')) || 0,
-              'Beds': parseInt(getValue(homestay, 'bedCount')) || 0
+              'Beds': parseInt(getValue(homestay, 'bedCount')) || 0,
+              'Remarks': ''
             };
             
             // If no attractions, add one row with "None" as attraction
@@ -539,7 +541,8 @@ export default function ReportPage({
             { wch: 60 },  // Local Attraction
             { wch: 10 },  // Homes
             { wch: 10 },  // Rooms
-            { wch: 10 }   // Beds
+            { wch: 10 },   // Beds
+            { wch: 20 }    // Remarks
           ];
         } else {
           // Original geographical-classification columns
@@ -559,7 +562,8 @@ export default function ReportPage({
             'Village': getValue(homestay, 'villageName') || 'N/A',
             'Homes': parseInt(getValue(homestay, 'homeCount')) || 0,
             'Rooms': parseInt(getValue(homestay, 'roomCount')) || 0,
-            'Beds': parseInt(getValue(homestay, 'bedCount')) || 0
+            'Beds': parseInt(getValue(homestay, 'bedCount')) || 0,
+            'Remarks': ''
           }))
         );
         
@@ -579,7 +583,8 @@ export default function ReportPage({
           { wch: 15 }, // Village
           { wch: 10 }, // Homes
           { wch: 10 }, // Rooms
-          { wch: 10 }  // Beds
+          { wch: 10 },  // Beds
+          { wch: 20 }   // Remarks
         ];
         }
         
@@ -705,7 +710,7 @@ export default function ReportPage({
           if (type === 'tourism-attractions') {
             // For tourism attractions, normalize the data with one attraction per row
             const normalizedData: Array<(string | number)[]> = [];
-            const normalizedHeaders = ['S.N.', 'Homestay Name', 'DHSR No', 'Type', 'Formatted Address', 'Local Attraction', 'Homes', 'Rooms', 'Beds'];
+            const normalizedHeaders = ['S.N.', 'Homestay Name', 'DHSR No', 'Type', 'Formatted Address', 'Local Attraction', 'Homes', 'Rooms', 'Beds', 'Remarks'];
             
             dataToExport.forEach((homestay, index) => {
               // Only process homestays with complete essential data
@@ -724,7 +729,8 @@ export default function ReportPage({
                   'None',
                   Number(getValue(homestay, 'homeCount')) || 0,
                   Number(getValue(homestay, 'roomCount')) || 0,
-                  Number(getValue(homestay, 'bedCount')) || 0
+                  Number(getValue(homestay, 'bedCount')) || 0,
+                  ''
                 ]);
                 return;
               }
@@ -745,7 +751,8 @@ export default function ReportPage({
                   en || 'N/A', // Ensure we always have a value
                   Number(getValue(homestay, 'homeCount')) || 0,
                   Number(getValue(homestay, 'roomCount')) || 0,
-                  Number(getValue(homestay, 'bedCount')) || 0
+                  Number(getValue(homestay, 'bedCount')) || 0,
+                  ''
                 ]);
               });
             });
@@ -781,10 +788,11 @@ export default function ReportPage({
                 2: { cellWidth: 20 },  // DHSR No
                 3: { cellWidth: 22 },  // Type - increased width
                 4: { cellWidth: 70, overflow: 'linebreak' }, // Formatted Address
-                5: { cellWidth: 85, overflow: 'linebreak' },  // Local Attraction (increased width)
+                5: { cellWidth: 55, overflow: 'linebreak' },  // Local Attraction (increased width)
                 6: { cellWidth: 15 },  // Homes
                 7: { cellWidth: 15 },  // Rooms
-                8: { cellWidth: 12 }   // Beds
+                8: { cellWidth: 12 },   // Beds
+                9: { cellWidth: 20 }    // Remarks
               },
               headStyles: {
                 fillColor: [220, 220, 220],
@@ -873,7 +881,7 @@ export default function ReportPage({
           } else if (type === 'infrastructure') {
             // For infrastructure report, normalize the data with one infrastructure item per row
             const normalizedData: Array<(string | number)[]> = [];
-            const normalizedHeaders = ['S.N.', 'Homestay Name', 'DHSR No', 'Type', 'Formatted Address', 'Infrastructure Item', 'Homes', 'Rooms', 'Beds'];
+            const normalizedHeaders = ['S.N.', 'Homestay Name', 'DHSR No', 'Type', 'Formatted Address', 'Infrastructure Item', 'Homes', 'Rooms', 'Beds', 'Remarks'];
             
             dataToExport.forEach((homestay, index) => {
               // Only process homestays with complete essential data
@@ -892,7 +900,8 @@ export default function ReportPage({
                   'None',
                   Number(getValue(homestay, 'homeCount')) || 0,
                   Number(getValue(homestay, 'roomCount')) || 0,
-                  Number(getValue(homestay, 'bedCount')) || 0
+                  Number(getValue(homestay, 'bedCount')) || 0,
+                  ''
                 ]);
                 return;
               }
@@ -915,7 +924,8 @@ export default function ReportPage({
                   infraEn || 'N/A', // English part of infrastructure name
                   Number(getValue(homestay, 'homeCount')) || 0,
                   Number(getValue(homestay, 'roomCount')) || 0,
-                  Number(getValue(homestay, 'bedCount')) || 0
+                  Number(getValue(homestay, 'bedCount')) || 0,
+                  ''
                 ]);
               });
             });
@@ -954,7 +964,8 @@ export default function ReportPage({
                 5: { cellWidth: 65, overflow: 'linebreak' },  // Infrastructure Item - reduced from 95 to 65
                 6: { cellWidth: 15 },  // Homes
                 7: { cellWidth: 15 },  // Rooms
-                8: { cellWidth: 12 }   // Beds
+                8: { cellWidth: 12 },   // Beds
+                9: { cellWidth: 20 }    // Remarks
               },
               headStyles: {
                 fillColor: [220, 220, 220],
@@ -1043,7 +1054,7 @@ export default function ReportPage({
           } else if (type === 'homestay-services') {
             // For tourism services, normalize the data with one service per row
             const normalizedData: Array<(string | number)[]> = [];
-            const normalizedHeaders = ['S.N.', 'Homestay Name', 'DHSR No', 'Type', 'Formatted Address', 'Tourism Service', 'Homes', 'Rooms', 'Beds'];
+            const normalizedHeaders = ['S.N.', 'Homestay Name', 'DHSR No', 'Type', 'Formatted Address', 'Tourism Service', 'Homes', 'Rooms', 'Beds', 'Remarks'];
             
             dataToExport.forEach((homestay, index) => {
               // Only process homestays with complete essential data
@@ -1062,7 +1073,8 @@ export default function ReportPage({
                   'None',
                   Number(getValue(homestay, 'homeCount')) || 0,
                   Number(getValue(homestay, 'roomCount')) || 0,
-                  Number(getValue(homestay, 'bedCount')) || 0
+                  Number(getValue(homestay, 'bedCount')) || 0,
+                  ''
                 ]);
                 return;
               }
@@ -1084,7 +1096,8 @@ export default function ReportPage({
                   serviceEn || 'N/A', // Ensure we always have a value
                   Number(getValue(homestay, 'homeCount')) || 0,
                   Number(getValue(homestay, 'roomCount')) || 0,
-                  Number(getValue(homestay, 'bedCount')) || 0
+                  Number(getValue(homestay, 'bedCount')) || 0,
+                  ''
                 ]);
               });
             });
@@ -1120,10 +1133,11 @@ export default function ReportPage({
                 2: { cellWidth: 20 },  // DHSR No
                 3: { cellWidth: 22 },  // Type
                 4: { cellWidth: 70, overflow: 'linebreak' }, // Formatted Address
-                5: { cellWidth: 85, overflow: 'linebreak' },  // Tourism Service
+                5: { cellWidth: 55, overflow: 'linebreak' },  // Tourism Service
                 6: { cellWidth: 15 },  // Homes
                 7: { cellWidth: 15 },  // Rooms
-                8: { cellWidth: 12 }   // Beds
+                8: { cellWidth: 12 },   // Beds
+                9: { cellWidth: 20 }    // Remarks
               },
               headStyles: {
                 fillColor: [220, 220, 220],
@@ -1219,7 +1233,7 @@ export default function ReportPage({
             
           autoTable(doc, {
             startY: tableStartY,
-            head: [['S.N.', 'Homestay Name', 'DHSR No', 'Type', 'Status', 'Province', 'District', 'Municipality', 'Ward', 'Village', 'Homes', 'Rooms', 'Beds']],
+            head: [['S.N.', 'Homestay Name', 'DHSR No', 'Type', 'Status', 'Province', 'District', 'Municipality', 'Ward', 'Village', 'Homes', 'Rooms', 'Beds', 'Remarks']],
             body: filteredData.map((homestay, index) => [
               index + 1,
               getValue(homestay, 'homeStayName') || 'N/A',
@@ -1233,7 +1247,8 @@ export default function ReportPage({
               getValue(homestay, 'villageName') || 'N/A',
               Number(getValue(homestay, 'homeCount')) || 0,
               Number(getValue(homestay, 'roomCount')) || 0,
-              Number(getValue(homestay, 'bedCount')) || 0
+              Number(getValue(homestay, 'bedCount')) || 0,
+              ''
             ]),
             styles: {
               fontSize: 8,
