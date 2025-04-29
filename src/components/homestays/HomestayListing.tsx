@@ -211,7 +211,7 @@ export default function HomestayListing({ adminUsername, locationFilter }: Homes
             <div className="flex items-start mb-3">
               <MapPin className="h-4 w-4 text-gray-500 mt-0.5 mr-1 flex-shrink-0" />
               <p className="text-sm text-gray-600 line-clamp-1">
-                {homestay.address.formattedAddress.en}
+                {homestay.address?.formattedAddress?.en || `${homestay.address?.tole || ''}, ${homestay.address?.city || ''}`}
               </p>
             </div>
             

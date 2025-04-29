@@ -88,3 +88,18 @@ export function getImageUrl(imagePath: string): string {
   // Add cache busting timestamp
   return `${apiPath}?t=${Date.now()}`;
 }
+
+/**
+ * Constructs an image URL without timestamps to prevent hydration mismatch
+ */
+export function getApiImageUrl(imagePath: string | null | undefined) {
+  if (!imagePath) {
+    return '/images/placeholder-homestay.jpg';
+  }
+  
+  if (imagePath.startsWith('/uploads/')) {
+    return `/api/images${imagePath.substring(8)}`;
+  }
+  
+  return imagePath;
+}
