@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams, usePathname } from 'next/navigation';
-import { Home, Phone, Info, Menu, X, Map } from 'lucide-react';
+import { Home, Phone, Info, Menu, X, Map, Mail, Facebook, Instagram, Twitter, Youtube, Music } from 'lucide-react';
 
 // Helper function to construct image URLs without timestamps to avoid hydration mismatches
 export function getApiImageUrl(imagePath: string | null | undefined): string {
@@ -32,6 +32,18 @@ interface HomestayData {
   homeStayName: string;
   profileImage: string | null;
   status: string;
+  contacts?: {
+    _id: string;
+    homestayId: string;
+    name: string;
+    mobile: string;
+    email: string;
+    facebook?: string;
+    youtube?: string;
+    instagram?: string;
+    tiktok?: string;
+    twitter?: string;
+  }[];
 }
 
 export default function HomestayLayout({
@@ -51,21 +63,37 @@ export default function HomestayLayout({
     const fetchBasicData = async () => {
       try {
         setLoading(true);
-        // Try to fetch from main API
-        const response = await fetch(`/api/homestays/${homestayId}`);
+        // Try to fetch from main API with explicit parameter to include contacts
+        const response = await fetch(`/api/homestays/${homestayId}?include=contacts`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch homestay data');
         }
         
         const data = await response.json();
+        console.log("API Response:", data); // Debug log to see what we're getting
         
         // Handle different response structures
         if (data.homestay) {
-          setHomestay(data.homestay);
+          // If contacts are in a separate array in the response, assign them to the homestay object
+          if (data.contacts && Array.isArray(data.contacts)) {
+            setHomestay({
+              ...data.homestay,
+              contacts: data.contacts
+            });
+          } else {
+            setHomestay(data.homestay);
+          }
         } else {
           // For backward compatibility if the response is directly the homestay
-          setHomestay(data);
+          if (data.contacts && Array.isArray(data.contacts)) {
+            setHomestay({
+              ...data,
+              contacts: data.contacts
+            });
+          } else {
+            setHomestay(data);
+          }
         }
       } catch (err) {
         console.error('Error fetching homestay data:', err);
@@ -76,7 +104,8 @@ export default function HomestayLayout({
           homestayId: homestayId,
           homeStayName: "Hamro Homestay",
           profileImage: "/images/homestay-profile.jpg",
-          status: "approved"
+          status: "approved",
+          contacts: []
         });
       } finally {
         setLoading(false);
@@ -89,6 +118,16 @@ export default function HomestayLayout({
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
   };
+
+  // Get the primary contact info for footer
+  const primaryContact = homestay?.contacts?.[0] || null;
+  
+  // Log contact info for debugging
+  console.log("Primary Contact:", primaryContact);
+  
+  // Create fallback contact information if none exists
+  const contactEmail = primaryContact?.email || "info@hamrohomestay.com";
+  const contactPhone = primaryContact?.mobile || "+977 9800000000";
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
@@ -103,13 +142,13 @@ export default function HomestayLayout({
               </Link>
               <Link href={`/homestays/${homestayId}`} className="flex items-center">
                 {homestay?.profileImage ? (
-                  <div className="h-8 w-8 rounded-full overflow-hidden mr-2">
+                  <div className="h-8 w-8 rounded-full overflow-hidden mr-2 flex-shrink-0">
                     <Image 
                       src={getApiImageUrl(homestay.profileImage)} 
                       alt={homestay.homeStayName}
                       width={32}
                       height={32}
-                      className="object-cover"
+                      className="object-cover w-full h-full object-center"
                     />
                   </div>
                 ) : (
@@ -238,13 +277,13 @@ export default function HomestayLayout({
             <div>
               <div className="flex items-center mb-3">
                 {homestay?.profileImage ? (
-                  <div className="h-8 w-8 rounded-full overflow-hidden mr-2">
+                  <div className="h-8 w-8 rounded-full overflow-hidden mr-2 flex-shrink-0">
                     <Image 
                       src={getApiImageUrl(homestay.profileImage)} 
                       alt={homestay?.homeStayName || 'Hamro Homestay'}
                       width={32}
                       height={32}
-                      className="object-cover"
+                      className="object-cover w-full h-full object-center"
                     />
                   </div>
                 ) : (
@@ -306,8 +345,74 @@ export default function HomestayLayout({
             <div>
               <h3 className="text-base font-medium mb-3">Contact Us</h3>
               <div className="space-y-2 text-sm text-gray-600">
-                <p>Email: info@hamrohomestay.com</p>
-                <p>Phone: +977 984-1234567</p>
+                <p className="flex items-center">
+                  <Mail className="h-4 w-4 mr-2 text-primary/70" />
+                  {contactEmail}
+                </p>
+                <p className="flex items-center">
+                  <Phone className="h-4 w-4 mr-2 text-primary/70" />
+                  {contactPhone}
+                </p>
+                
+                {/* Social Media Links */}
+                {primaryContact && (
+                  <div className="flex space-x-3 mt-3">
+                    {primaryContact.facebook && (
+                      <a 
+                        href={primaryContact.facebook} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 hover:bg-blue-100 transition-colors"
+                      >
+                        <Facebook size={16} />
+                      </a>
+                    )}
+                    
+                    {primaryContact.instagram && (
+                      <a 
+                        href={primaryContact.instagram} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="h-8 w-8 rounded-full bg-pink-50 flex items-center justify-center text-pink-600 hover:bg-pink-100 transition-colors"
+                      >
+                        <Instagram size={16} />
+                      </a>
+                    )}
+                    
+                    {primaryContact.twitter && (
+                      <a 
+                        href={primaryContact.twitter} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-400 hover:bg-blue-100 transition-colors"
+                      >
+                        <Twitter size={16} />
+                      </a>
+                    )}
+                    
+                    {primaryContact.youtube && (
+                      <a 
+                        href={primaryContact.youtube} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="h-8 w-8 rounded-full bg-red-50 flex items-center justify-center text-red-600 hover:bg-red-100 transition-colors"
+                      >
+                        <Youtube size={16} />
+                      </a>
+                    )}
+                    
+                    {primaryContact.tiktok && (
+                      <a 
+                        href={primaryContact.tiktok} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="h-8 w-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-800 hover:bg-gray-100 transition-colors"
+                      >
+                        <Music size={16} />
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>

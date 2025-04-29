@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { MapPin, Phone, Mail, Globe, Facebook, Instagram, Twitter, Send, ChevronRight, Info } from "lucide-react";
+import { MapPin, Phone, Mail, Globe, Facebook, Instagram, Twitter, Send, ChevronRight, Info, Youtube, Music } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -378,6 +378,7 @@ export default function ContactPage() {
                                 target="_blank" 
                                 rel="noopener noreferrer"
                                 className="h-9 w-9 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 hover:bg-blue-100 transition-colors"
+                                title="Facebook"
                               >
                                 <Facebook size={18} />
                               </a>
@@ -389,6 +390,7 @@ export default function ContactPage() {
                                 target="_blank" 
                                 rel="noopener noreferrer"
                                 className="h-9 w-9 rounded-full bg-pink-50 flex items-center justify-center text-pink-600 hover:bg-pink-100 transition-colors"
+                                title="Instagram"
                               >
                                 <Instagram size={18} />
                               </a>
@@ -400,8 +402,33 @@ export default function ContactPage() {
                                 target="_blank" 
                                 rel="noopener noreferrer"
                                 className="h-9 w-9 rounded-full bg-blue-50 flex items-center justify-center text-blue-400 hover:bg-blue-100 transition-colors"
+                                title="Twitter"
                               >
                                 <Twitter size={18} />
+                              </a>
+                            )}
+                            
+                            {contact.youtube && (
+                              <a 
+                                href={contact.youtube} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="h-9 w-9 rounded-full bg-red-50 flex items-center justify-center text-red-600 hover:bg-red-100 transition-colors"
+                                title="YouTube"
+                              >
+                                <Youtube size={18} />
+                              </a>
+                            )}
+                            
+                            {contact.tiktok && (
+                              <a 
+                                href={contact.tiktok} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="h-9 w-9 rounded-full bg-gray-50 flex items-center justify-center text-gray-800 hover:bg-gray-100 transition-colors"
+                                title="TikTok"
+                              >
+                                <Music size={18} />
                               </a>
                             )}
                           </div>

@@ -447,14 +447,8 @@ We pride ourselves on providing a genuine cultural experience that connects trav
       }
     ],
     
-    // Default gallery images
-    galleryImages: [
-      "/images/destinations/kathmandu.jpg",
-      "/images/destinations/pokhara.jpg",
-      "/images/destinations/chitwan.jpg",
-      "/images/about/nepal-impact.jpg",
-      "/images/about/nepal-story.jpg"
-    ],
+    // Empty gallery images array
+    galleryImages: [],
     
     // Default description to match what was in the UI
     description: `Welcome to ${homestayName}, where we offer an authentic glimpse into Nepali village life. Our homestay is nestled in the beautiful ${villageName}, surrounded by stunning natural beauty and rich cultural heritage.
@@ -579,6 +573,11 @@ export async function POST(req: NextRequest) {
     // Add the default content
     const defaultContent = getDefaultHomestayContent(homestayData.homeStayName, homestayData.villageName);
     
+    // Check if galleryImages are explicitly provided in the request body
+    const galleryImages = body.galleryImages !== undefined ? 
+      body.galleryImages : // Use provided galleryImages (even if it's empty array)
+      defaultContent.galleryImages; // Fall back to default content
+    
     // Create homestay record - No transaction
     const createdHomestay = await HomestaySingle.create({
       ...homestayData,
@@ -586,7 +585,7 @@ export async function POST(req: NextRequest) {
       teamMembers: defaultContent.teamMembers, 
       destinations: defaultContent.destinations,
       testimonials: defaultContent.testimonials,
-      galleryImages: defaultContent.galleryImages,
+      galleryImages: galleryImages,
       pageContent: defaultContent.pageContent
     });
     console.log(`Created homestay record with ID: ${createdHomestay._id}`);

@@ -413,13 +413,19 @@ export default function HomestayDetailPage() {
       images.push({ src: getApiImageUrl(data.profileImage), alt: data.homeStayName || 'Homestay Profile Image' });
     }
     
-    // If still no images, use fallbacks
+    // If still no images, use high-quality fallback images
     if (images.length === 0) {
       images = [
         { src: '/images/homestay-placeholder-1.jpg', alt: 'Homestay' },
         { src: '/images/homestay-placeholder-2.jpg', alt: 'Homestay' },
-        { src: '/images/homestay-placeholder-3.jpg', alt: 'Homestay' }
+        { src: '/images/homestay-placeholder-3.jpg', alt: 'Homestay' },
+        { src: '/images/destinations/kathmandu.jpg', alt: 'Kathmandu Valley' },
+        { src: '/images/destinations/pokhara.jpg', alt: 'Pokhara' },
+        { src: '/images/destinations/chitwan.jpg', alt: 'Chitwan National Park' }
       ];
+      
+      // Log that we're using default images
+      console.log("Using default gallery images for homestay:", data.homeStayName);
     }
     
     return images;
