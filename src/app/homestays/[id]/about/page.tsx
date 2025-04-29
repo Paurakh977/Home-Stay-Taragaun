@@ -15,7 +15,7 @@ const formatImageUrl = (imagePath: string | undefined): string => {
 
   // For images stored in the uploads directory, route through the API
   if (imagePath.startsWith('/uploads/')) {
-    return `/api/images${imagePath}`;
+    return imagePath.replace('/uploads/', '/api/images/');
   }
 
   return imagePath;

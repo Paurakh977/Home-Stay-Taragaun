@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight, MapPin, ExternalLink, ChevronLeft, ArrowRight } from "lucide-react";
+import { getApiImageUrl } from "../layout";
 
 interface Destination {
   name: string;
@@ -82,6 +83,20 @@ const defaultDestinations = [
     highlights: ["Local Cuisine", "Handicraft Workshops", "Cultural Performances", "Farm Activities"]
   }
 ];
+
+// Helper function to format image URLs for destinations
+const formatDestinationImage = (imagePath: string): string => {
+  if (!imagePath) {
+    return "/images/destinations/pokhara.jpg"; // Default image
+  }
+
+  // For images stored in the uploads directory, route through the API
+  if (imagePath.startsWith('/uploads/')) {
+    return imagePath.replace('/uploads/', '/api/images/');
+  }
+
+  return imagePath;
+};
 
 export default function DestinationsPage() {
   const params = useParams();
@@ -234,7 +249,7 @@ export default function DestinationsPage() {
             <div className="relative">
               <div className="h-[40vh] relative">
                 <Image
-                  src={filteredDestinations[0].image}
+                  src={formatDestinationImage(filteredDestinations[0].image)}
                   alt={filteredDestinations[0].name}
                   fill
                   className="object-cover"
@@ -292,7 +307,7 @@ export default function DestinationsPage() {
               >
                 <div className="relative h-48">
                   <Image
-                    src={destination.image}
+                    src={formatDestinationImage(destination.image)}
                     alt={destination.name}
                     fill
                     className="object-cover"

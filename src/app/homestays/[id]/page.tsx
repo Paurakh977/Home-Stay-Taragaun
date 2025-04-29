@@ -15,6 +15,7 @@ interface GalleryImage {
 
 interface HomestayData {
   _id: string;
+  homestayId?: string;
   homeStayName: string;
   description?: string;
   address: {
@@ -385,36 +386,60 @@ export default function HomestayDetailPage() {
   const prepareGalleryImages = (data: HomestayData): GalleryImage[] => {
     let images: GalleryImage[] = [];
     
+    console.log("PrepareGalleryImages - homestay data:", {
+      id: data.homestayId || data._id,
+      name: data.homeStayName,
+      profileImage: data.profileImage,
+      galleryImagesCount: data.galleryImages?.length || 0
+    });
+    
     // Check for galleryImages array (standard format from API)
     if (data.galleryImages && data.galleryImages.length > 0) {
-      images = data.galleryImages.map((img: string) => ({
-        src: getApiImageUrl(img),
-        alt: data.homeStayName || 'Homestay Image'
-      }));
+      console.log("PrepareGalleryImages - Using galleryImages from API", data.galleryImages);
+      images = data.galleryImages.map((img: string) => {
+        const imgSrc = getApiImageUrl(img);
+        console.log(`PrepareGalleryImages - Transformed ${img} to ${imgSrc}`);
+        return {
+          src: imgSrc,
+          alt: data.homeStayName || 'Homestay Image'
+        };
+      });
     }
     // Fallback to gallery array if galleryImages is not available
     else if (data.gallery && data.gallery.length > 0) {
+      console.log("PrepareGalleryImages - Using gallery array fallback", data.gallery);
       images = data.gallery.map((img: any) => {
         // Handle different possible formats in the gallery
         if (typeof img === 'string') {
-          return { src: getApiImageUrl(img), alt: data.homeStayName || 'Homestay Image' };
+          const imgSrc = getApiImageUrl(img);
+          console.log(`PrepareGalleryImages - String format: Transformed ${img} to ${imgSrc}`);
+          return { src: imgSrc, alt: data.homeStayName || 'Homestay Image' };
         } else if (img.image) {
-          return { src: getApiImageUrl(img.image), alt: img.caption || data.homeStayName || 'Homestay Image' };
+          const imgSrc = getApiImageUrl(img.image);
+          console.log(`PrepareGalleryImages - Object.image format: Transformed ${img.image} to ${imgSrc}`);
+          return { src: imgSrc, alt: img.caption || data.homeStayName || 'Homestay Image' };
         } else if (img.src) {
-          return { src: getApiImageUrl(img.src), alt: img.alt || data.homeStayName || 'Homestay Image' };
+          const imgSrc = getApiImageUrl(img.src);
+          console.log(`PrepareGalleryImages - Object.src format: Transformed ${img.src} to ${imgSrc}`);
+          return { src: imgSrc, alt: img.alt || data.homeStayName || 'Homestay Image' };
         }
         // Default case if the structure is unexpected
+        console.log("PrepareGalleryImages - Unknown format for gallery item:", img);
         return { src: '', alt: 'Homestay Image' };
       }).filter(img => img.src); // Filter out any images with empty src
     }
     
     // If gallery is empty, use profile image if available
     if (images.length === 0 && data.profileImage) {
-      images.push({ src: getApiImageUrl(data.profileImage), alt: data.homeStayName || 'Homestay Profile Image' });
+      console.log("PrepareGalleryImages - Using profile image as fallback:", data.profileImage);
+      const profileImgSrc = getApiImageUrl(data.profileImage);
+      console.log(`PrepareGalleryImages - Transformed profile ${data.profileImage} to ${profileImgSrc}`);
+      images.push({ src: profileImgSrc, alt: data.homeStayName || 'Homestay Profile Image' });
     }
     
     // If still no images, use high-quality fallback images
     if (images.length === 0) {
+      console.log("PrepareGalleryImages - No images found, using default placeholder images");
       images = [
         { src: '/images/homestay-placeholder-1.jpg', alt: 'Homestay' },
         { src: '/images/homestay-placeholder-2.jpg', alt: 'Homestay' },
@@ -428,6 +453,7 @@ export default function HomestayDetailPage() {
       console.log("Using default gallery images for homestay:", data.homeStayName);
     }
     
+    console.log("PrepareGalleryImages - Final image count:", images.length);
     return images;
   };
   

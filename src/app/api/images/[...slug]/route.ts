@@ -14,6 +14,7 @@ export async function GET(
   try {
     const { slug } = params;
     console.log('Image API - Requested slug:', slug);
+    console.log('Image API - Request URL:', request.url);
     
     if (!slug || slug.length === 0) {
       console.error('Image API - No slug provided');
@@ -22,6 +23,7 @@ export async function GET(
     
     // Ensure there's no path traversal by removing any .. segments
     const sanitizedSlug = slug.filter(segment => segment !== '..' && segment !== '.');
+    console.log('Image API - Sanitized slug:', sanitizedSlug);
     
     // Join all slug parts to form the path within uploads
     const filePath = join(process.cwd(), 'public', 'uploads', ...sanitizedSlug);
@@ -34,6 +36,18 @@ export async function GET(
       return new NextResponse('Forbidden', { status: 403 });
     }
 
+    // Debug: List directory structure to verify paths
+    try {
+      const dirPath = path.dirname(filePath);
+      if (fs.existsSync(dirPath)) {
+        console.log('Image API - Directory exists, contents:', fs.readdirSync(dirPath));
+      } else {
+        console.error('Image API - Directory does not exist:', dirPath);
+      }
+    } catch (err) {
+      console.error('Image API - Error listing directory:', err);
+    }
+
     // Check if file exists
     try {
       const stats = statSync(filePath);
@@ -41,8 +55,29 @@ export async function GET(
         console.error('Image API - Path exists but is not a file:', filePath);
         return new NextResponse('File not found', { status: 404 });
       }
+      console.log('Image API - File found, size:', stats.size);
     } catch (err) {
       console.error('Image API - File does not exist:', filePath, err);
+      
+      // Debug: Try to find path variations that might work
+      try {
+        // Check if only the filename is case-sensitive
+        const dirPath = path.dirname(filePath);
+        const fileName = path.basename(filePath);
+        if (fs.existsSync(dirPath)) {
+          const files = fs.readdirSync(dirPath);
+          console.log('Image API - Files in directory:', files);
+          
+          // Find if there's a file with same name ignoring case
+          const possibleMatch = files.find(f => f.toLowerCase() === fileName.toLowerCase());
+          if (possibleMatch) {
+            console.log('Image API - Possible case-insensitive match found:', possibleMatch);
+          }
+        }
+      } catch (listErr) {
+        console.error('Image API - Error listing directory for alternatives:', listErr);
+      }
+      
       return new NextResponse('File not found', { status: 404 });
     }
 
@@ -61,6 +96,8 @@ export async function GET(
       'doc': 'application/msword',
       'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     }[ext || ''] || 'application/octet-stream';
+
+    console.log('Image API - Serving file with content type:', contentType);
 
     // Return the file stream
     return new NextResponse(stream as any, {

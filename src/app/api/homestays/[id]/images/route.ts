@@ -5,6 +5,17 @@ import { join } from "path";
 import { mkdir, writeFile, unlink } from "fs/promises";
 import { existsSync } from "fs";
 
+// Maximum file size allowed (5MB)
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+// Allowed image MIME types
+const ALLOWED_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp'
+];
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -40,11 +51,19 @@ export async function POST(
       );
     }
     
+    // Check file size
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: `File size exceeds the maximum limit of ${MAX_FILE_SIZE / (1024 * 1024)}MB` },
+        { status: 400 }
+      );
+    }
+    
     // Validate file type
     const fileType = file.type;
-    if (!fileType.startsWith('image/')) {
+    if (!ALLOWED_TYPES.includes(fileType)) {
       return NextResponse.json(
-        { error: "File must be an image" },
+        { error: "File must be one of these types: JPEG, PNG, GIF, WebP" },
         { status: 400 }
       );
     }
@@ -85,36 +104,44 @@ export async function POST(
       }
     }
     
-    // Create directories if they don't exist
-    await mkdir(imageDirPath, { recursive: true });
-    
-    // Complete file path
-    const filePath = join(imageDirPath, fileName);
-    
-    // Write file to disk
-    const fileBuffer = await file.arrayBuffer();
-    await writeFile(filePath, Buffer.from(fileBuffer));
-    
-    // Create the public URL that matches what the image serving API expects
-    const fileUrl = `${imageUrlPath}/${fileName}`;
-    
-    // Update homestay with the new image
-    if (isProfileImage) {
-      await HomestaySingle.updateOne(
-        { homestayId }, 
-        { $set: { profileImage: fileUrl } }
-      );
-    } else {
-      await HomestaySingle.updateOne(
-        { homestayId }, 
-        { $push: { galleryImages: fileUrl } }
+    try {
+      // Create directories if they don't exist
+      await mkdir(imageDirPath, { recursive: true });
+      
+      // Complete file path
+      const filePath = join(imageDirPath, fileName);
+      
+      // Write file to disk
+      const fileBuffer = await file.arrayBuffer();
+      await writeFile(filePath, Buffer.from(fileBuffer));
+      
+      // Create the public URL that matches what the image serving API expects
+      const fileUrl = `${imageUrlPath}/${fileName}`;
+      
+      // Update homestay with the new image
+      if (isProfileImage) {
+        await HomestaySingle.updateOne(
+          { homestayId }, 
+          { $set: { profileImage: fileUrl } }
+        );
+      } else {
+        await HomestaySingle.updateOne(
+          { homestayId }, 
+          { $push: { galleryImages: fileUrl } }
+        );
+      }
+      
+      return NextResponse.json({ 
+        success: true, 
+        imageUrl: fileUrl 
+      });
+    } catch (fileError) {
+      console.error("Error saving file:", fileError);
+      return NextResponse.json(
+        { error: "Failed to save file", message: fileError instanceof Error ? fileError.message : 'Unknown error' },
+        { status: 500 }
       );
     }
-    
-    return NextResponse.json({ 
-      success: true, 
-      imageUrl: fileUrl 
-    });
     
   } catch (error) {
     console.error("Error uploading image:", error);
@@ -125,7 +152,7 @@ export async function POST(
   }
 }
 
-// New DELETE endpoint for gallery images
+// DELETE endpoint for gallery images
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -177,25 +204,33 @@ export async function DELETE(
       filePath = join(process.cwd(), "public", imagePath);
     }
     
-    // Check if file exists
-    if (existsSync(filePath)) {
-      // Delete the file from filesystem
-      await unlink(filePath);
-      console.log(`Deleted file: ${filePath}`);
-    } else {
-      console.warn(`File not found for deletion: ${filePath}`);
+    try {
+      // Check if file exists
+      if (existsSync(filePath)) {
+        // Delete the file from filesystem
+        await unlink(filePath);
+        console.log(`Deleted file: ${filePath}`);
+      } else {
+        console.warn(`File not found for deletion: ${filePath}`);
+      }
+      
+      // Remove the image from the database
+      await HomestaySingle.updateOne(
+        { homestayId }, 
+        { $pull: { galleryImages: imagePath } }
+      );
+      
+      return NextResponse.json({ 
+        success: true, 
+        message: "Image deleted successfully" 
+      });
+    } catch (fileError) {
+      console.error("Error deleting file:", fileError);
+      return NextResponse.json(
+        { error: "Failed to delete file", message: fileError instanceof Error ? fileError.message : 'Unknown error' },
+        { status: 500 }
+      );
     }
-    
-    // Remove the image from the database
-    await HomestaySingle.updateOne(
-      { homestayId }, 
-      { $pull: { galleryImages: imagePath } }
-    );
-    
-    return NextResponse.json({ 
-      success: true, 
-      message: "Image deleted successfully" 
-    });
     
   } catch (error) {
     console.error("Error deleting gallery image:", error);
