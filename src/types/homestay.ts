@@ -59,6 +59,65 @@ export interface CustomFieldValues {
   reviewedAt?: string | Date;
 }
 
+// Team member interface
+export interface TeamMember {
+  name: string;
+  position: string;
+  contactNo?: string;
+  photoPath: string;
+  bio: string;
+  order: number;
+}
+
+// Destination interface
+export interface Destination {
+  name: string;
+  description: string;
+  distance: string;
+  image: string;
+  category: string;
+  highlights: string[];
+}
+
+// Testimonial interface
+export interface Testimonial {
+  name: string;
+  location: string;
+  rating: number;
+  quote: string;
+  photoPath: string;
+  date: string | Date;
+}
+
+// Page content sections
+export interface PageContent {
+  aboutPage?: {
+    title?: string;
+    subtitle?: string;
+    description?: string;
+    mission?: string;
+    vision?: string;
+    backgroundImage?: string;
+    highlightPoints?: string[];
+  };
+  contactPage?: {
+    title?: string;
+    subtitle?: string;
+    backgroundImage?: string;
+    formTitle?: string;
+    mapEmbedUrl?: string;
+    faq?: {
+      question: string;
+      answer: string;
+    }[];
+  };
+  heroSection?: {
+    slogan?: string;
+    welcomeMessage?: string;
+  };
+  whyChooseUs?: string[];
+}
+
 // Main Homestay Data Type
 export interface HomestayData {
   _id: string; // Typically included from MongoDB
@@ -134,4 +193,10 @@ export interface HomestayData {
     definitions: CustomFieldDefinition[];
     values: CustomFieldValues;
   };
+  
+  // New fields for UI content
+  teamMembers?: TeamMember[];
+  destinations?: Destination[];
+  pageContent?: PageContent;
+  testimonials?: Testimonial[];
 } 

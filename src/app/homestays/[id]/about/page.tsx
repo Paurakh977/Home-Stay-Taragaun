@@ -57,6 +57,26 @@ interface HomestayData {
   villageName?: string;
   homeStayType?: string;
   dhsrNo?: string;
+  teamMembers?: {
+    name: string;
+    position: string;
+    contactNo?: string;
+    photoPath: string;
+    bio: string;
+    order: number;
+  }[];
+  pageContent?: {
+    aboutPage?: {
+      title?: string;
+      subtitle?: string;
+      description?: string;
+      mission?: string;
+      vision?: string;
+      backgroundImage?: string;
+      highlightPoints?: string[];
+    };
+    whyChooseUs?: string[];
+  };
 }
 
 // Certification badges - static for presentation
@@ -111,12 +131,55 @@ function getStaticHomestayData(id: string): HomestayData {
   };
 }
 
+// Replace hardcoded team members with an empty array
+const defaultTeamMembers = [
+  {
+    name: "Aarav Sharma",
+    position: "Host & Cultural Guide",
+    bio: "Aarav has been hosting guests for over 10 years, sharing local traditions and stories with visitors from around the world.",
+    photoPath: "/images/team/team-1.jpg",
+    order: 0
+  },
+  {
+    name: "Priya Tamang",
+    position: "Chef & Cooking Instructor",
+    bio: "Priya specializes in traditional Nepali cuisine and leads our popular cooking workshops for guests.",
+    photoPath: "/images/team/team-2.jpg",
+    order: 1
+  },
+  {
+    name: "Ram Bahadur",
+    position: "Trekking & Nature Guide",
+    bio: "Ram knows every trail in the region and leads our nature excursions, pointing out local flora and fauna.",
+    photoPath: "/images/team/team-3.jpg",
+    order: 2
+  },
+  {
+    name: "Sita Gurung",
+    position: "Cultural Performance Director",
+    bio: "Sita organizes our traditional dance and music performances, showcasing authentic local culture.",
+    photoPath: "/images/team/team-4.jpg",
+    order: 3
+  }
+];
+
+// Define team member interface
+interface TeamMember {
+  name: string;
+  position: string;
+  contactNo?: string;
+  photoPath: string;
+  bio: string;
+  order: number;
+}
+
 export default function AboutPage() {
   const params = useParams();
   const homestayId = params.id as string;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [homestay, setHomestay] = useState<HomestayData | null>(null);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
 
   useEffect(() => {
     setLoading(true);
@@ -142,8 +205,12 @@ export default function AboutPage() {
         // Handle different response structures
         if (data.homestay) {
           setHomestay(data.homestay);
+          // Set team members from database or use defaults
+          setTeamMembers(data.homestay.teamMembers || defaultTeamMembers);
         } else {
           setHomestay(data);
+          // Set team members from database or use defaults
+          setTeamMembers(data.teamMembers || defaultTeamMembers);
         }
       } catch (err) {
         console.error('Error fetching homestay data:', err);
@@ -151,6 +218,7 @@ export default function AboutPage() {
         
         // Only use static data as fallback if we don't get data from the API
         setHomestay(getStaticHomestayData(homestayId));
+        setTeamMembers(defaultTeamMembers);
       } finally {
         setLoading(false);
       }
@@ -186,40 +254,15 @@ export default function AboutPage() {
   const tourismServices = homestay?.features?.tourismServices || homestay?.tourismServices || [];
   const infrastructure = homestay?.features?.infrastructure || homestay?.infrastructure || [];
 
-  // Hardcoded team members data for presentation
-  const teamMembers = [
-    {
-      name: "Aarav Sharma",
-      role: "Host & Cultural Guide",
-      bio: "Aarav has been hosting guests for over 10 years, sharing local traditions and stories with visitors from around the world.",
-      image: "/images/team/team-1.jpg"
-    },
-    {
-      name: "Priya Tamang",
-      role: "Chef & Cooking Instructor",
-      bio: "Priya specializes in traditional Nepali cuisine and leads our popular cooking workshops for guests.",
-      image: "/images/team/team-2.jpg"
-    },
-    {
-      name: "Ram Bahadur",
-      role: "Trekking & Nature Guide",
-      bio: "Ram knows every trail in the region and leads our nature excursions, pointing out local flora and fauna.",
-      image: "/images/team/team-3.jpg"
-    },
-    {
-      name: "Sita Gurung",
-      role: "Cultural Performance Director",
-      bio: "Sita organizes our traditional dance and music performances, showcasing authentic local culture.",
-      image: "/images/team/team-4.jpg"
-    }
-  ];
+  // Get the about page custom content if available
+  const aboutPageContent = homestay?.pageContent?.aboutPage || {};
 
   return (
     <div className="bg-white">
       {/* Hero Section with hardcoded background image */}
       <div className="relative h-[40vh] bg-slate-900">
         <Image 
-          src="/images/home/hero-bg.jpg"
+          src={formatImageUrl(aboutPageContent.backgroundImage) || "/images/home/hero-bg.jpg"}
           alt={`${homestay.homeStayName} view`}
           fill
           className="object-cover opacity-60"
@@ -228,7 +271,7 @@ export default function AboutPage() {
         
         <div className="absolute bottom-0 left-0 right-0 p-8">
           <div className="container mx-auto">
-            <h1 className="text-4xl font-bold text-white mb-3">{homestay.homeStayName}</h1>
+            <h1 className="text-4xl font-bold text-white mb-3">{aboutPageContent.title || homestay.homeStayName}</h1>
             <div className="flex items-center text-white/90">
               <MapPin size={18} className="mr-2" />
               <p>{homestay.address?.formattedAddress?.en || `${homestay.address?.tole || ''}, ${homestay.address?.city || ''}`}</p>
@@ -269,18 +312,20 @@ export default function AboutPage() {
           <div className="mb-16">
             <div className="flex flex-col md:flex-row gap-8">
               <div className="md:w-2/3">
-                <h2 className="text-3xl font-bold text-gray-900 mb-6">About {homestay.homeStayName}</h2>
+                <h2 className="text-3xl font-bold text-gray-900 mb-6">{aboutPageContent.subtitle || `About ${homestay.homeStayName}`}</h2>
                 
                 <div className="prose max-w-none text-gray-700">
-                  {homestay.description ? homestay.description.split('\n\n').map((paragraph, index) => (
-                    <p key={index} className="mb-4 leading-relaxed">
-                      {paragraph}
-                    </p>
-                  )) : (
-                    <p className="mb-4 leading-relaxed">
-                      Experience authentic Nepali hospitality in our carefully curated homestay. Immerse yourself in local culture, taste traditional cuisine, and create unforgettable memories with our host families.
-                    </p>
-                  )}
+                  {(aboutPageContent?.description || homestay?.description) ? 
+                    (aboutPageContent?.description || homestay?.description)?.split('\n\n').map((paragraph, index) => (
+                      <p key={index} className="mb-4 leading-relaxed">
+                        {paragraph}
+                      </p>
+                    )) : (
+                      <p className="mb-4 leading-relaxed">
+                        Experience authentic Nepali hospitality in our carefully curated homestay. Immerse yourself in local culture, taste traditional cuisine, and create unforgettable memories with our host families.
+                      </p>
+                    )
+                  }
                 </div>
               </div>
               
@@ -317,6 +362,13 @@ export default function AboutPage() {
                       <span>DHSR No: {homestay.dhsrNo}</span>
                     </li>
                     )}
+                    {/* Add highlight points if available */}
+                    {aboutPageContent.highlightPoints && aboutPageContent.highlightPoints.map((point, index) => (
+                      <li key={`highlight-${index}`} className="flex items-start">
+                        <Check className="h-5 w-5 text-primary mr-3 flex-shrink-0 mt-0.5" />
+                        <span>{point}</span>
+                      </li>
+                    ))}
                   </ul>
                   
                   <div className="mt-6">
@@ -333,37 +385,58 @@ export default function AboutPage() {
             </div>
           </div>
           
-          {/* Our Values Section */}
-          {(homestay.description && homestay.description.trim() !== "") && (
-          <div className="mb-16">
-            <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">Our Values</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 text-center hover:shadow-md transition-shadow">
-                <div className="bg-primary/10 h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl">🌿</span>
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3">Sustainability</h3>
-                <p className="text-gray-600">We are committed to sustainable tourism practices that preserve our environment and benefit the local community.</p>
-              </div>
+          {/* Our Values Section - Always show if mission or vision exists */}
+          {(aboutPageContent.mission || aboutPageContent.vision) && (
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">Our Values</h2>
               
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 text-center hover:shadow-md transition-shadow">
-                <div className="bg-primary/10 h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl">🏺</span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {/* Mission */}
+                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 text-center hover:shadow-md transition-shadow">
+                  <div className="bg-primary/10 h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-2xl">🌿</span>
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-3">Mission</h3>
+                  <p className="text-gray-600">{aboutPageContent.mission || "We are committed to sustainable tourism practices that preserve our environment and benefit the local community."}</p>
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3">Authenticity</h3>
-                <p className="text-gray-600">We provide genuine cultural experiences that reflect the true essence of our traditions and way of life.</p>
-              </div>
-              
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 text-center hover:shadow-md transition-shadow">
-                <div className="bg-primary/10 h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl">👥</span>
+                
+                {/* Vision */}
+                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 text-center hover:shadow-md transition-shadow">
+                  <div className="bg-primary/10 h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-2xl">🏺</span>
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-3">Vision</h3>
+                  <p className="text-gray-600">{aboutPageContent.vision || "We provide genuine cultural experiences that reflect the true essence of our traditions and way of life."}</p>
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3">Community</h3>
-                <p className="text-gray-600">We believe in inclusive growth and ensure that tourism benefits all members of our community.</p>
+                
+                {/* Community */}
+                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 text-center hover:shadow-md transition-shadow">
+                  <div className="bg-primary/10 h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-2xl">👥</span>
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-3">Community</h3>
+                  <p className="text-gray-600">We believe in inclusive growth and ensure that tourism benefits all members of our community.</p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
+          
+          {/* Why Choose Us Section - New section from database */}
+          {homestay.pageContent?.whyChooseUs && homestay.pageContent.whyChooseUs.length > 0 && (
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">Why Choose Us</h2>
+              
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+                <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {homestay.pageContent.whyChooseUs.map((item, index) => (
+                    <li key={index} className="flex items-start">
+                      <Check className="h-5 w-5 text-primary mr-3 flex-shrink-0 mt-0.5" />
+                      <span className="text-gray-700">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           )}
           
           {/* Features Section */}
@@ -407,31 +480,33 @@ export default function AboutPage() {
             </div>
           </div>
           
-          {/* Our Team Section - Now enabled with hardcoded data */}
-          <div className="mb-16">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2 text-center">Meet Our Team</h2>
-            <p className="text-gray-600 text-center mb-8 max-w-2xl mx-auto">Our dedicated team members are passionate about providing you with an authentic and memorable homestay experience.</p>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {teamMembers.map((member, index) => (
-                <div key={index} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                  <div className="relative h-64">
-                    <Image 
-                      src={member.image} 
-                      alt={member.name}
-                      fill
-                      className="object-cover"
-                    />
+          {/* Our Team Section - Now uses data from the database */}
+          {teamMembers && teamMembers.length > 0 && (
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold text-gray-900 mb-2 text-center">Meet Our Team</h2>
+              <p className="text-gray-600 text-center mb-8 max-w-2xl mx-auto">Our dedicated team members are passionate about providing you with an authentic and memorable homestay experience.</p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {teamMembers.sort((a, b) => a.order - b.order).map((member, index) => (
+                  <div key={index} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                    <div className="relative h-64">
+                      <Image 
+                        src={member.photoPath} 
+                        alt={member.name}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="p-5">
+                      <h3 className="text-lg font-semibold text-gray-900">{member.name}</h3>
+                      <p className="text-primary text-sm mb-3">{member.position}</p>
+                      <p className="text-gray-600 text-sm">{member.bio}</p>
+                    </div>
                   </div>
-                  <div className="p-5">
-                    <h3 className="text-lg font-semibold text-gray-900">{member.name}</h3>
-                    <p className="text-primary text-sm mb-3">{member.role}</p>
-                    <p className="text-gray-600 text-sm">{member.bio}</p>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
           
           {/* Certifications */}
           {false && ( /* Disabled unless explicit certification data exists */

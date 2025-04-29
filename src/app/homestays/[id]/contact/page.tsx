@@ -88,6 +88,19 @@ interface HomestayData {
   dhsrNo?: string;
   contacts?: Contact[];
   officials?: Official[];
+  pageContent?: {
+    contactPage?: {
+      title?: string;
+      subtitle?: string;
+      backgroundImage?: string;
+      formTitle?: string;
+      mapEmbedUrl?: string;
+      faq?: {
+        question: string;
+        answer: string;
+      }[];
+    };
+  };
 }
 
 // Helper function to provide static data
@@ -304,8 +317,8 @@ export default function ContactPage() {
             </nav>
           </div>
           
-          <h1 className="text-3xl font-bold text-gray-900">Contact {homestay.homeStayName}</h1>
-          <p className="text-gray-600 mt-2">Get in touch with us to plan your stay or ask any questions</p>
+          <h1 className="text-3xl font-bold text-gray-900">{homestay.pageContent?.contactPage?.title || `Contact ${homestay.homeStayName}`}</h1>
+          <p className="text-gray-600 mt-2">{homestay.pageContent?.contactPage?.subtitle || "Get in touch with us to plan your stay or ask any questions"}</p>
         </div>
       </div>
       
@@ -319,7 +332,9 @@ export default function ContactPage() {
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                 <div 
                   className="relative h-44 bg-cover bg-center" 
-                  style={{ backgroundImage: "url('/images/destinations/kathmandu.jpg')" }}
+                  style={{ 
+                    backgroundImage: `url('${homestay.pageContent?.contactPage?.backgroundImage || "/images/destinations/kathmandu.jpg"}')`
+                  }}
                 >
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent"></div>
                   <div className="absolute bottom-0 left-0 right-0 p-4">
@@ -477,7 +492,7 @@ export default function ContactPage() {
             <div className="lg:col-span-3">
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                 <div className="p-6 border-b">
-                  <h2 className="text-2xl font-semibold text-gray-900">Send us a Message</h2>
+                  <h2 className="text-2xl font-semibold text-gray-900">{homestay.pageContent?.contactPage?.formTitle || "Send us a Message"}</h2>
                   <p className="text-gray-600 mt-1">Have a question or want to book a stay? Send us a message below.</p>
                 </div>
                 
@@ -586,25 +601,38 @@ export default function ContactPage() {
                 <h3 className="text-xl font-semibold text-gray-900 mb-4">Frequently Asked Questions</h3>
                 
                 <div className="space-y-4">
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">What is the check-in and check-out time?</h4>
-                    <p className="text-gray-600">Check-in is at 2:00 PM and check-out is at 12:00 PM. Early check-in or late check-out may be available upon request.</p>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">Do you offer airport pickup?</h4>
-                    <p className="text-gray-600">Yes, we can arrange airport pickup for an additional fee. Please contact us at least 24 hours before your arrival.</p>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">What payment methods do you accept?</h4>
-                    <p className="text-gray-600">We accept cash (NPR), major credit cards, and mobile payment options like eSewa and Khalti.</p>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">Is Wi-Fi available?</h4>
-                    <p className="text-gray-600">Yes, we provide complimentary Wi-Fi access throughout the homestay.</p>
-                  </div>
+                  {homestay.pageContent?.contactPage?.faq && homestay.pageContent.contactPage.faq.length > 0 ? (
+                    // Use FAQs from database
+                    homestay.pageContent.contactPage.faq.map((faqItem, index) => (
+                      <div key={index}>
+                        <h4 className="font-medium text-gray-900 mb-2">{faqItem.question}</h4>
+                        <p className="text-gray-600">{faqItem.answer}</p>
+                      </div>
+                    ))
+                  ) : (
+                    // Default FAQs as fallback
+                    <>
+                      <div>
+                        <h4 className="font-medium text-gray-900 mb-2">What is the check-in and check-out time?</h4>
+                        <p className="text-gray-600">Check-in is at 2:00 PM and check-out is at 12:00 PM. Early check-in or late check-out may be available upon request.</p>
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-medium text-gray-900 mb-2">Do you offer airport pickup?</h4>
+                        <p className="text-gray-600">Yes, we can arrange airport pickup for an additional fee. Please contact us at least 24 hours before your arrival.</p>
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-medium text-gray-900 mb-2">What payment methods do you accept?</h4>
+                        <p className="text-gray-600">We accept cash (NPR), major credit cards, and mobile payment options like eSewa and Khalti.</p>
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-medium text-gray-900 mb-2">Is Wi-Fi available?</h4>
+                        <p className="text-gray-600">Yes, we provide complimentary Wi-Fi access throughout the homestay.</p>
+                      </div>
+                    </>
+                  )}
                 </div>
                 
                 <div className="mt-6 text-center">

@@ -38,6 +38,65 @@ interface IDocumentEntry {
   files: IDocumentFile[];
 }
 
+// Define interface for a team member
+interface ITeamMember {
+  name: string;
+  position: string;
+  contactNo?: string;
+  photoPath: string;
+  bio: string;
+  order: number;
+}
+
+// Define interface for a destination
+interface IDestination {
+  name: string;
+  description: string;
+  distance: string;
+  image: string;
+  category: string;
+  highlights: string[];
+}
+
+// Define interface for a testimonial
+interface ITestimonial {
+  name: string;
+  location: string;
+  rating: number;
+  quote: string;
+  photoPath: string;
+  date: Date;
+}
+
+// Define interface for page content sections
+interface IPageContent {
+  aboutPage?: {
+    title?: string;
+    subtitle?: string;
+    description?: string;
+    mission?: string;
+    vision?: string;
+    backgroundImage?: string;
+    highlightPoints?: string[];
+  };
+  contactPage?: {
+    title?: string;
+    subtitle?: string;
+    backgroundImage?: string;
+    formTitle?: string;
+    mapEmbedUrl?: string;
+    faq?: {
+      question: string;
+      answer: string;
+    }[];
+  };
+  heroSection?: {
+    slogan?: string;
+    welcomeMessage?: string;
+  };
+  whyChooseUs?: string[];
+}
+
 // Interface for Homestay data
 export interface IHomestaySingle extends Document {
   // Primary identification
@@ -168,6 +227,18 @@ export interface IHomestaySingle extends Document {
       reviewedAt?: Date;
     };
   };
+  
+  // Team members
+  teamMembers?: ITeamMember[];
+  
+  // Destinations near homestay
+  destinations?: IDestination[];
+  
+  // Page-specific content
+  pageContent?: IPageContent;
+  
+  // Testimonials
+  testimonials?: ITestimonial[];
 }
 
 // Define the homestay schema
@@ -355,6 +426,65 @@ const homestaySchema = new Schema<IHomestaySingle>(
         default: () => new Map()
       }
     },
+    
+    // Team members
+    teamMembers: [{
+      name: { type: String, required: true },
+      position: { type: String, required: true },
+      contactNo: { type: String },
+      photoPath: { type: String, required: true },
+      bio: { type: String, required: true },
+      order: { type: Number, default: 0 }
+    }],
+    
+    // Destinations near homestay
+    destinations: [{
+      name: { type: String, required: true },
+      description: { type: String, required: true },
+      distance: { type: String, required: true },
+      image: { type: String, required: true },
+      category: { type: String, required: true },
+      highlights: [{ type: String }]
+    }],
+    
+    // Page-specific content
+    pageContent: {
+      aboutPage: {
+        title: { type: String },
+        subtitle: { type: String },
+        description: { type: String },
+        mission: { type: String },
+        vision: { type: String },
+        backgroundImage: { type: String },
+        highlightPoints: [{ type: String }]
+      },
+      contactPage: {
+        title: { type: String },
+        subtitle: { type: String },
+        backgroundImage: { type: String },
+        formTitle: { type: String },
+        mapEmbedUrl: { type: String },
+        faq: [{
+          question: { type: String, required: true },
+          answer: { type: String, required: true }
+        }]
+      },
+      heroSection: {
+        slogan: { type: String },
+        welcomeMessage: { type: String }
+      },
+      whyChooseUs: [{ type: String }]
+    },
+    
+    // Testimonials
+    testimonials: [{
+      name: { type: String, required: true },
+      location: { type: String, required: true },
+      rating: { type: Number, required: true, min: 1, max: 5 },
+      quote: { type: String, required: true },
+      photoPath: { type: String, required: true },
+      date: { type: Date, default: Date.now }
+    }],
   },
   {
     timestamps: true, // Adds createdAt and updatedAt

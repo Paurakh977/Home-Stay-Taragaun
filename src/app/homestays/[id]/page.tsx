@@ -66,6 +66,47 @@ interface HomestayData {
   };
   directions?: string;
   status?: string;
+  testimonials?: {
+    name: string;
+    location: string;
+    rating: number;
+    quote: string;
+    photoPath: string;
+    date: string | Date;
+  }[];
+  pageContent?: {
+    heroSection?: {
+      slogan?: string;
+      welcomeMessage?: string;
+    };
+    whyChooseUs?: string[];
+  };
+  teamMembers?: {
+    name: string;
+    position: string;
+    contactNo?: string;
+    photoPath: string;
+    bio: string;
+    order: number;
+  }[];
+  destinations?: {
+    name: string;
+    description: string;
+    distance: string;
+    image: string;
+    category: string;
+    highlights: string[];
+  }[];
+}
+
+// Define interface for testimonial
+interface Testimonial {
+  name: string;
+  location: string;
+  rating: number;
+  quote: string;
+  photoPath: string;
+  date: string | Date;
 }
 
 // Helper function to provide static data
@@ -147,9 +188,145 @@ function getStaticHomestayData(): HomestayData {
     roomCount: 5,
     bedCount: 8,
     homeCount: 3,
-    directions: "From Thamel, head north for 500 meters. Turn right at the main temple and follow the path for 200 meters. Our homestay is the blue house with a traditional wooden gate."
+    directions: "From Thamel, head north for 500 meters. Turn right at the main temple and follow the path for 200 meters. Our homestay is the blue house with a traditional wooden gate.",
+    testimonials: [
+      {
+        name: "Sarah Johnson",
+        location: "United States",
+        rating: 5,
+        quote: "My stay here was incredible! The hosts were warm and welcoming, and I learned so much about the local culture.",
+        photoPath: "/images/testimonials/guest1.jpg",
+        date: new Date().toISOString()
+      },
+      {
+        name: "Michael Chen",
+        location: "Canada",
+        rating: 4,
+        quote: "A truly authentic experience. The food was amazing and the natural surroundings are breathtaking.",
+        photoPath: "/images/testimonials/guest2.jpg",
+        date: new Date().toISOString()
+      },
+      {
+        name: "Emma Wilson",
+        location: "Australia",
+        rating: 5,
+        quote: "The homestay offers a perfect blend of comfort and cultural immersion. I'll definitely be back!",
+        photoPath: "/images/testimonials/guest3.jpg",
+        date: new Date().toISOString()
+      }
+    ],
+    pageContent: {
+      heroSection: {
+        slogan: "Experience the Authenticity of Nepal",
+        welcomeMessage: "Welcome to Peaceful Village Homestay"
+      },
+      whyChooseUs: [
+        "Authentic local experience",
+        "Beautiful natural surroundings",
+        "Traditional homemade meals",
+        "Cultural activities and workshops"
+      ]
+    },
+    teamMembers: [
+      {
+        name: "Ram Bahadur",
+        position: "Manager",
+        contactNo: "+977-9812345678",
+        photoPath: "/images/team/ram.jpg",
+        bio: "Ram has been managing the homestay for over 10 years. He loves sharing his knowledge about the local culture and traditions.",
+        order: 1
+      },
+      {
+        name: "Shyam Kumar",
+        position: "Assistant Manager",
+        contactNo: "+977-9807654321",
+        photoPath: "/images/team/shyam.jpg",
+        bio: "Shyam is a local expert who loves to share his knowledge about the Nepali culture and history.",
+        order: 2
+      }
+    ],
+    destinations: [
+      {
+        name: "Kathmandu",
+        description: "The capital city of Nepal",
+        distance: "15 minutes drive",
+        image: "/images/destinations/kathmandu.jpg",
+        category: "City",
+        highlights: ["Thamel", "Swayambhunath", "Boudhanath"]
+      },
+      {
+        name: "Pokhara",
+        description: "A beautiful city by the lake",
+        distance: "4 hours drive",
+        image: "/images/destinations/pokhara.jpg",
+        category: "Nature",
+        highlights: ["Fewa Lake", "Sarangkot", "Gupteshwor Cave"]
+      },
+      {
+        name: "Chitwan",
+        description: "A national park known for its one-horned rhinoceros",
+        distance: "6 hours drive",
+        image: "/images/destinations/chitwan.jpg",
+        category: "Nature",
+        highlights: ["Elephant Safari", "Tharu Cultural Show", "Bird Watching"]
+      }
+    ]
   };
 }
+
+// Add this helper function to generate star rating display
+const StarRating = ({ rating }: { rating: number }) => {
+  const fullStars = Math.floor(rating);
+  const hasHalfStar = rating % 1 >= 0.5;
+  const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+  
+  return (
+    <div className="flex">
+      {[...Array(fullStars)].map((_, i) => (
+        <Star key={`full-${i}`} className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+      ))}
+      {hasHalfStar && (
+        <div className="relative">
+          <Star className="w-4 h-4 text-yellow-400" />
+          <div className="absolute top-0 left-0 w-1/2 overflow-hidden">
+            <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+          </div>
+        </div>
+      )}
+      {[...Array(emptyStars)].map((_, i) => (
+        <Star key={`empty-${i}`} className="w-4 h-4 text-yellow-400" />
+      ))}
+    </div>
+  );
+};
+
+// Add default testimonials when no data is available
+const defaultTestimonials = [
+  {
+    name: "Sarah Johnson",
+    location: "United States",
+    rating: 5,
+    quote: "My stay here was incredible! The hosts were warm and welcoming, and I learned so much about the local culture.",
+    photoPath: "/images/testimonials/guest1.jpg",
+    date: new Date().toISOString()
+  },
+  {
+    name: "Michael Chen",
+    location: "Canada",
+    rating: 4,
+    quote: "A truly authentic experience. The food was amazing and the natural surroundings are breathtaking.",
+    photoPath: "/images/testimonials/guest2.jpg",
+    date: new Date().toISOString()
+  },
+  {
+    name: "Emma Wilson",
+    location: "Australia",
+    rating: 5,
+    quote: "The homestay offers a perfect blend of comfort and cultural immersion. I'll definitely be back!",
+    photoPath: "/images/testimonials/guest3.jpg",
+    date: new Date().toISOString()
+  }
+];
 
 export default function HomestayDetailPage() {
   const router = useRouter();
@@ -200,6 +377,9 @@ export default function HomestayDetailPage() {
   const officials = useMemo(() => {
     return homestay?.officials || [];
   }, [homestay]);
+  
+  // State for testimonials - properly typed
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   
   // Helper function to prepare gallery images from different data formats
   const prepareGalleryImages = (data: HomestayData): GalleryImage[] => {
@@ -293,9 +473,15 @@ export default function HomestayDetailPage() {
           if (data.officials) {
             homestayData.officials = data.officials;
           }
+          
+          // Set testimonials
+          setTestimonials(homestayData.testimonials || defaultTestimonials);
         } else {
           // For backward compatibility if the data is returned directly
           homestayData = data;
+          
+          // Set testimonials
+          setTestimonials(data.testimonials || defaultTestimonials);
         }
         
         // Only use static data for missing critical fields
@@ -304,6 +490,9 @@ export default function HomestayDetailPage() {
           const staticData = getStaticHomestayData();
           homestayData.homeStayName = homestayData.homeStayName || staticData.homeStayName;
           homestayData.address = homestayData.address || staticData.address;
+          
+          // Set testimonials
+          setTestimonials(staticData.testimonials || defaultTestimonials);
         }
         
         setHomestay(homestayData);
@@ -317,6 +506,9 @@ export default function HomestayDetailPage() {
         const staticData = getStaticHomestayData();
         setHomestay(staticData);
         setGalleryImages(prepareGalleryImages(staticData));
+        
+        // Set testimonials
+        setTestimonials(defaultTestimonials);
       } finally {
         setLoading(false);
       }
@@ -360,6 +552,50 @@ export default function HomestayDetailPage() {
   const rating = homestay.rating || homestay.averageRating || 0;
   const ratingCount = homestay.ratingCount || homestay.reviewCount || 0;
   
+  // Testimonials section (add this code at an appropriate location in the component)
+  const renderTestimonialsSection = () => {
+    if (!testimonials || testimonials.length === 0) return null;
+    
+    return (
+      <section className="py-12 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto">
+            <h2 className="text-3xl font-bold text-center text-gray-900 mb-2">Guest Experiences</h2>
+            <p className="text-gray-600 text-center mb-8 max-w-2xl mx-auto">
+              Here's what our guests have to say about their stay with us
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {testimonials.map((testimonial, index) => (
+                <div key={index} className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center mb-4">
+                    <div className="h-12 w-12 rounded-full overflow-hidden mr-3">
+                      <Image 
+                        src={testimonial.photoPath || '/images/avatar-placeholder.png'} 
+                        alt={testimonial.name}
+                        width={48}
+                        height={48}
+                        className="object-cover"
+                      />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">{testimonial.name}</h4>
+                      <p className="text-sm text-gray-600">{testimonial.location}</p>
+                    </div>
+                  </div>
+                  
+                  <StarRating rating={testimonial.rating} />
+                  
+                  <p className="mt-3 text-gray-700 italic">"{testimonial.quote}"</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Back Button - Minimal and Clean */}
@@ -457,6 +693,14 @@ export default function HomestayDetailPage() {
                 <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                   <div>
                     <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">{homestay.homeStayName}</h1>
+                    {/* Display hero section slogan from database */}
+                    {homestay.pageContent?.heroSection?.slogan && (
+                      <p className="text-primary text-lg font-medium mb-2">{homestay.pageContent.heroSection.slogan}</p>
+                    )}
+                    {/* Display welcome message from database */}
+                    {homestay.pageContent?.heroSection?.welcomeMessage && (
+                      <p className="text-gray-700 mb-3">{homestay.pageContent.heroSection.welcomeMessage}</p>
+                    )}
                     <p className="text-gray-600 mb-3 flex items-center">
                       <MapPin size={16} className="mr-2 text-gray-500 flex-shrink-0" />
                       {homestay.address.formattedAddress.en}
@@ -842,7 +1086,7 @@ export default function HomestayDetailPage() {
                   href={`/homestays/${homestayId}/contact`} 
                   className="block w-full py-3 bg-primary text-white text-center font-medium rounded-lg hover:bg-primary-dark transition-colors"
                 >
-                  Contact Host
+                  Book Stay
                 </Link>
                 
                 <Link 
@@ -856,22 +1100,35 @@ export default function HomestayDetailPage() {
               <div className="border-t pt-5">
                 <h4 className="font-medium text-gray-700 mb-3">Why choose this homestay?</h4>
                 <ul className="space-y-2.5">
-                  <li className="flex items-start">
-                    <Check className="h-5 w-5 text-green-500 mr-2.5 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 text-sm">Authentic local experience</span>
-                  </li>
-                  <li className="flex items-start">
-                    <Check className="h-5 w-5 text-green-500 mr-2.5 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 text-sm">Beautiful natural surroundings</span>
-                  </li>
-                  <li className="flex items-start">
-                    <Check className="h-5 w-5 text-green-500 mr-2.5 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 text-sm">Traditional homemade meals</span>
-                  </li>
-                  <li className="flex items-start">
-                    <Check className="h-5 w-5 text-green-500 mr-2.5 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 text-sm">Cultural activities and workshops</span>
-                  </li>
+                  {homestay.pageContent?.whyChooseUs && homestay.pageContent.whyChooseUs.length > 0 ? (
+                    // Use whyChooseUs from database
+                    homestay.pageContent.whyChooseUs.map((reason, index) => (
+                      <li key={index} className="flex items-start">
+                        <Check className="h-5 w-5 text-green-500 mr-2.5 flex-shrink-0 mt-0.5" />
+                        <span className="text-gray-700 text-sm">{reason}</span>
+                      </li>
+                    ))
+                  ) : (
+                    // Fallback points
+                    <>
+                      <li className="flex items-start">
+                        <Check className="h-5 w-5 text-green-500 mr-2.5 flex-shrink-0 mt-0.5" />
+                        <span className="text-gray-700 text-sm">Authentic local experience</span>
+                      </li>
+                      <li className="flex items-start">
+                        <Check className="h-5 w-5 text-green-500 mr-2.5 flex-shrink-0 mt-0.5" />
+                        <span className="text-gray-700 text-sm">Beautiful natural surroundings</span>
+                      </li>
+                      <li className="flex items-start">
+                        <Check className="h-5 w-5 text-green-500 mr-2.5 flex-shrink-0 mt-0.5" />
+                        <span className="text-gray-700 text-sm">Traditional homemade meals</span>
+                      </li>
+                      <li className="flex items-start">
+                        <Check className="h-5 w-5 text-green-500 mr-2.5 flex-shrink-0 mt-0.5" />
+                        <span className="text-gray-700 text-sm">Cultural activities and workshops</span>
+                      </li>
+                    </>
+                  )}
                 </ul>
               </div>
             </div>
@@ -921,6 +1178,12 @@ export default function HomestayDetailPage() {
           </div>
         </div>
       )}
+      
+      {/* After the existing content but before the closing main tag */}
+      {renderTestimonialsSection()}
+      
+      {/* Mobile bottom action bar */}
+      {/* ... existing code ... */}
     </div>
   );
 } 

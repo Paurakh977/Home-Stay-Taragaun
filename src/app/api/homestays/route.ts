@@ -283,6 +283,186 @@ export async function GET(req: NextRequest) {
   }
 }
 
+// Add a function to generate default content for new homestays
+function getDefaultHomestayContent(homestayName: string, villageName: string) {
+  return {
+    // Default team members - EXACTLY as they were in the UI
+    teamMembers: [
+      {
+        name: "Aarav Sharma",
+        position: "Host & Cultural Guide",
+        bio: "Aarav has been hosting guests for over 10 years, sharing local traditions and stories with visitors from around the world.",
+        photoPath: "/images/team/team-1.jpg",
+        order: 0
+      },
+      {
+        name: "Priya Tamang",
+        position: "Chef & Cooking Instructor",
+        bio: "Priya specializes in traditional Nepali cuisine and leads our popular cooking workshops for guests.",
+        photoPath: "/images/team/team-2.jpg",
+        order: 1
+      },
+      {
+        name: "Ram Bahadur",
+        position: "Trekking & Nature Guide",
+        bio: "Ram knows every trail in the region and leads our nature excursions, pointing out local flora and fauna.",
+        photoPath: "/images/team/team-3.jpg",
+        order: 2
+      },
+      {
+        name: "Sita Gurung",
+        position: "Cultural Performance Director",
+        bio: "Sita organizes our traditional dance and music performances, showcasing authentic local culture.",
+        photoPath: "/images/team/team-4.jpg",
+        order: 3
+      }
+    ],
+    
+    // Default destinations - EXACTLY as they were in the destinations page
+    destinations: [
+      {
+        name: "Kathmandu Valley",
+        description: "Explore the cultural heritage sites, ancient temples, and vibrant markets of Kathmandu Valley.",
+        distance: "2 hours drive",
+        image: "/images/destinations/kathmandu.jpg",
+        category: "cultural",
+        highlights: ["Durbar Square", "Swayambhunath", "Boudhanath Stupa", "Pashupatinath Temple"]
+      },
+      {
+        name: "Chitwan National Park",
+        description: "Experience wildlife safari, jungle activities, and traditional Tharu culture in this UNESCO World Heritage Site.",
+        distance: "3 hours drive",
+        image: "/images/destinations/chitwan.jpg",
+        category: "wildlife",
+        highlights: ["Wildlife Safari", "Elephant Bathing", "Canoe Rides", "Tharu Cultural Show"]
+      },
+      {
+        name: "Pokhara",
+        description: "Enjoy stunning mountain views, peaceful lakes, and adventure activities in the tourism capital of Nepal.",
+        distance: "1.5 hours drive",
+        image: "/images/destinations/pokhara.jpg",
+        category: "nature",
+        highlights: ["Phewa Lake", "Sarangkot", "Davis Falls", "World Peace Pagoda"]
+      },
+      {
+        name: "Local Community Forest",
+        description: "Trek through lush community-managed forests with diverse flora and fauna, and panoramic views.",
+        distance: "30 minutes walk",
+        image: "/images/about/nepal-impact.jpg",
+        category: "nature",
+        highlights: ["Bird Watching", "Nature Walk", "Plant Species", "Panoramic Views"]
+      },
+      {
+        name: "Traditional Village",
+        description: "Visit nearby traditional villages to experience authentic rural lifestyle, crafts, and local cuisine.",
+        distance: "45 minutes walk",
+        image: "/images/about/nepal-story.jpg",
+        category: "cultural",
+        highlights: ["Local Cuisine", "Handicraft Workshops", "Cultural Performances", "Farm Activities"]
+      }
+    ],
+    
+    // Default page content - Matching the content used in the UI
+    pageContent: {
+      aboutPage: {
+        title: `About ${homestayName}`,
+        subtitle: "Our Story and Values",
+        description: `Welcome to ${homestayName}, where we offer an authentic glimpse into Nepali village life. Our homestay is nestled in the beautiful ${villageName}, surrounded by stunning natural beauty and rich cultural heritage.
+
+Experience authentic Nepali hospitality in our carefully curated homestay. Immerse yourself in local culture, taste traditional cuisine, and create unforgettable memories with our host families.
+
+We pride ourselves on providing a genuine cultural experience that connects travelers with the heart and soul of Nepal. Our homestay offers comfortable accommodations while preserving the authentic charm of traditional village life.`,
+        mission: "We are committed to sustainable tourism practices that preserve our environment and benefit the local community.",
+        vision: "We provide genuine cultural experiences that reflect the true essence of our traditions and way of life.",
+        backgroundImage: "/images/home/hero-bg.jpg",
+        highlightPoints: [
+          "Authentic cultural experience",
+          "Home-cooked traditional meals",
+          "Sustainable tourism practices",
+          "Support for local community"
+        ]
+      },
+      contactPage: {
+        title: "Contact Us",
+        subtitle: "Get in touch with us to plan your stay or ask any questions",
+        backgroundImage: "/images/destinations/kathmandu.jpg",
+        formTitle: "Send us a Message",
+        mapEmbedUrl: "",
+        faq: [
+          {
+            question: "What is the check-in and check-out time?",
+            answer: "Check-in is at 2:00 PM and check-out is at 12:00 PM. Early check-in or late check-out may be available upon request."
+          },
+          {
+            question: "Do you offer airport pickup?",
+            answer: "Yes, we can arrange airport pickup for an additional fee. Please contact us at least 24 hours before your arrival."
+          },
+          {
+            question: "What payment methods do you accept?",
+            answer: "We accept cash (NPR), major credit cards, and mobile payment options like eSewa and Khalti."
+          },
+          {
+            question: "Is Wi-Fi available?",
+            answer: "Yes, we provide complimentary Wi-Fi access throughout the homestay."
+          }
+        ]
+      },
+      heroSection: {
+        slogan: "Experience Authentic Nepali Hospitality",
+        welcomeMessage: `Welcome to ${homestayName} where traditions meet comfort.`
+      },
+      whyChooseUs: [
+        "Authentic local experience",
+        "Beautiful natural surroundings",
+        "Traditional homemade meals",
+        "Cultural activities and workshops"
+      ]
+    },
+    
+    // Default testimonials - EXACTLY as they were in the UI
+    testimonials: [
+      {
+        name: "Sarah Johnson",
+        location: "United States",
+        rating: 5,
+        quote: "My stay here was incredible! The hosts were warm and welcoming, and I learned so much about the local culture.",
+        photoPath: "/images/testimonials/sarah.jpg",
+        date: new Date()
+      },
+      {
+        name: "Michael Chen",
+        location: "Canada",
+        rating: 4,
+        quote: "A truly authentic experience. The food was amazing and the natural surroundings are breathtaking.",
+        photoPath: "/images/testimonials/ramesh.jpg",
+        date: new Date()
+      },
+      {
+        name: "Emmlish Wilson",
+        location: "Australia",
+        rating: 5,
+        quote: "The homestay offers a perfect blend of comfort and cultural immersion. I'll definitely be back!",
+        photoPath: "/images/testimonials/akiko.jpg",
+        date: new Date()
+      }
+    ],
+    
+    // Default gallery images
+    galleryImages: [
+      "/images/destinations/kathmandu.jpg",
+      "/images/destinations/pokhara.jpg",
+      "/images/destinations/chitwan.jpg",
+      "/images/about/nepal-impact.jpg",
+      "/images/about/nepal-story.jpg"
+    ],
+    
+    // Default description to match what was in the UI
+    description: `Welcome to ${homestayName}, where we offer an authentic glimpse into Nepali village life. Our homestay is nestled in the beautiful ${villageName}, surrounded by stunning natural beauty and rich cultural heritage.
+
+Experience authentic Nepali hospitality in our carefully curated homestay. Immerse yourself in local culture, taste traditional cuisine, and create unforgettable memories with our host families.`
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
     // First establish connection
@@ -396,8 +576,19 @@ export async function POST(req: NextRequest) {
       }
     };
     
+    // Add the default content
+    const defaultContent = getDefaultHomestayContent(homestayData.homeStayName, homestayData.villageName);
+    
     // Create homestay record - No transaction
-    const createdHomestay = await HomestaySingle.create(homestayData);
+    const createdHomestay = await HomestaySingle.create({
+      ...homestayData,
+      description: defaultContent.description,
+      teamMembers: defaultContent.teamMembers, 
+      destinations: defaultContent.destinations,
+      testimonials: defaultContent.testimonials,
+      galleryImages: defaultContent.galleryImages,
+      pageContent: defaultContent.pageContent
+    });
     console.log(`Created homestay record with ID: ${createdHomestay._id}`);
     
     // Save location data to Location Collection

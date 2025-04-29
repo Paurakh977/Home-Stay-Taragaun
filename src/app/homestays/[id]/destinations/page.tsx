@@ -6,6 +6,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight, MapPin, ExternalLink, ChevronLeft, ArrowRight } from "lucide-react";
 
+interface Destination {
+  name: string;
+  description: string;
+  distance: string;
+  image: string;
+  category: string;
+  highlights: string[];
+}
+
 interface HomestayData {
   _id: string;
   homestayId: string;
@@ -19,6 +28,7 @@ interface HomestayData {
     district?: { en: string; ne?: string };
     municipality?: { en: string; ne?: string };
   };
+  destinations?: Destination[];
 }
 
 // Static destination categories
@@ -29,10 +39,9 @@ const categories = [
   { id: 'adventure', name: 'Adventure', icon: '🧗' }
 ];
 
-// Static destination data
-const destinations = [
+// Static destination data - fallback if no database data
+const defaultDestinations = [
   {
-    id: 1,
     name: "Kathmandu Valley",
     description: "Explore the cultural heritage sites, ancient temples, and vibrant markets of Kathmandu Valley.",
     distance: "2 hours drive",
@@ -41,7 +50,6 @@ const destinations = [
     highlights: ["Durbar Square", "Swayambhunath", "Boudhanath Stupa", "Pashupatinath Temple"]
   },
   {
-    id: 2,
     name: "Chitwan National Park",
     description: "Experience wildlife safari, jungle activities, and traditional Tharu culture in this UNESCO World Heritage Site.",
     distance: "3 hours drive",
@@ -50,7 +58,6 @@ const destinations = [
     highlights: ["Wildlife Safari", "Elephant Bathing", "Canoe Rides", "Tharu Cultural Show"]
   },
   {
-    id: 3,
     name: "Pokhara",
     description: "Enjoy stunning mountain views, peaceful lakes, and adventure activities in the tourism capital of Nepal.",
     distance: "1.5 hours drive",
@@ -59,7 +66,6 @@ const destinations = [
     highlights: ["Phewa Lake", "Sarangkot", "Davis Falls", "World Peace Pagoda"]
   },
   {
-    id: 4,
     name: "Local Community Forest",
     description: "Trek through lush community-managed forests with diverse flora and fauna, and panoramic views.",
     distance: "30 minutes walk",
@@ -68,7 +74,6 @@ const destinations = [
     highlights: ["Bird Watching", "Nature Walk", "Plant Species", "Panoramic Views"]
   },
   {
-    id: 5,
     name: "Traditional Village",
     description: "Visit nearby traditional villages to experience authentic rural lifestyle, crafts, and local cuisine.",
     distance: "45 minutes walk",
@@ -84,6 +89,7 @@ export default function DestinationsPage() {
   const [homestay, setHomestay] = useState<HomestayData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [destinations, setDestinations] = useState<Destination[]>([]);
 
   useEffect(() => {
     const fetchBasicData = async () => {
@@ -100,8 +106,12 @@ export default function DestinationsPage() {
         // Handle different response structures
         if (data.homestay) {
           setHomestay(data.homestay);
+          // Set destinations from database or use defaults
+          setDestinations(data.homestay.destinations || defaultDestinations);
         } else {
           setHomestay(data);
+          // Set destinations from database or use defaults
+          setDestinations(data.destinations || defaultDestinations);
         }
       } catch (err) {
         console.error('Error fetching homestay data:', err);
@@ -115,6 +125,8 @@ export default function DestinationsPage() {
             formattedAddress: { en: "Nepal" }
           }
         });
+        // Use default destinations
+        setDestinations(defaultDestinations);
       } finally {
         setLoading(false);
       }
@@ -275,7 +287,7 @@ export default function DestinationsPage() {
           <div className="flex overflow-x-auto gap-6 pb-4 hide-scrollbar snap-x snap-mandatory px-1">
             {filteredDestinations.slice(1).map((destination) => (
               <div 
-                key={destination.id} 
+                key={destination.name} 
                 className="flex-shrink-0 w-[300px] snap-start bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-all transform hover:-translate-y-1"
               >
                 <div className="relative h-48">
