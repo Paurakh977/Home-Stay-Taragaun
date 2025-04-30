@@ -122,10 +122,6 @@ export default function HomestayLayout({
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Link href="/homestays" className="text-primary font-medium flex items-center mr-4">
-                <Home className="h-5 w-5 mr-1" />
-                <span className="hidden sm:inline">All Homestays</span>
-              </Link>
               <Link href={`/homestays/${homestayId}`} className="flex items-center">
                 {homestay?.profileImage ? (
                   <div className="h-8 w-8 rounded-full overflow-hidden mr-2 flex-shrink-0">
@@ -197,16 +193,6 @@ export default function HomestayLayout({
         {mobileMenuOpen && (
           <div className="md:hidden bg-white border-t border-gray-100 py-2">
             <div className="container mx-auto px-4 space-y-2">
-              <Link 
-                href="/homestays"
-                className="block py-2 px-3 rounded-md text-gray-600 hover:bg-gray-50"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <div className="flex items-center">
-                  <Home className="h-4 w-4 mr-2" />
-                  All Homestays
-                </div>
-              </Link>
               <Link 
                 href={`/homestays/${homestayId}`}
                 className={`block py-2 px-3 rounded-md ${pathname === `/homestays/${homestayId}` ? 'bg-primary/10 text-primary' : 'text-gray-600 hover:bg-gray-50'}`}

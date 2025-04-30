@@ -648,10 +648,10 @@ export default function HomestayDetailPage() {
         </button>
       </div>
 
-      {/* Hero Section - Modern and Eye-Catching */}
-      <div className="relative mb-16">
+      {/* Hero Section - Modern and Minimalistic */}
+      <div className="relative mb-10">
         {/* Main Image with Overlay Gradient */}
-        <div className="relative h-[60vh] overflow-hidden">
+        <div className="relative h-[50vh] md:h-[60vh] overflow-hidden">
           {galleryImages.map((image, index) => (
             <div
               key={index}
@@ -670,21 +670,21 @@ export default function HomestayDetailPage() {
               />
             </div>
           ))}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/30" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40" />
           
           {/* Image navigation controls */}
           {galleryImages.length > 1 && (
             <>
               <button 
                 onClick={prevSlide} 
-                className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full z-20 transition-all hover:scale-110"
+                className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/30 hover:bg-white/50 text-black p-2 rounded-full z-20 transition-all hover:scale-110 backdrop-blur-sm"
                 aria-label="Previous image"
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
               <button 
                 onClick={nextSlide} 
-                className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full z-20 transition-all hover:scale-110"
+                className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/30 hover:bg-white/50 text-black p-2 rounded-full z-20 transition-all hover:scale-110 backdrop-blur-sm"
                 aria-label="Next image"
               >
                 <ChevronRight className="h-5 w-5" />
@@ -696,7 +696,7 @@ export default function HomestayDetailPage() {
                   <button
                     key={index}
                     onClick={() => setCurrentImageIndex(index)}
-                    className={`w-2.5 h-2.5 rounded-full transition-all ${
+                    className={`w-2 h-2 rounded-full transition-all ${
                       index === currentImageIndex ? "bg-white scale-110" : "bg-white/50"
                     }`}
                     aria-label={`Go to slide ${index + 1}`}
@@ -707,122 +707,129 @@ export default function HomestayDetailPage() {
           )}
           
           {/* Save button */}
-          <button className="absolute top-6 right-6 z-10 rounded-full bg-white/20 backdrop-blur-sm p-3 hover:bg-white/30 transition-colors">
+          <button className="absolute top-6 right-6 z-10 rounded-full bg-white/30 backdrop-blur-sm p-2.5 hover:bg-white/50 transition-colors">
             <Heart size={20} className="text-white" />
           </button>
+          
+          {/* Minimalist heading overlay */}
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pt-20 pb-8 px-4 md:px-6 z-10">
+            <div className="container mx-auto">
+              <div className="flex items-center">
+                {homestay.profileImage && (
+                  <div className="relative h-16 w-16 md:h-20 md:w-20 rounded-full overflow-hidden border-2 border-white mr-4 bg-white">
+                    <Image
+                      src={getImageUrl(homestay.profileImage)}
+                      alt={homestay.homeStayName}
+                      fill
+                      className="object-cover"
+                      unoptimized={true}
+                    />
+                  </div>
+                )}
+                <div>
+                  <h1 className="text-2xl md:text-3xl font-bold text-white">{homestay.homeStayName}</h1>
+                  {homestay.pageContent?.heroSection?.slogan && (
+                    <p className="text-white/90 text-sm md:text-base mt-1">{homestay.pageContent.heroSection.slogan}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         
-        {/* Hero Content - Floating Card */}
-        <div className="container mx-auto px-4 relative -mt-32">
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <div className="flex flex-col lg:flex-row lg:items-start gap-8">
-              {/* Profile Image - Higher Quality & Circular */}
-              <div className="lg:mr-6 mb-4 lg:mb-0 flex-shrink-0">
-                <div className="relative h-28 w-28 lg:h-36 lg:w-36 rounded-full overflow-hidden border-4 border-white shadow-md -mt-20 bg-white">
-                  <Image
-                    src={homestay.profileImage ? getImageUrl(homestay.profileImage) : '/images/homestay-placeholder-1.jpg'}
-                    alt={homestay.homeStayName}
-                    fill
-                    className="object-cover"
-                    unoptimized={true}
-                  />
+        {/* Homestay details card - minimalistic design */}
+        <div className="container mx-auto px-4">
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="flex flex-col space-y-5">
+              {/* Location and badges */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <p className="flex items-center text-gray-600 mb-3">
+                    <MapPin size={18} className="mr-2 text-rose-500 flex-shrink-0" />
+                    {homestay.address.formattedAddress.en}
+                  </p>
+                  
+                  {/* Badges - Modern and Clean */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {displayHomestayType && (
+                      <span className="text-xs px-3 py-1 rounded-full font-medium bg-green-100 text-green-700">
+                        {displayHomestayType}
+                      </span>
+                    )}
+                    
+                    {homestay.dhsrNo && (
+                      <span className="text-xs px-3 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+                        DHSR: {homestay.dhsrNo}
+                      </span>
+                    )}
+
+                    {(homestay.villageName || homestay.village) && (
+                      <span className="text-xs px-3 py-1 rounded-full bg-amber-100 text-amber-700 font-medium">
+                        {homestay.villageName || homestay.village}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Rating */}
+                <div className="shrink-0">
+                  <div className="inline-flex items-center gap-1 bg-yellow-50 px-3 py-2 rounded-lg">
+                    <div className="flex">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star 
+                          key={star} 
+                          size={16} 
+                          className={star <= Math.round(rating) 
+                            ? "fill-yellow-400 text-yellow-400" 
+                            : "text-gray-300"
+                          } 
+                        />
+                      ))}
+                    </div>
+                    <span className="font-bold text-gray-700 ml-1">{rating.toFixed(1)}</span>
+                    <span className="text-sm text-gray-500">({ratingCount})</span>
+                  </div>
                 </div>
               </div>
               
-              {/* Main Details - Clean Layout */}
-              <div className="flex-grow">
-                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                  <div>
-                    <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">{homestay.homeStayName}</h1>
-                    {/* Display hero section slogan from database */}
-                    {homestay.pageContent?.heroSection?.slogan && (
-                      <p className="text-primary text-lg font-medium mb-2">{homestay.pageContent.heroSection.slogan}</p>
-                    )}
-                    {/* Display welcome message from database */}
-                    {homestay.pageContent?.heroSection?.welcomeMessage && (
-                      <p className="text-gray-700 mb-3">{homestay.pageContent.heroSection.welcomeMessage}</p>
-                    )}
-                    <p className="text-gray-600 mb-3 flex items-center">
-                      <MapPin size={16} className="mr-2 text-gray-500 flex-shrink-0" />
-                      {homestay.address.formattedAddress.en}
-                    </p>
-                    
-                    {/* Badges - Modern and Clean */}
-                    <div className="flex flex-wrap items-center gap-2 mb-4">
-                      {displayHomestayType && (
-                        <span className="text-xs px-3 py-1 rounded-full font-medium bg-green-100 text-green-700">
-                          {displayHomestayType}
-                        </span>
-                      )}
-                      
-                      {homestay.dhsrNo && (
-                        <span className="text-xs px-3 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
-                          DHSR: {homestay.dhsrNo}
-                        </span>
-                      )}
-
-                      {(homestay.villageName || homestay.village) && (
-                        <span className="text-xs px-3 py-1 rounded-full bg-amber-100 text-amber-700 font-medium">
-                          {homestay.villageName || homestay.village}
-                        </span>
-                      )}
-                    </div>
+              {/* Capacity Details - Colorful Visual Icons */}
+              <div className="grid grid-cols-3 gap-4 my-2">
+                <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50">
+                  <div className="p-2 rounded-full bg-gradient-to-r from-blue-400 to-indigo-500 text-white mb-2">
+                    <Home size={20} />
                   </div>
-                  
-                  {/* Rating - Visual Appeal */}
-                  <div className="lg:text-right">
-                    <div className="inline-flex items-center gap-1 bg-yellow-50 px-3 py-2 rounded-lg">
-                      <div className="flex">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Star 
-                            key={star} 
-                            size={16} 
-                            className={star <= Math.round(rating) 
-                              ? "fill-yellow-400 text-yellow-400" 
-                              : "text-gray-300"
-                            } 
-                          />
-                        ))}
-                      </div>
-                      <span className="font-bold text-gray-700 ml-1">{rating.toFixed(1)}</span>
-                      <span className="text-sm text-gray-500">({ratingCount})</span>
-                    </div>
-                  </div>
+                  <span className="font-bold text-xl text-gray-800">{homestay.homeCount || 0}</span>
+                  <span className="text-xs text-gray-500">Homes</span>
                 </div>
                 
-                {/* Capacity Details - Clear Visual Icons */}
-                <div className="grid grid-cols-3 gap-4 my-6 bg-gray-50 rounded-xl p-4">
-                  <div className="flex flex-col items-center text-center">
-                    <Home size={20} className="mb-2 text-primary" />
-                    <span className="font-bold text-xl text-gray-800">{homestay.homeCount || 0}</span>
-                    <span className="text-xs text-gray-500">Homes</span>
+                <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gradient-to-br from-purple-50 to-pink-50">
+                  <div className="p-2 rounded-full bg-gradient-to-r from-purple-400 to-pink-500 text-white mb-2">
+                    <Users size={20} />
                   </div>
-                  
-                  <div className="flex flex-col items-center text-center">
-                    <Users size={20} className="mb-2 text-primary" />
-                    <span className="font-bold text-xl text-gray-800">{homestay.roomCount || 0}</span>
-                    <span className="text-xs text-gray-500">Rooms</span>
-                  </div>
-                  
-                  <div className="flex flex-col items-center text-center">
-                    <Bed size={20} className="mb-2 text-primary" />
-                    <span className="font-bold text-xl text-gray-800">{homestay.bedCount || 0}</span>
-                    <span className="text-xs text-gray-500">Beds</span>
-                  </div>
+                  <span className="font-bold text-xl text-gray-800">{homestay.roomCount || 0}</span>
+                  <span className="text-xs text-gray-500">Rooms</span>
                 </div>
                 
-                {/* Description - Clean and Concise */}
-                <div className="mt-4">
-                  <h2 className="text-lg font-semibold text-gray-800 mb-2">Welcome to {homestay.homeStayName}</h2>
-                  <p className="text-gray-700 line-clamp-3">
-                    {homestay.description || "Experience the authentic local lifestyle at our homestay. Enjoy comfortable accommodations, homemade meals, and cultural experiences in a family environment."}
-                  </p>
-                  {homestay.description && homestay.description.length > 240 && (
-                    <button className="text-primary hover:text-primary-dark font-medium text-sm mt-1">
-                      Read more
-                    </button>
-                  )}
+                <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gradient-to-br from-amber-50 to-orange-50">
+                  <div className="p-2 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white mb-2">
+                    <Bed size={20} />
+                  </div>
+                  <span className="font-bold text-xl text-gray-800">{homestay.bedCount || 0}</span>
+                  <span className="text-xs text-gray-500">Beds</span>
                 </div>
+              </div>
+              
+              {/* Description */}
+              <div className="mt-2">
+                <h2 className="text-lg font-semibold text-gray-800 mb-2">Welcome to {homestay.homeStayName}</h2>
+                <p className="text-gray-700 line-clamp-3">
+                  {homestay.description || "Experience the authentic local lifestyle at our homestay. Enjoy comfortable accommodations, homemade meals, and cultural experiences in a family environment."}
+                </p>
+                {homestay.description && homestay.description.length > 240 && (
+                  <button className="text-primary hover:text-primary-dark font-medium text-sm mt-1">
+                    Read more
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -867,48 +874,76 @@ export default function HomestayDetailPage() {
               </div>
             </div>
 
-            {/* Tabs Section - Modern Design */}
+            {/* Tabs Section - Modern Design with colorful icons */}
             <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
               <div className="border-b">
                 <div className="flex">
                   <button
                     onClick={() => setActiveTab('amenities')}
-                    className={`px-6 py-4 font-medium text-sm transition-colors ${
+                    className={`px-6 py-4 font-medium text-sm transition-colors flex items-center ${
                       activeTab === 'amenities' 
                         ? 'border-b-2 border-primary text-primary' 
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center mr-2 ${
+                      activeTab === 'amenities' 
+                        ? 'bg-primary/10 text-primary' 
+                        : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      <Home className="h-3.5 w-3.5" />
+                    </div>
                     Amenities
                   </button>
                   <button
                     onClick={() => setActiveTab('attractions')}
-                    className={`px-6 py-4 font-medium text-sm transition-colors ${
+                    className={`px-6 py-4 font-medium text-sm transition-colors flex items-center ${
                       activeTab === 'attractions' 
-                        ? 'border-b-2 border-primary text-primary' 
+                        ? 'border-b-2 border-green-500 text-green-600' 
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
-                    Local Attractions
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center mr-2 ${
+                      activeTab === 'attractions' 
+                        ? 'bg-green-100 text-green-600' 
+                        : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      <Map className="h-3.5 w-3.5" />
+                    </div>
+                    Attractions
                   </button>
                   <button
                     onClick={() => setActiveTab('location')}
-                    className={`px-6 py-4 font-medium text-sm transition-colors ${
+                    className={`px-6 py-4 font-medium text-sm transition-colors flex items-center ${
                       activeTab === 'location' 
-                        ? 'border-b-2 border-primary text-primary' 
+                        ? 'border-b-2 border-blue-500 text-blue-600' 
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center mr-2 ${
+                      activeTab === 'location' 
+                        ? 'bg-blue-100 text-blue-600' 
+                        : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      <Navigation className="h-3.5 w-3.5" />
+                    </div>
                     Location
                   </button>
                   <button
                     onClick={() => setActiveTab('contact')}
-                    className={`px-6 py-4 font-medium text-sm transition-colors ${
+                    className={`px-6 py-4 font-medium text-sm transition-colors flex items-center ${
                       activeTab === 'contact' 
-                        ? 'border-b-2 border-primary text-primary' 
+                        ? 'border-b-2 border-violet-500 text-violet-600' 
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center mr-2 ${
+                      activeTab === 'contact' 
+                        ? 'bg-violet-100 text-violet-600' 
+                        : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      <Phone className="h-3.5 w-3.5" />
+                    </div>
                     Contact
                   </button>
                 </div>
@@ -921,8 +956,8 @@ export default function HomestayDetailPage() {
                     {/* Infrastructure */}
                     <div>
                       <h3 className="text-xl font-semibold mb-4 flex items-center">
-                        <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center mr-3">
-                          <Home className="h-4 w-4 text-primary" />
+                        <div className="w-8 h-8 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center mr-3">
+                          <Home className="h-4 w-4 text-indigo-600" />
                         </div>
                         Infrastructure
                       </h3>
@@ -939,8 +974,8 @@ export default function HomestayDetailPage() {
                     {/* Tourism Services */}
                     <div>
                       <h3 className="text-xl font-semibold mb-4 flex items-center">
-                        <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center mr-3">
-                          <Users className="h-4 w-4 text-primary" />
+                        <div className="w-8 h-8 bg-gradient-to-r from-amber-100 to-orange-100 rounded-lg flex items-center justify-center mr-3">
+                          <Users className="h-4 w-4 text-amber-600" />
                         </div>
                         Tourism Services
                       </h3>
