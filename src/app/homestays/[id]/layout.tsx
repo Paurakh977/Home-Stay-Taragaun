@@ -5,25 +5,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useParams, usePathname } from 'next/navigation';
 import { Home, Phone, Info, Menu, X, Map, Mail, Facebook, Instagram, Twitter, Youtube, Music } from 'lucide-react';
+import { getImageUrl } from '@/lib/imageUtils';
 
 // Helper function to construct image URLs without timestamps to avoid hydration mismatches
 export function getApiImageUrl(imagePath: string | null | undefined): string {
-  if (!imagePath) {
-    return '/images/placeholder-homestay.jpg';
-  }
-  
-  // If it's already a URL or an absolute path, return it as is
-  if (imagePath.startsWith('http') || imagePath.startsWith('/images/')) {
-    return imagePath;
-  }
-  
-  // Convert /uploads/ paths to /api/images/ paths
-  if (imagePath.startsWith('/uploads/')) {
-    return imagePath.replace('/uploads/', '/api/images/');
-  }
-  
-  // Handle other paths
-  return `/api/images/${imagePath}`;
+  return getImageUrl(imagePath);
 }
 
 interface HomestayData {
@@ -149,6 +135,7 @@ export default function HomestayLayout({
                       width={32}
                       height={32}
                       className="object-cover w-full h-full object-center"
+                      unoptimized={true}
                     />
                   </div>
                 ) : (
@@ -284,6 +271,7 @@ export default function HomestayLayout({
                       width={32}
                       height={32}
                       className="object-cover w-full h-full object-center"
+                      unoptimized={true}
                     />
                   </div>
                 ) : (

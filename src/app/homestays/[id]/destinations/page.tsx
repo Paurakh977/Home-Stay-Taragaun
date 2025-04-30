@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight, MapPin, ExternalLink, ChevronLeft, ArrowRight } from "lucide-react";
 import { getApiImageUrl } from "../layout";
+import { getImageUrl } from "@/lib/imageUtils";
 
 interface Destination {
   name: string;
@@ -89,13 +90,7 @@ const formatDestinationImage = (imagePath: string): string => {
   if (!imagePath) {
     return "/images/destinations/pokhara.jpg"; // Default image
   }
-
-  // For images stored in the uploads directory, route through the API
-  if (imagePath.startsWith('/uploads/')) {
-    return imagePath.replace('/uploads/', '/api/images/');
-  }
-
-  return imagePath;
+  return getImageUrl(imagePath);
 };
 
 export default function DestinationsPage() {
@@ -253,6 +248,7 @@ export default function DestinationsPage() {
                   alt={filteredDestinations[0].name}
                   fill
                   className="object-cover"
+                  unoptimized={true}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
               </div>
@@ -311,6 +307,7 @@ export default function DestinationsPage() {
                     alt={destination.name}
                     fill
                     className="object-cover"
+                    unoptimized={true}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
                   <div className="absolute bottom-0 left-0 right-0 p-4">

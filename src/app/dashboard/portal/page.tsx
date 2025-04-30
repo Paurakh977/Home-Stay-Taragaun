@@ -330,20 +330,27 @@ export default function PortalPage({ adminUsername }: PortalPageProps) {
   const currentImageSrc = validGalleryImages.length > 0 ? validGalleryImages[currentSlideIndex] : null;
 
   useEffect(() => {
+    // Clear any existing interval first
+    if (sliderInterval.current) {
+      clearInterval(sliderInterval.current);
+      sliderInterval.current = null;
+    }
+    
+    // Only set interval if we have multiple images and auto-slide is enabled
     if (validGalleryImages.length > 1 && autoSlide) {
       sliderInterval.current = setInterval(() => {
-        setCurrentSlide(prev => (prev === validGalleryImages.length - 1 ? 0 : prev + 1));
+        setCurrentSlide(prev => (prev + 1) % validGalleryImages.length);
       }, 5000);
-    } else if (sliderInterval.current) {
-      clearInterval(sliderInterval.current);
     }
 
+    // Cleanup function
     return () => {
       if (sliderInterval.current) {
         clearInterval(sliderInterval.current);
+        sliderInterval.current = null;
       }
     };
-  }, [autoSlide, validGalleryImages, currentSlide]);
+  }, [autoSlide, validGalleryImages.length]); // Reduced dependencies to prevent unnecessary interval recreation
 
   const validProfileImage = homestay?.profileImage && typeof homestay.profileImage === 'string' && homestay.profileImage.trim() !== '' ? homestay.profileImage : null;
 
@@ -661,7 +668,8 @@ export default function PortalPage({ adminUsername }: PortalPageProps) {
   };
 
   const renderSliderImage = (imageSrc: string, index: number) => {
-    const apiUrl = imageSrc.replace('/uploads/', '/api/images/') + `?t=${new Date().getTime()}`;
+    // Add cache busting to prevent caching
+    const apiUrl = `${imageSrc.replace('/uploads/', '/api/images/')}?t=${Date.now()}`;
     console.log(`[Portal Slider] Rendering image ${index} via API: ${apiUrl}`);
     return (
       <div
@@ -754,55 +762,27 @@ export default function PortalPage({ adminUsername }: PortalPageProps) {
   };
 
   const getImageUrl = (filePath?: string) => {
-    if (!filePath) return '/placeholder.png';
+    if (!filePath) return '/images/placeholder-homestay.jpg';
+    
+    // For images stored in the uploads directory, route through the API
+    // This will handle both regular and admin paths properly
     return filePath.startsWith('/uploads/') 
-      ? filePath.replace('/uploads/', '/api/images/')
+      ? `${filePath.replace('/uploads/', '/api/images/')}?t=${Date.now()}`
       : filePath;
   };
 
   const openPreview = (imageSrc: string | null) => {
     if (imageSrc && typeof imageSrc === 'string' && imageSrc.trim() !== '') {
+      // For images stored in the uploads directory, route through the API
+      // This will handle both regular and admin paths properly
       const apiUrl = imageSrc.startsWith('/uploads/') 
-        ? imageSrc.replace('/uploads/', '/api/images/')
+        ? `${imageSrc.replace('/uploads/', '/api/images/')}?t=${Date.now()}`
         : imageSrc;
       setPreviewImage(apiUrl);
     } else {
       setPreviewImage(null);
     }
   };
-
-  useEffect(() => {
-    const fetchHomestayData = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`/api/homestays/${user?.homestayId}?adminUsername=${adminUsername || ''}`);
-        
-        if (!response.ok) throw new Error('Failed to fetch homestay data');
-        
-        const data = await response.json();
-        setHomestay(data.homestay);
-        setDescription(data.homestay.description || "");
-        setGalleryImages(data.homestay.galleryImages || []);
-        
-      } catch (err) {
-        console.error('Error fetching homestay data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (user?.homestayId) {
-      fetchHomestayData();
-    }
-
-    const interval = setInterval(() => {
-      if (user?.homestayId) {
-        fetchHomestayData();
-      }
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [user?.homestayId, adminUsername]);
 
   const handleCustomFieldChange = (fieldId: string, value: any) => {
     setCustomFieldValues(prev => ({ ...prev, [fieldId]: value }));

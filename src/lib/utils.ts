@@ -83,6 +83,8 @@ export function getImageUrl(imagePath: string): string {
   }
   
   // Transform /uploads/path/to/image.jpg to /api/images/path/to/image.jpg
+  // This handles both admin paths (/uploads/adminUsername/homestayId/...)
+  // and regular paths (/uploads/homestayId/...)
   const apiPath = imagePath.replace('/uploads/', '/api/images/');
   
   // Add cache busting timestamp
@@ -93,27 +95,22 @@ export function getImageUrl(imagePath: string): string {
  * Constructs an image URL without timestamps to prevent hydration mismatch
  */
 export function getApiImageUrl(imagePath: string | null | undefined): string {
-  console.log("getApiImageUrl - Input path:", imagePath);
-  
   if (!imagePath) {
-    console.log("getApiImageUrl - No path provided, using default");
     return '/images/placeholder-homestay.jpg';
   }
   
   // If it's already a URL or an absolute path to images, return it as is
   if (imagePath.startsWith('http') || imagePath.startsWith('/images/')) {
-    console.log("getApiImageUrl - Using path as is (http or /images/)");
     return imagePath;
   }
   
   // Convert /uploads/ paths to /api/images/ paths
+  // This will handle both regular and admin paths properly
   if (imagePath.startsWith('/uploads/')) {
     const apiPath = imagePath.replace('/uploads/', '/api/images/');
-    console.log("getApiImageUrl - Converted to API path:", apiPath);
     return apiPath;
   }
   
   // Handle other paths
-  console.log("getApiImageUrl - Using default API prefix for path");
   return `/api/images/${imagePath}`;
 }

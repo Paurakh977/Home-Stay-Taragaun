@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import Image from "next/image";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, useParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, MapPin, Star, Home, Users, Bed, Calendar, Phone, Mail, Globe, Navigation, ArrowLeft, Heart, Map, Check, ExternalLink } from "lucide-react";
+import { getImageUrl } from "@/lib/imageUtils";
 import { getApiImageUrl } from "./layout";
 
 // Define interfaces for typing
@@ -329,6 +330,11 @@ const defaultTestimonials = [
   }
 ];
 
+// Update the formatImageUrl function to use getImageUrl
+const formatImageUrl = (imagePath: string | undefined): string => {
+  return getImageUrl(imagePath);
+};
+
 export default function HomestayDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -397,7 +403,7 @@ export default function HomestayDetailPage() {
     if (data.galleryImages && data.galleryImages.length > 0) {
       console.log("PrepareGalleryImages - Using galleryImages from API", data.galleryImages);
       images = data.galleryImages.map((img: string) => {
-        const imgSrc = getApiImageUrl(img);
+        const imgSrc = getImageUrl(img);
         console.log(`PrepareGalleryImages - Transformed ${img} to ${imgSrc}`);
         return {
           src: imgSrc,
@@ -411,15 +417,15 @@ export default function HomestayDetailPage() {
       images = data.gallery.map((img: any) => {
         // Handle different possible formats in the gallery
         if (typeof img === 'string') {
-          const imgSrc = getApiImageUrl(img);
+          const imgSrc = getImageUrl(img);
           console.log(`PrepareGalleryImages - String format: Transformed ${img} to ${imgSrc}`);
           return { src: imgSrc, alt: data.homeStayName || 'Homestay Image' };
         } else if (img.image) {
-          const imgSrc = getApiImageUrl(img.image);
+          const imgSrc = getImageUrl(img.image);
           console.log(`PrepareGalleryImages - Object.image format: Transformed ${img.image} to ${imgSrc}`);
           return { src: imgSrc, alt: img.caption || data.homeStayName || 'Homestay Image' };
         } else if (img.src) {
-          const imgSrc = getApiImageUrl(img.src);
+          const imgSrc = getImageUrl(img.src);
           console.log(`PrepareGalleryImages - Object.src format: Transformed ${img.src} to ${imgSrc}`);
           return { src: imgSrc, alt: img.alt || data.homeStayName || 'Homestay Image' };
         }
@@ -432,7 +438,7 @@ export default function HomestayDetailPage() {
     // If gallery is empty, use profile image if available
     if (images.length === 0 && data.profileImage) {
       console.log("PrepareGalleryImages - Using profile image as fallback:", data.profileImage);
-      const profileImgSrc = getApiImageUrl(data.profileImage);
+      const profileImgSrc = getImageUrl(data.profileImage);
       console.log(`PrepareGalleryImages - Transformed profile ${data.profileImage} to ${profileImgSrc}`);
       images.push({ src: profileImgSrc, alt: data.homeStayName || 'Homestay Profile Image' });
     }
@@ -603,11 +609,12 @@ export default function HomestayDetailPage() {
                   <div className="flex items-center mb-4">
                     <div className="h-12 w-12 rounded-full overflow-hidden mr-3">
                       <Image 
-                        src={testimonial.photoPath || '/images/avatar-placeholder.png'} 
+                        src={formatImageUrl(testimonial.photoPath) || '/images/avatar-placeholder.png'} 
                         alt={testimonial.name}
                         width={48}
                         height={48}
                         className="object-cover"
+                        unoptimized={true}
                       />
                     </div>
                     <div>
@@ -659,6 +666,7 @@ export default function HomestayDetailPage() {
                 className="object-cover"
                 priority={index === 0}
                 sizes="100vw"
+                unoptimized={true}
               />
             </div>
           ))}
@@ -712,10 +720,11 @@ export default function HomestayDetailPage() {
               <div className="lg:mr-6 mb-4 lg:mb-0 flex-shrink-0">
                 <div className="relative h-28 w-28 lg:h-36 lg:w-36 rounded-full overflow-hidden border-4 border-white shadow-md -mt-20 bg-white">
                   <Image
-                    src={homestay.profileImage ? getApiImageUrl(homestay.profileImage) : '/images/homestay-placeholder-1.jpg'}
+                    src={homestay.profileImage ? getImageUrl(homestay.profileImage) : '/images/homestay-placeholder-1.jpg'}
                     alt={homestay.homeStayName}
                     fill
                     className="object-cover"
+                    unoptimized={true}
                   />
                 </div>
               </div>
@@ -843,6 +852,7 @@ export default function HomestayDetailPage() {
                       fill
                       className="object-cover hover:scale-105 transition-transform duration-300 cursor-pointer"
                       onClick={() => { setCurrentImageIndex(index); setShowGallery(true); }}
+                      unoptimized={true}
                     />
                     {index === 5 && galleryImages.length > 6 && (
                       <div 
@@ -1195,6 +1205,7 @@ export default function HomestayDetailPage() {
               width={1200}
               height={800}
               className="object-contain max-h-[90vh]"
+              unoptimized={true}
             />
           </div>
           

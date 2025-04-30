@@ -1,24 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Check, MapPin, ChevronRight, Calendar } from "lucide-react";
 import { getApiImageUrl } from "../layout";
+import { getImageUrl } from "@/lib/imageUtils";
 
 // Helper function to format image URLs
 const formatImageUrl = (imagePath: string | undefined): string => {
-  if (!imagePath) {
-    return "/images/homestay-placeholder.jpg";
-  }
-
-  // For images stored in the uploads directory, route through the API
-  if (imagePath.startsWith('/uploads/')) {
-    return imagePath.replace('/uploads/', '/api/images/');
-  }
-
-  return imagePath;
+  return getImageUrl(imagePath);
 };
 
 interface HomestayData {
@@ -491,10 +483,11 @@ export default function AboutPage() {
                   <div key={index} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                     <div className="relative h-64">
                       <Image 
-                        src={member.photoPath} 
+                        src={formatImageUrl(member.photoPath)}
                         alt={member.name}
                         fill
                         className="object-cover"
+                        unoptimized={true}
                       />
                     </div>
                     <div className="p-5">

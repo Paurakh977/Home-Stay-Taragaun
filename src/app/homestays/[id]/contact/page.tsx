@@ -1,30 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { MapPin, Phone, Mail, Globe, Facebook, Instagram, Twitter, Send, ChevronRight, Info, Youtube, Music } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { getImageUrl } from "@/lib/imageUtils";
 
 // Helper function to format image URLs
 const formatImageUrl = (imagePath: string | undefined): string => {
-  console.log("Original image path:", imagePath); // Debug log
-
-  if (!imagePath || imagePath === "") {
-    // Hardcoded fallback image
-    console.log("Using fallback image: /images/destinations/kathmandu.jpg"); // Debug log
-    return "/images/destinations/kathmandu.jpg";
-  }
-
-  // For images stored in the uploads directory, route through the API
-  if (imagePath.startsWith('/uploads/')) {
-    const apiImagePath = imagePath.replace('/uploads/', '/api/images/');
-    console.log("Converted to API path:", apiImagePath); // Debug log
-    return apiImagePath;
-  }
-
-  console.log("Using original path:", imagePath); // Debug log
-  return imagePath;
+  return getImageUrl(imagePath);
 };
 
 interface Contact {
@@ -333,7 +318,7 @@ export default function ContactPage() {
                 <div 
                   className="relative h-44 bg-cover bg-center" 
                   style={{ 
-                    backgroundImage: `url('${homestay.pageContent?.contactPage?.backgroundImage || "/images/destinations/kathmandu.jpg"}')`
+                    backgroundImage: `url('${formatImageUrl(homestay.pageContent?.contactPage?.backgroundImage) || "/images/destinations/kathmandu.jpg"}')`
                   }}
                 >
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent"></div>

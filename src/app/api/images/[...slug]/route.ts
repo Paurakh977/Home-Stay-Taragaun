@@ -103,7 +103,7 @@ export async function GET(
     return new NextResponse(stream as any, {
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
         'Pragma': 'no-cache',
         'Expires': '0'
       }

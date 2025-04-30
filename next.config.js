@@ -9,6 +9,8 @@ const nextConfig = {
         pathname: '/**',
       },
     ],
+    domains: ['localhost'],
+    unoptimized: true, // Disable the built-in image optimizer to use our API route
   },
   // Add env variables to be accessible in client-side code
   env: {
