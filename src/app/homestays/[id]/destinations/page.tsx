@@ -100,6 +100,19 @@ export default function DestinationsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  // Set up auto-sliding for hero carousel
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (destinations.length > 1) {
+        // Slide in reverse order
+        setCurrentSlide(prev => (prev - 1 + destinations.length) % destinations.length);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [destinations.length]);
 
   useEffect(() => {
     const fetchBasicData = async () => {
@@ -150,6 +163,17 @@ export default function DestinationsPage() {
     ? destinations.filter(d => d.category === selectedCategory)
     : destinations;
 
+  // Next and previous controls for the hero carousel - adjust for consistency with reversed direction
+  const nextSlide = () => {
+    // "Next" now goes to the previous slide since we're moving in reverse
+    setCurrentSlide((prev) => (prev - 1 + destinations.length) % destinations.length);
+  };
+
+  const prevSlide = () => {
+    // "Previous" now goes to the next slide since we're moving in reverse
+    setCurrentSlide((prev) => (prev + 1) % destinations.length);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
@@ -160,15 +184,46 @@ export default function DestinationsPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      {/* Hero Section with Image Background */}
+      {/* Hero Section with Image Carousel */}
       <div className="relative h-[40vh] bg-gray-900">
-        <Image 
-          src="/images/destinations/pokhara.jpg"
-          alt="Destinations near homestay"
-          fill
-          className="object-cover opacity-60"
-          priority
-        />
+        {destinations.map((destination, index) => (
+          <div 
+            key={index}
+            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+              index === currentSlide ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            <Image 
+              src={formatDestinationImage(destination.image)}
+              alt={destination.name}
+              fill
+              className="object-cover opacity-60"
+              priority={index === 0}
+              unoptimized={true}
+            />
+          </div>
+        ))}
+        
+        {/* Navigation controls */}
+        {destinations.length > 1 && (
+          <>
+            <button 
+              onClick={prevSlide} 
+              className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full z-20 transition-all"
+              aria-label="Previous image"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button 
+              onClick={nextSlide} 
+              className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full z-20 transition-all"
+              aria-label="Next image"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </>
+        )}
+        
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
         <div className="absolute inset-0 flex flex-col justify-end p-8">
           <div className="container mx-auto">
@@ -201,6 +256,22 @@ export default function DestinationsPage() {
             <p className="text-white/80 text-lg max-w-2xl">
               Explore these amazing places during your stay at {homestay?.homeStayName}
             </p>
+            
+            {/* Indicator dots */}
+            {destinations.length > 1 && (
+              <div className="flex mt-4 gap-2">
+                {destinations.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentSlide(index)}
+                    className={`w-2.5 h-2.5 rounded-full transition-all ${
+                      index === currentSlide ? "bg-white scale-110" : "bg-white/50"
+                    }`}
+                    aria-label={`Go to slide ${index + 1}`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
