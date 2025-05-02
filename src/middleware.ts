@@ -353,7 +353,7 @@ export async function middleware(request: NextRequest) {
 // --- Matcher Configuration --- 
 export const config = {
   matcher: [
-    // Match all paths except _next, static assets, and seed-superadmin
-    '/((?!_next|static|images|favicon.ico|api/seed-superadmin|api/reset-web-content|api/reset).*)',
+    // Exclude API routes, especially seed-superadmin
+    '/((?!api|_next|static|images|favicon.ico).*)',
   ],
 }; 

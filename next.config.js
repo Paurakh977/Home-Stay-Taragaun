@@ -1,8 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   /* config options here */
-  // Add trailing slash to improve static asset loading
-  trailingSlash: true,
+  // Ensure images work
   images: {
     remotePatterns: [
       {
@@ -37,11 +36,14 @@ const nextConfig = {
   // External packages
   serverExternalPackages: [],
   
-  // Asset configuration for production
-  assetPrefix: process.env.NODE_ENV === 'production' ? './' : '',
+  // CRITICAL FIX FOR CSS LOADING
+  basePath: '',
   
-  // Use standalone for API routes to work
+  // Use standalone for API support
   output: 'standalone',
+  
+  // Disable using trailing slash
+  trailingSlash: false,
 };
 
 module.exports = nextConfig; 

@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "deploy-prep": "rm -rf .next && next build"
+    "deploy-prep": "rm -rf .next && next build",
+    "export": "next build && next export"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
