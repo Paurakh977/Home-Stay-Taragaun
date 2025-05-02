@@ -122,8 +122,22 @@ function createRedirectResponse(request: NextRequest, redirectTo: string, cookie
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Debug for seed-superadmin path
+  if (pathname === '/api/seed-superadmin') {
+    console.log('Seed superadmin path detected, skipping middleware');
+    return NextResponse.next();
+  }
+
   // 1. Skip Middleware for Assets and specific public paths
-  if (ASSET_REGEX.test(pathname) || pathname === SEED_API_PATH) {
+  if (
+    ASSET_REGEX.test(pathname) || 
+    pathname === SEED_API_PATH || 
+    pathname.startsWith('/_next/') || 
+    pathname.includes('.js') || 
+    pathname.includes('.css') || 
+    pathname.includes('.png') || 
+    pathname.includes('.ico')
+  ) {
     return NextResponse.next();
   }
   
@@ -339,12 +353,7 @@ export async function middleware(request: NextRequest) {
 // --- Matcher Configuration --- 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones matching the ASSET_REGEX.
-     * This simplified matcher relies on the internal logic to skip assets early.
-     */
-    '/((?!_next/static|_next/image|static/|images/|favicon.ico|.*\.(?:png|jpg|jpeg|gif|svg|webp)).*)',
-    // Ensure API routes are included for processing
-    '/api/:path*',
+    // Match all paths except _next, static assets, and seed-superadmin
+    '/((?!_next|static|images|favicon.ico|api/seed-superadmin|api/reset-web-content|api/reset).*)',
   ],
 }; 
