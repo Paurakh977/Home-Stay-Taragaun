@@ -78,6 +78,7 @@ const menuItems: MenuSection[] = [
 const userManagementItems: MenuItem[] = [
   { href: '/superadmin/dashboard/users', label: 'All Users', icon: Users, badge: 'New', badgeColor: 'bg-primary' },
   { href: '/superadmin/dashboard/users/create', label: 'Create New User', icon: UserPlus },
+  { href: '/superadmin/dashboard/users/officers', label: 'Manage Officers', icon: Shield, badge: 'New', badgeColor: 'bg-amber-500' },
   { href: '/superadmin/dashboard/users/roles', label: 'Roles', icon: Shield },
   { href: '/superadmin/dashboard/users/permissions', label: 'Permissions', icon: Key },
 ];
