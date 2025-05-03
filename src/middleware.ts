@@ -59,6 +59,9 @@ const ADMIN_DELETE_PATH = /^\/admin\/homestays\/[^\/]+\/delete/;
 const ADMIN_DOCUMENT_PATH = /^\/admin\/homestays\/[^\/]+\/documents/;
 const ADMIN_IMAGE_PATH = /^\/admin\/homestays\/[^\/]+\/images/;
 
+// Direct uploads path regex for redirection
+const UPLOADS_PATH_REGEX = /^\/uploads\/(.*)/;
+
 // Define permission types for type safety
 interface AdminPermissions {
   adminDashboardAccess?: boolean;
@@ -126,6 +129,28 @@ export async function middleware(request: NextRequest) {
   if (pathname === '/api/seed-superadmin') {
     console.log('Seed superadmin path detected, skipping middleware');
     return NextResponse.next();
+  }
+
+  // Special handler for direct uploads paths - redirect to API route
+  // This is critical to ensure direct image access works
+  const uploadsMatch = pathname.match(UPLOADS_PATH_REGEX);
+  if (uploadsMatch) {
+    const imagePath = uploadsMatch[1];
+    const url = request.nextUrl.clone();
+    url.pathname = `/api/images/${imagePath}`;
+    // Preserve any query parameters
+    request.nextUrl.searchParams.forEach((value, key) => {
+      url.searchParams.set(key, value);
+    });
+    console.log(`🔄 Redirecting direct upload path: ${pathname} -> ${url.pathname}`);
+    return NextResponse.redirect(url);
+  }
+
+  // Direct image file access - add cache control headers
+  if (pathname.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) {
+    const response = NextResponse.next();
+    response.headers.set('Cache-Control', 'no-store, max-age=0');
+    return response;
   }
 
   // 1. Skip Middleware for Assets and specific public paths

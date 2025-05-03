@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Search, Star, Home as HomeIcon, Users, Shield, MapPin, Quote } from "lucide-react";
 import { useWebContent } from "@/context/WebContentContext";
+import { getImageUrl, shouldUseUnoptimizedImage } from "@/lib/imageUtils";
 
 // Helper function to get the correct icon component
 const getIcon = (iconName: string) => {
@@ -186,11 +187,12 @@ export default function Home() {
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <Image
-            src={homeContent.hero.backgroundImage}
+            src={getImageUrl(homeContent.hero.backgroundImage)}
             alt="Beautiful Himalayan view with traditional Nepali homestay"
             fill
             priority
             className="object-cover brightness-[0.7]"
+            unoptimized={shouldUseUnoptimizedImage(homeContent.hero.backgroundImage) || false}
           />
         </div>
         
@@ -284,10 +286,11 @@ export default function Home() {
               <div key={index} className="group rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-gray-100">
                 <div className="relative h-72 w-full">
                   <Image
-                    src={destination.imagePath}
+                    src={getImageUrl(destination.imagePath)}
                     alt={destination.name}
                     fill
                     className="object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out"
+                    unoptimized={shouldUseUnoptimizedImage(destination.imagePath) || false}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
                   <div className="absolute bottom-5 left-5 text-white">
@@ -348,10 +351,11 @@ export default function Home() {
             
             <div className="relative h-96 lg:h-[600px] rounded-2xl overflow-hidden shadow-md">
               <Image
-                src={homeContent.join.backgroundImage}
+                src={getImageUrl(homeContent.join.backgroundImage)}
                 alt="Homestay owner welcoming guests"
                 fill
                 className="object-cover"
+                unoptimized={shouldUseUnoptimizedImage(homeContent.join.backgroundImage) || false}
               />
               <div className="absolute inset-0 bg-gradient-to-r from-gray-900/80 to-transparent"></div>
             </div>
@@ -378,12 +382,14 @@ export default function Home() {
                   <p className="text-gray-600 italic leading-relaxed">"{testimonial.quote}"</p>
                 </div>
                 <div className="flex items-center mt-4">
-                  <div className="relative h-14 w-14 rounded-full overflow-hidden mr-4 border-2 border-white shadow-sm">
+                  <div className="w-12 h-12 rounded-full overflow-hidden mr-4 flex-shrink-0">
                     <Image
-                      src={testimonial.photoPath}
+                      src={getImageUrl(testimonial.photoPath)}
                       alt={testimonial.name}
-                      fill
-                      className="object-cover"
+                      width={48}
+                      height={48}
+                      className="object-cover w-full h-full"
+                      unoptimized={shouldUseUnoptimizedImage(testimonial.photoPath) || false}
                     />
                   </div>
                   <div>
@@ -400,11 +406,12 @@ export default function Home() {
       {/* CTA Section */}
       <section className="py-20 bg-gray-900 relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
-          <Image 
-            src={homeContent.cta.backgroundImage}
+          <Image
+            src={getImageUrl(homeContent.cta.backgroundImage)}
             alt="Nepal background"
             fill
-            className="object-cover"
+            className="object-cover brightness-50"
+            unoptimized={shouldUseUnoptimizedImage(homeContent.cta.backgroundImage) || false}
           />
         </div>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">

@@ -5,12 +5,13 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, Check, FileText, Globe, Home, Info, Layout, Users, X } from "lucide-react";
+import { AlertCircle, Check, FileText, Globe, Home, Info, Layout, Users, X, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { IWebContent } from '@/lib/models';
 import Image from "next/image";
 import { toast } from "sonner";
+import { getImageUrl, shouldUseUnoptimizedImage, updateImageCacheBuster } from '@/lib/imageUtils';
 
 export default function ContentManagementPage() {
   const [content, setContent] = useState<IWebContent | null>(null);
@@ -18,27 +19,49 @@ export default function ContentManagementPage() {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [resetLoading, setResetLoading] = useState<boolean>(false);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [timestamp, setTimestamp] = useState<number>(Date.now());
 
-  useEffect(() => {
-    const fetchContent = async () => {
-      try {
-        const response = await fetch('/api/web-content?adminUsername=main');
-        if (!response.ok) {
-          throw new Error('Failed to fetch content');
+  const fetchContent = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/web-content?adminUsername=main&t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
         }
-        const data = await response.json();
-        setContent(data);
-        setLastUpdated(new Date(data.updatedAt).toLocaleString());
-      } catch (err) {
-        console.error('Error fetching content:', err);
-        setError('Failed to load website content');
-      } finally {
-        setLoading(false);
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch content');
       }
-    };
+      
+      const data = await response.json();
+      setContent(data);
+      setLastUpdated(new Date(data.updatedAt).toLocaleString());
+    } catch (err) {
+      console.error('Error fetching content:', err);
+      setError('Failed to load website content');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // Initial data load
+  useEffect(() => {
     fetchContent();
-  }, []);
+  }, [timestamp]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    // Update the cache buster to ensure fresh images
+    updateImageCacheBuster();
+    // Trigger a refresh by updating the timestamp
+    setTimestamp(Date.now());
+    toast.success('Content refreshed successfully');
+    setTimeout(() => setRefreshing(false), 1000);
+  };
 
   const handleReset = async () => {
     if (confirm('Are you sure you want to reset all content to defaults? This action cannot be undone.')) {
@@ -46,6 +69,10 @@ export default function ContentManagementPage() {
         setResetLoading(true);
         const response = await fetch('/api/reset-web-content?adminUsername=main', {
           method: 'POST',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          }
         });
         
         if (!response.ok) {
@@ -55,6 +82,10 @@ export default function ContentManagementPage() {
         const data = await response.json();
         setContent(data.content);
         setLastUpdated(new Date(data.content.updatedAt).toLocaleString());
+        
+        // Update the cache buster to ensure fresh images
+        updateImageCacheBuster();
+        
         toast.success('Content has been reset to defaults successfully');
       } catch (err) {
         console.error('Error resetting content:', err);
@@ -90,17 +121,31 @@ export default function ContentManagementPage() {
     </div>
   );
 
-  if (loading) {
+  if (loading && !content) {
     return <div className="flex items-center justify-center h-64">Loading content dashboard...</div>;
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight">Content Management</h2>
-        <p className="text-muted-foreground text-sm mt-1">
-          Manage the content displayed on your website. Last updated: {lastUpdated || 'Never'}
-        </p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">Content Management</h2>
+          <p className="text-muted-foreground text-sm mt-1">
+            Manage the content displayed on your website. Last updated: {lastUpdated || 'Never'}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh} 
+            disabled={refreshing}
+            title="Refresh content and clear caches"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
       
       {error && (
@@ -131,11 +176,12 @@ export default function ContentManagementPage() {
                 <div className="relative h-8 w-8 overflow-hidden rounded-md border bg-muted">
                   {content.siteInfo.logoPath && (
                     <Image 
-                      src={content.siteInfo.logoPath} 
+                      src={getImageUrl(content.siteInfo.logoPath)} 
                       alt="Logo" 
                       width={32} 
                       height={32} 
                       className="object-contain"
+                      unoptimized={true}
                     />
                   )}
                 </div>
@@ -285,7 +331,7 @@ export default function ContentManagementPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <StatusBadge configured={content?.testimonials && content.testimonials.length > 0} />
+            <StatusBadge configured={content?.testimonials && content.testimonials.length > 0 ? true : false} />
             
             {content?.testimonials && content.testimonials.length > 0 && (
               <div className="mt-3">

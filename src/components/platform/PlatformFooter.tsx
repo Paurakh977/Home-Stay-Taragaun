@@ -4,9 +4,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { Facebook, Instagram, Twitter, Mail, Phone, MapPin } from "lucide-react";
 import { useWebContent } from "@/context/WebContentContext";
+import { getImageUrl, shouldUseUnoptimizedImage } from "@/lib/imageUtils";
 
 const PlatformFooter = () => {
-  const { content, loading } = useWebContent();
+  const { content, loading, refreshContent } = useWebContent();
   
   // Get footer data from content or use default
   const footerData = loading || !content?.footer
@@ -54,6 +55,10 @@ const PlatformFooter = () => {
       }
     : content.siteInfo;
   
+  // Get the logo URL with cache busting
+  const logoUrl = getImageUrl(siteInfo.logoPath);
+  const useUnoptimized = shouldUseUnoptimizedImage(siteInfo.logoPath);
+  
   // Sort links by order
   const quickLinks = footerData.quickLinks.sort((a: any, b: any) => a.order - b.order);
   const hostLinks = footerData.hostLinks.sort((a: any, b: any) => a.order - b.order);
@@ -83,11 +88,12 @@ const PlatformFooter = () => {
             <div className="flex items-center">
               <div className="relative h-12 w-12 mr-3 overflow-hidden rounded-full bg-white shadow-sm">
                 <Image 
-                  src={siteInfo.logoPath} 
+                  src={logoUrl} 
                   alt={siteInfo.siteName} 
                   width={48}
                   height={48}
                   className="object-contain"
+                  unoptimized={useUnoptimized}
                 />
               </div>
               <span className="text-xl font-bold">{siteInfo.siteName}</span>
