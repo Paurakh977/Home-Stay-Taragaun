@@ -1,0 +1,449 @@
+
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Roboto', Arial, sans-serif;
+    color: #202124;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+#map {
+    flex: 1;
+    width: 100%;
+    z-index: 1;
+}
+
+/* Google Maps style search bar */
+.search-container {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    z-index: 1000;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.search-box {
+    width: 100%;
+    height: 48px;
+    padding: 0 12px 0 48px;
+    background-color: white;
+    border: none;
+    border-radius: 24px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    font-size: 16px;
+    box-sizing: border-box;
+    outline: none;
+}
+
+.search-icon {
+    position: absolute;
+    left: 16px;
+    top: 12px;
+    color: #5F6368;
+}
+
+/* Map type control */
+.map-type-control {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1000;
+    background-color: white;
+    border-radius: 4px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    overflow: hidden;
+}
+
+.map-type-control select {
+    padding: 8px 12px;
+    border: none;
+    font-size: 14px;
+    font-family: 'Roboto', Arial, sans-serif;
+    appearance: none;
+    background-color: white;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24'%3E%3Cpath fill='%23202124' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 28px;
+    cursor: pointer;
+}
+
+.map-type-control select:focus {
+    outline: none;
+}
+
+/* Bottom Panel */
+.bottom-panel {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    z-index: 1000;
+    padding: 12px;
+    transition: transform 0.3s ease;
+    max-height: 40%;
+    overflow-y: auto;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.panel-header h3 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.coordinates-display {
+    font-size: 14px;
+    font-weight: 400;
+    color: #202124;
+    margin-bottom: 8px;
+}
+
+.coordinates-value {
+    font-weight: 500;
+    color: #1A73E8;
+}
+
+.action-button {
+    background-color: #1A73E8;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.action-button:hover {
+    background-color: #1765cc;
+}
+
+/* Action buttons container */
+.action-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.google-maps-button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    display: flex;
+    align-items: center;
+}
+
+.google-maps-button i {
+    margin-right: 6px;
+}
+
+.google-maps-button:hover {
+    background-color: #45a049;
+}
+
+/* Leaflet Custom Styling */
+.leaflet-control-zoom {
+    border: none !important;
+    margin: 15px !important;
+}
+
+.leaflet-control-zoom a {
+    border-radius: 50% !important;
+    width: 40px !important;
+    height: 40px !important;
+    line-height: 40px !important;
+    background-color: white !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
+    font-size: 18px !important;
+    font-weight: bold !important;
+}
+
+.leaflet-control-attribution {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+    padding: 3px 8px !important;
+    font-size: 11px !important;
+}
+
+/* Hide the geosearch control - we'll use our custom search */
+.leaflet-control-geosearch {
+    display: none !important;
+}
+
+/* Result Page */
+#page2 {
+    display: none;
+    height: 100vh;
+    width: 100%;
+    background-color: white;
+}
+
+.location-details {
+    padding: 20px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.location-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.back-button {
+    background: none;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 16px;
+    cursor: pointer;
+}
+
+.back-button:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.location-title {
+    font-size: 22px;
+    font-weight: 500;
+    margin: 0;
+}
+
+.coordinates-card {
+    background-color: #F8F9FA;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 24px;
+}
+
+.coordinates-label {
+    font-size: 14px;
+    color: #5F6368;
+    margin-bottom: 8px;
+}
+
+.coordinates-text {
+    font-size: 16px;
+    color: #202124;
+    font-weight: 500;
+}
+
+#resultMap {
+    height: 300px;
+    width: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 24px;
+}
+
+.share-button {
+    width: 100%;
+    background-color: #1A73E8;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+}
+
+.share-button i {
+    margin-right: 8px;
+}
+
+.share-button:hover {
+    background-color: #1765cc;
+}
+
+/* Custom marker style */
+.marker-pin {
+    width: 30px;
+    height: 30px;
+    border-radius: 50% 50% 50% 0;
+    background-color: #1A73E8;
+    transform: rotate(-45deg);
+    position: relative;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    margin: -15px 0 0 -15px;
+}
+
+.marker-pin::after {
+    content: '';
+    width: 14px;
+    height: 14px;
+    position: absolute;
+    background-color: #fff;
+    border-radius: 50%;
+    top: 8px;
+    left: 8px;
+}
+
+/* Suggestions dropdown */
+.suggestions-container {
+    position: absolute;
+    top: 58px;
+    left: 0;
+    right: 0;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    z-index: 2000;
+    max-height: 300px;
+    overflow-y: auto;
+    display: none;
+}
+
+.suggestion-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+.suggestion-item:hover {
+    background-color: #F8F9FA;
+}
+
+.suggestion-item i {
+    margin-right: 12px;
+    color: #5F6368;
+}
+
+.suggestion-text {
+    font-size: 14px;
+    color: #202124;
+}
+
+/* Loading indicator */
+.loading-container {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1500;
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    text-align: center;
+}
+
+.spinner {
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border-left-color: #1A73E8;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 12px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Location info */
+.location-info {
+    margin-top: 8px;
+    margin-bottom: 8px;
+    background-color: #F8F9FA;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+.info-row {
+    margin-bottom: 4px;
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.info-label {
+    font-size: 12px;
+    color: #5F6368;
+    margin-right: 4px;
+    font-weight: 500;
+}
+
+.info-value {
+    font-size: 12px;
+    color: #202124;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Measurement tools */
+.measurement-control {
+    position: absolute;
+    top: 70px;
+    right: 10px;
+    z-index: 1000;
+    background-color: white;
+    border-radius: 4px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    overflow: hidden;
+}
+
+.measure-button {
+    padding: 8px 12px;
+    border: none;
+    background-color: white;
+    font-size: 14px;
+    font-family: 'Roboto', Arial, sans-serif;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+.measure-button i {
+    margin-right: 8px;
+}
+
+.measure-button:hover {
+    background-color: #F8F9FA;
+}
+
+.measure-tooltip {
+    position: absolute;
+    background-color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    font-size: 12px;
+    z-index: 1500;
+    pointer-events: none;
+}
