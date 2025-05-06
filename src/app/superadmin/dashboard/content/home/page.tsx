@@ -1172,9 +1172,9 @@ export default function HomePageEditor() {
                         name="cta.secondaryButton.link"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Button Link</FormLabel>
+                            <FormLabel>Secondary Button Link</FormLabel>
                             <FormControl>
-                              <Input placeholder="/register" {...field} />
+                              <Input placeholder="/contact" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>

@@ -150,7 +150,7 @@ export default function Home() {
           },
           secondaryButton: {
             text: "List Your Property",
-            link: "/register"
+            link: "/contact"
           }
         }
       }
@@ -341,7 +341,7 @@ export default function Home() {
                 ))}
               </div>
               
-              <Link href="/register">
+              <Link href="/contact">
                 <button className="bg-white text-gray-900 hover:bg-gray-100 px-6 py-3 rounded-lg font-medium transition-all inline-flex items-center">
                   Register Your Homestay
                   <ArrowRight className="ml-2 h-4 w-4" />

@@ -146,7 +146,7 @@ export default function About() {
       },
       secondaryButton: {
         text: "List Your Property",
-        link: "/register"
+        link: "/contact"
       }
     }
   };

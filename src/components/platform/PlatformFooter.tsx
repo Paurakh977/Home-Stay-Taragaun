@@ -18,7 +18,7 @@ const PlatformFooter = () => {
           { name: "About Us", path: "/about", order: 2 },
           { name: "Explore Homestays", path: "/homestays", order: 3 },
           { name: "Contact Us", path: "/contact", order: 4 },
-          { name: "List Your Property", path: "/register", order: 5 }
+          { name: "List Your Property", path: "/contact", order: 5 }
         ],
         hostLinks: [
           { name: "Register Your Homestay", path: "/register", order: 1 },
