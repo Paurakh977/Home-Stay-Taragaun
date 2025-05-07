@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Filter, X, MapPin, ArrowRight, Home } from 'lucide-react';
+import { Search, Filter, X, MapPin, ArrowRight, Home, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Add province translations
@@ -114,6 +114,11 @@ export default function AdminHomestayClient({
 
   // State to store user permissions
   const [userPermissions, setUserPermissions] = useState<UserPermissions | null>(null);
+
+  // State for delete confirmation modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingHomestayId, setDeletingHomestayId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Check authentication and fetch user data
   useEffect(() => {
@@ -457,34 +462,7 @@ export default function AdminHomestayClient({
     }
     
     // Otherwise use standard admin routes
-    // Determine if we should use the admin username route
-    const getCurrentAdmin = async () => {
-      try {
-        if (propUsername) {
-          router.push(`/admin/${propUsername}/homestays/${homestayId}`);
-          return;
-        }
-        
-        const response = await fetch('/api/admin/auth/me');
-        if (response.ok) {
-          const data = await response.json();
-          const username = data.user?.username;
-          
-          if (username) {
-            router.push(`/admin/${username}/homestays/${homestayId}`);
-          } else {
-            router.push(`/admin/homestays/${homestayId}`);
-          }
-        } else {
-          router.push(`/admin/homestays/${homestayId}`);
-        }
-      } catch (error) {
-        console.error('Error getting current admin:', error);
-        router.push(`/admin/homestays/${homestayId}`);
-      }
-    };
-    
-    getCurrentAdmin();
+    navigateToHomestayDetail(homestayId);
   };
 
   // Clear all filters
@@ -607,50 +585,131 @@ export default function AdminHomestayClient({
     getCurrentAdmin();
   };
   
-  // Handle delete functionality
-  const handleDelete = async (homestayId: string) => {
-    // Check for delete permission before allowing
+  // Open delete modal with homestay ID
+  const openDeleteModal = (homestayId: string) => {
     if (!hasPermission('homestayDelete')) {
       toast.error("You don't have permission to delete homestays");
       return;
     }
     
-    // Delete logic would go here
-    toast.success("Delete functionality would be implemented here");
+    setDeletingHomestayId(homestayId);
+    setShowDeleteModal(true);
   };
   
-  // Handle document upload
-  const handleDocumentUpload = (homestayId: string) => {
+  // Close delete modal
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setDeletingHomestayId(null);
+  };
+  
+  // Handle delete functionality
+  const handleDelete = async () => {
+    if (!deletingHomestayId) return;
+    
+    setIsDeleting(true);
+    toast.info("Deleting homestay...");
+    
+    try {
+      // Call the delete API endpoint
+      const response = await fetch(`/api/admin/homestays/${deletingHomestayId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete homestay");
+      }
+      
+      const result = await response.json();
+      
+      // Update state to remove deleted homestay
+      setHomestays(homestays.filter(h => h.homestayId !== deletingHomestayId));
+      setFilteredHomestays(filteredHomestays.filter(h => h.homestayId !== deletingHomestayId));
+      
+      toast.success(result.message || "Homestay deleted successfully");
+      closeDeleteModal();
+    } catch (error) {
+      console.error("Error deleting homestay:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to delete homestay");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+  
+  // Handle document upload - redirect to homestay detail page
+  const handleDocumentUpload = (homestayId: string, e: React.MouseEvent) => {
+    // Prevent the card click event from triggering
+    e.stopPropagation();
+    
     // Check for document upload permission before allowing
     if (!hasPermission('documentUpload')) {
       toast.error("You don't have permission to upload documents");
       return;
     }
     
-    // Document upload logic would go here
-    toast.success("Document upload functionality would be implemented here");
+    // Redirect to homestay detail page
+    navigateToHomestayDetail(homestayId);
   };
   
-  // Handle image upload
-  const handleImageUpload = (homestayId: string) => {
+  // Handle image upload - redirect to homestay detail page
+  const handleImageUpload = (homestayId: string, e: React.MouseEvent) => {
+    // Prevent the card click event from triggering
+    e.stopPropagation();
+    
     // Check for image upload permission before allowing
     if (!hasPermission('imageUpload')) {
       toast.error("You don't have permission to upload images");
       return;
     }
     
-    // Image upload logic would go here
-    toast.success("Image upload functionality would be implemented here");
+    // Redirect to homestay detail page
+    navigateToHomestayDetail(homestayId);
+  };
+  
+  // Common function to navigate to homestay detail page
+  const navigateToHomestayDetail = (homestayId: string) => {
+    // If we have the username from props, use it directly
+    if (propUsername) {
+      router.push(`/admin/${propUsername}/homestays/${homestayId}`);
+      return;
+    }
+    
+    // Otherwise get from current admin session
+    const getCurrentAdmin = async () => {
+      try {
+        const response = await fetch('/api/admin/auth/me');
+        if (!response.ok) {
+          toast.error("Authentication failed");
+          return;
+        }
+        
+        const data = await response.json();
+        if (data.success && data.user) {
+          const currentAdminUsername = data.user.username;
+          router.push(`/admin/${currentAdminUsername}/homestays/${homestayId}`);
+        } else {
+          toast.error("Failed to retrieve admin details");
+        }
+      } catch (error) {
+        console.error("Error checking admin permissions:", error);
+        toast.error("Failed to verify permissions");
+      }
+    };
+    
+    getCurrentAdmin();
   };
 
   // Render action buttons with permission checks
   const renderActionButtons = (homestay: Homestay) => (
-    <div className="flex space-x-2">
+    <div className="flex space-x-2" onClick={(e) => e.stopPropagation()}>
       {hasPermission('homestayEdit') && (
         <button 
-          onClick={() => handleEdit(homestay.homestayId)}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleEdit(homestay.homestayId);
+          }}
           className="p-1 text-blue-600 hover:text-blue-800"
-          title="Edit homestay"
+          title="Edit homestay details"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -660,7 +719,10 @@ export default function AdminHomestayClient({
       
       {hasPermission('homestayDelete') && (
         <button 
-          onClick={() => handleDelete(homestay.homestayId)}
+          onClick={(e) => {
+            e.stopPropagation();
+            openDeleteModal(homestay.homestayId);
+          }}
           className="p-1 text-red-600 hover:text-red-800"
           title="Delete homestay"
         >
@@ -672,7 +734,7 @@ export default function AdminHomestayClient({
       
       {hasPermission('documentUpload') && (
         <button 
-          onClick={() => handleDocumentUpload(homestay.homestayId)}
+          onClick={(e) => handleDocumentUpload(homestay.homestayId, e)}
           className="p-1 text-green-600 hover:text-green-800"
           title="Upload documents"
         >
@@ -684,7 +746,7 @@ export default function AdminHomestayClient({
       
       {hasPermission('imageUpload') && (
         <button 
-          onClick={() => handleImageUpload(homestay.homestayId)}
+          onClick={(e) => handleImageUpload(homestay.homestayId, e)}
           className="p-1 text-purple-600 hover:text-purple-800"
           title="Upload images"
         >
@@ -958,6 +1020,38 @@ export default function AdminHomestayClient({
           >
             Clear All Filters
           </button>
+        </div>
+      )}
+      
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black bg-opacity-50" onClick={closeDeleteModal}></div>
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full z-10 mx-4">
+            <div className="flex items-center mb-4 text-red-600">
+              <AlertTriangle className="h-6 w-6 mr-2" />
+              <h3 className="text-lg font-semibold">Confirm Deletion</h3>
+            </div>
+            <p className="mb-6 text-gray-700">
+              Are you sure you want to delete this homestay? This action cannot be undone and will delete all related data including images and documents.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button 
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-none"
+                onClick={closeDeleteModal}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button 
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none"
+                onClick={handleDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

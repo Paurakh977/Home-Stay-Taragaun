@@ -183,16 +183,6 @@ export default function AdminLoginForm({ adminUsername }: AdminLoginFormProps) {
             </form>
           </div>
         </div>
-        
-        {/* Back link */}
-        <div className="text-center mt-6">
-          <Link 
-            href="/admin/login"
-            className="text-sm text-gray-600 hover:text-primary transition-colors"
-          >
-            एडमिन लगइन पृष्ठमा फर्कनुहोस्
-          </Link>
-        </div>
       </div>
     </div>
   );

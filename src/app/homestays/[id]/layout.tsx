@@ -139,7 +139,7 @@ export default function HomestayLayout({
                     {homestay?.homeStayName?.charAt(0) || 'H'}
                   </div>
                 )}
-                <span className="text-primary font-medium truncate max-w-[200px]">
+                <span className="text-primary font-medium">
                   {loading ? 'Loading...' : homestay?.homeStayName || 'Hamro Homestay'}
                 </span>
               </Link>
