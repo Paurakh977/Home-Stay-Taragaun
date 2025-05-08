@@ -7,6 +7,7 @@ import ScrollPopup from "@/components/ui/ScrollPopup";
 import { User } from "@/lib/models";
 import dbConnect from "@/lib/mongodb";
 
+// Configure the page to use dynamic rendering
 export const dynamic = 'force-dynamic';
 
 // This function generates the metadata for the page

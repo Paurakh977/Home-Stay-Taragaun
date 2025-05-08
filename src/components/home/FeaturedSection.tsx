@@ -1,40 +1,52 @@
+'use client';
+
 import Image from "next/image";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useBranding } from "@/context/BrandingContext";
 
 interface FeaturedSectionProps {
   adminUsername?: string;
 }
 
-const features = [
+// Default features as fallback if no data from context
+const defaultFeatures = [
   {
     icon: "🏠",
     title: "Authentic Local Experience",
     description: "Stay with local families and experience authentic Nepali hospitality and culture.",
-    image: "https://images.unsplash.com/photo-1599619351208-3e6c839d6828?q=80&w=600&auto=format&fit=crop"
+    imagePath: "/images/features/feature-1.jpg"
   },
   {
     icon: "🍽️",
     title: "Traditional Cuisine",
     description: "Enjoy homemade Nepali dishes prepared with locally sourced organic ingredients.",
-    image: "https://images.unsplash.com/photo-1565557623262-b51c2513a641?q=80&w=600&auto=format&fit=crop"
+    imagePath: "/images/features/feature-2.jpg"
   },
   {
     icon: "🌿",
     title: "Scenic Locations",
     description: "Our home stays are situated in beautiful locations with stunning mountain views.",
-    image: "https://images.unsplash.com/photo-1544735716-392fe2489ffa?q=80&w=600&auto=format&fit=crop"
+    imagePath: "/images/features/feature-3.jpg"
   },
   {
     icon: "🧳",
     title: "Personalized Service",
     description: "Each home stay offers personalized service to make your stay comfortable and memorable.",
-    image: "https://images.unsplash.com/photo-1578683010236-d716f9a3f461?q=80&w=600&auto=format&fit=crop"
+    imagePath: "/images/features/feature-4.jpg"
   }
 ];
 
 const FeaturedSection = ({ adminUsername }: FeaturedSectionProps) => {
+  // Get branding data from context
+  const branding = useBranding();
+  
+  // Use features from branding if available, otherwise use defaults
+  const features = branding?.featuredSection?.features?.length ? 
+    branding.featuredSection.features : 
+    defaultFeatures;
+  
   return (
     <section className="py-16 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -50,8 +62,8 @@ const FeaturedSection = ({ adminUsername }: FeaturedSectionProps) => {
             <Card key={index} className="overflow-hidden border border-gray-200 hover:shadow-lg transition-shadow">
               <div className="relative h-48 w-full">
                 <Image
-                  src={feature.image}
-                  alt={feature.title}
+                  src={feature.imagePath || `/images/features/feature-${index+1}.jpg`}
+                  alt={feature.title || `Feature ${index+1}`}
                   fill
                   className="object-cover"
                   sizes="(max-width: 768px) 100vw, 300px"
@@ -59,12 +71,12 @@ const FeaturedSection = ({ adminUsername }: FeaturedSectionProps) => {
               </div>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-xl">
-                  <span className="text-2xl">{feature.icon}</span> {feature.title}
+                  <span className="text-2xl">{feature.icon || '🏠'}</span> {feature.title || `Feature ${index+1}`}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <CardDescription className="text-gray-600 text-base">
-                  {feature.description}
+                  {feature.description || 'Experience the best of Nepali hospitality with our carefully selected home stays.'}
                 </CardDescription>
               </CardContent>
             </Card>

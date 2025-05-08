@@ -64,6 +64,8 @@ export async function POST(request: NextRequest) {
     const logoDir = path.join(uploadDir, 'logo');
     const sliderDir = path.join(uploadDir, 'slider');
     const teamDir = path.join(uploadDir, 'team');
+    const featuresDir = path.join(uploadDir, 'features');
+    const testimonialsDir = path.join(uploadDir, 'testimonials');
     
     if (!existsSync(uploadDir)) {
       await mkdir(uploadDir, { recursive: true });
@@ -80,6 +82,14 @@ export async function POST(request: NextRequest) {
     if (!existsSync(teamDir)) {
       await mkdir(teamDir, { recursive: true });
       console.log(`Created directory: ${teamDir}`);
+    }
+    if (!existsSync(featuresDir)) {
+      await mkdir(featuresDir, { recursive: true });
+      console.log(`Created directory: ${featuresDir}`);
+    }
+    if (!existsSync(testimonialsDir)) {
+      await mkdir(testimonialsDir, { recursive: true });
+      console.log(`Created directory: ${testimonialsDir}`);
     }
     
     // Prepare response paths object
