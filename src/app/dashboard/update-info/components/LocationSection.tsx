@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
+// Using explicit relative path to fix module resolution
+import MapSectionSelector from "../components/MapSectionSelector";
 
 // Define bilingual field structure to match database schema
 interface BilingualField {
@@ -13,6 +15,16 @@ interface LocationFormData {
   ward: BilingualField;
   city: string;
   tole: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+// Define the location object type for map
+interface MapLocation {
+  latitude: number;
+  longitude: number;
+  address?: string;
+  district?: string;
 }
 
 interface LocationSectionProps {
@@ -403,6 +415,27 @@ const LocationSection: React.FC<LocationSectionProps> = ({
             />
           </div>
         </div>
+
+        {/* Map Location Selector */}
+        <div className="mt-8 pt-5 border-t border-gray-200">
+          <h4 className="text-base font-medium text-gray-900 mb-3">Homestay Map Location</h4>
+          <p className="text-sm text-gray-500 mb-4">
+            Select the exact location of your homestay on the map
+          </p>
+          
+          <MapSectionSelector 
+            value={{
+              latitude: formData.latitude,
+              longitude: formData.longitude,
+            }}
+            onChange={(location: MapLocation) => {
+              updateFormData({
+                latitude: location.latitude,
+                longitude: location.longitude
+              });
+            }}
+          />
+        </div>
       </div>
     );
   }
@@ -461,6 +494,16 @@ const LocationSection: React.FC<LocationSectionProps> = ({
           <h4 className="text-sm font-medium text-gray-500">Tole</h4>
           <p className="mt-1 text-base">{formData.tole}</p>
         </div>
+
+        {/* Display map coordinates if available */}
+        {(formData.latitude || formData.longitude) && (
+          <div>
+            <h4 className="text-sm font-medium text-gray-500">Map Coordinates</h4>
+            <p className="mt-1 text-base">
+              {formData.latitude}, {formData.longitude}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

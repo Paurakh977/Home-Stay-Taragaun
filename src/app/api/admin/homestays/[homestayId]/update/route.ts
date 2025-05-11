@@ -39,7 +39,8 @@ export async function PUT(request: NextRequest, context: ParamsContext) {
     // Process basic fields
     const basicFields = [
       'homeStayName', 'dhsrNo', 'villageName', 'homeStayType', 'description',
-      'homeCount', 'roomCount', 'bedCount', 'profileImage'
+      'homeCount', 'roomCount', 'bedCount', 'profileImage', 'latitude', 'longitude',
+      'directions'
     ];
     
     basicFields.forEach(field => {
@@ -91,16 +92,20 @@ export async function PUT(request: NextRequest, context: ParamsContext) {
       
       homestayUpdateData.address = updatedAddress;
       
-      // Also update Location collection if address was changed
-      if (addressFieldsChanged) {
+      // Also update Location collection if address was changed or coordinates were updated
+      if (addressFieldsChanged || body.latitude !== undefined || body.longitude !== undefined) {
         const locationUpdateData: any = {};
         
-        if (body.address.province) locationUpdateData.province = body.address.province;
-        if (body.address.district) locationUpdateData.district = body.address.district;
-        if (body.address.municipality) locationUpdateData.municipality = body.address.municipality;
-        if (body.address.ward) locationUpdateData.ward = body.address.ward;
-        if (body.address.city) locationUpdateData.city = body.address.city;
-        if (body.address.tole) locationUpdateData.tole = body.address.tole;
+        if (body.address?.province) locationUpdateData.province = body.address.province;
+        if (body.address?.district) locationUpdateData.district = body.address.district;
+        if (body.address?.municipality) locationUpdateData.municipality = body.address.municipality;
+        if (body.address?.ward) locationUpdateData.ward = body.address.ward;
+        if (body.address?.city) locationUpdateData.city = body.address.city;
+        if (body.address?.tole) locationUpdateData.tole = body.address.tole;
+        
+        // Update coordinates if provided
+        if (body.latitude !== undefined) locationUpdateData.latitude = body.latitude;
+        if (body.longitude !== undefined) locationUpdateData.longitude = body.longitude;
         
         // Find and update location record
         await Location.findOneAndUpdate(

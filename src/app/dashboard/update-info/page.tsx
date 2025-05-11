@@ -44,6 +44,8 @@ interface HomeStayData {
   status: string;
   createdAt: string;
   updatedAt: string;
+  latitude: number;
+  longitude: number;
 }
 
 interface ContactInfo {
@@ -120,7 +122,7 @@ export default function UpdateInfoPage({ adminUsername }: UpdateInfoPageProps) {
       setContacts(data.contacts || []);
       setOfficials(data.officials || []);
       
-      // Update edited data with current values
+      // Update edited data with current values - now including latitude/longitude
       setEditedData({
         homeStayName: data.homestay.homeStayName,
         villageName: data.homestay.villageName,
@@ -135,6 +137,8 @@ export default function UpdateInfoPage({ adminUsername }: UpdateInfoPageProps) {
         ward: data.homestay.address.ward,
         city: data.homestay.address.city,
         tole: data.homestay.address.tole,
+        latitude: data.homestay.latitude,
+        longitude: data.homestay.longitude,
         localAttractions: data.homestay.features?.localAttractions || [],
         tourismServices: data.homestay.features?.tourismServices || [],
         infrastructure: data.homestay.features?.infrastructure || [],
@@ -193,6 +197,15 @@ export default function UpdateInfoPage({ adminUsername }: UpdateInfoPageProps) {
       
       if (editedData.directions !== homeStay.directions) {
         updateData.directions = editedData.directions;
+      }
+
+      // Check if latitude/longitude have changed
+      if (editedData.latitude !== homeStay.latitude) {
+        updateData.latitude = editedData.latitude;
+      }
+      
+      if (editedData.longitude !== homeStay.longitude) {
+        updateData.longitude = editedData.longitude;
       }
       
       // Address fields - only include if they're different
@@ -275,6 +288,8 @@ export default function UpdateInfoPage({ adminUsername }: UpdateInfoPageProps) {
         ward: responseData.homestay.address.ward,
         city: responseData.homestay.address.city,
         tole: responseData.homestay.address.tole,
+        latitude: responseData.homestay.latitude,
+        longitude: responseData.homestay.longitude,
         localAttractions: responseData.homestay.features?.localAttractions || [],
         tourismServices: responseData.homestay.features?.tourismServices || [],
         infrastructure: responseData.homestay.features?.infrastructure || [],

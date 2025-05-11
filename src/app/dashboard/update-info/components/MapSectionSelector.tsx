@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Script from 'next/script';
 import MapTypeSelector from './MapTypeSelector';
 
-interface MapLocationSelectorProps {
+interface MapSectionSelectorProps {
   value: {
     latitude?: number;
     longitude?: number;
@@ -18,8 +17,6 @@ interface MapLocationSelectorProps {
     address?: string;
     district?: string;
   }) => void;
-  initialSearchQuery?: string | null;
-  autoSaveLocation?: boolean;
 }
 
 declare global {
@@ -38,18 +35,11 @@ declare global {
       currentLat: number | null;
       currentLng: number | null;
     };
-    mapSearchControl?: any; // Store search control separately
   }
 }
 
-const MapLocationSelector: React.FC<MapLocationSelectorProps> = ({ 
-  value, 
-  onChange, 
-  initialSearchQuery = null, 
-  autoSaveLocation = false 
-}) => {
+const MapSectionSelector: React.FC<MapSectionSelectorProps> = ({ value, onChange }) => {
   const mapRef = useRef<HTMLDivElement>(null);
-  const [mapReady, setMapReady] = useState(false);
   const [mapType, setMapType] = useState<string>('street');
   const [address, setAddress] = useState<string>(value.address || 'Finding location...');
   const [district, setDistrict] = useState<string>(value.district || 'Finding district...');
@@ -58,12 +48,10 @@ const MapLocationSelector: React.FC<MapLocationSelectorProps> = ({
   const [currentCoordinates, setCurrentCoordinates] = useState<{lat: number, lng: number} | null>(
     value.latitude && value.longitude ? {lat: value.latitude, lng: value.longitude} : null
   );
-  const [hasPerformedInitialSearch, setHasPerformedInitialSearch] = useState(false);
 
   // Create refs at the component level
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
-  const searchControlRef = useRef<any>(null);
 
   // Load Leaflet scripts when component mounts
   useEffect(() => {
@@ -177,7 +165,15 @@ const MapLocationSelector: React.FC<MapLocationSelectorProps> = ({
     const INITIAL_ZOOM = 7;
     
     // Initialize map with default view
-    const map = window.L.map(mapRef.current).setView(NEPAL_CENTER, INITIAL_ZOOM);
+    const map = window.L.map(mapRef.current);
+    
+    // If we have coordinates, center on them, otherwise use Nepal center
+    if (value.latitude && value.longitude) {
+      map.setView([value.latitude, value.longitude], 14);
+    } else {
+      map.setView(NEPAL_CENTER, INITIAL_ZOOM);
+    }
+    
     mapInstanceRef.current = map;
     
     // Add tile layers
@@ -216,9 +212,6 @@ const MapLocationSelector: React.FC<MapLocationSelectorProps> = ({
         icon: customIcon
       }).addTo(map);
       
-      map.setView([value.latitude, value.longitude], 14);
-      setCurrentCoordinates({lat: value.latitude, lng: value.longitude});
-      
       // Store marker reference
       markerRef.current = marker;
       
@@ -250,7 +243,6 @@ const MapLocationSelector: React.FC<MapLocationSelectorProps> = ({
     });
     
     map.addControl(searchControl);
-    searchControlRef.current = searchControl;
 
     // Handle map click to add/move marker
     map.on('click', function(e: any) {
@@ -301,25 +293,9 @@ const MapLocationSelector: React.FC<MapLocationSelectorProps> = ({
         });
       }
       
-      // Update location data
       updateLocation(location.y, location.x);
-      
-      console.log('Search result found:', location.y, location.x);
-      console.log('Auto-save setting:', autoSaveLocation, 'Location saved:', locationSaved);
-      
-      // Auto-save the location if requested
-      if (autoSaveLocation && !locationSaved) {
-        console.log('Auto-saving location from search result');
-        // Use a timeout to ensure the location data is updated
-        setTimeout(() => {
-          if (currentCoordinates) {
-            handleSaveLocation();
-          }
-        }, 800);
-      } else {
-        // Reset saved state when location changes if not auto-saving
-        setLocationSaved(false);
-      }
+      // Reset saved state when location changes
+      setLocationSaved(false);
     });
 
     // Function to update location data
@@ -390,9 +366,6 @@ const MapLocationSelector: React.FC<MapLocationSelectorProps> = ({
       currentLat: value.latitude || null,
       currentLng: value.longitude || null
     };
-    
-    // Store search control separately
-    window.mapSearchControl = searchControl;
 
     // Clean up function to run when component unmounts
     return () => {
@@ -403,54 +376,8 @@ const MapLocationSelector: React.FC<MapLocationSelectorProps> = ({
       if (window.mapInstance) {
         delete window.mapInstance;
       }
-      if (window.mapSearchControl) {
-        delete window.mapSearchControl;
-      }
     };
-  }, [leafletLoaded, value.latitude, value.longitude, autoSaveLocation]);
-
-  // Handle programmatic search if initialSearchQuery is provided
-  useEffect(() => {
-    if (
-      leafletLoaded && 
-      initialSearchQuery && 
-      !hasPerformedInitialSearch && 
-      mapInstanceRef.current
-    ) {
-      console.log('Performing initial search with query:', initialSearchQuery);
-      
-      try {
-        // Find the input element within the search control
-        const searchInput = document.querySelector('.leaflet-control-geosearch form input');
-        if (searchInput) {
-          // Set the value and dispatch events to trigger the search
-          (searchInput as HTMLInputElement).value = initialSearchQuery;
-          
-          // Focus the input
-          (searchInput as HTMLInputElement).focus();
-          
-          // Dispatch input event to trigger search suggestions
-          const inputEvent = new Event('input', { bubbles: true });
-          searchInput.dispatchEvent(inputEvent);
-          
-          // Wait a bit then dispatch keydown event for Enter key
-          setTimeout(() => {
-            const keyEvent = new KeyboardEvent('keydown', { 
-              bubbles: true, 
-              key: 'Enter',
-              keyCode: 13,
-              which: 13
-            });
-            searchInput.dispatchEvent(keyEvent);
-            
-            setHasPerformedInitialSearch(true);
-          }, 500);
-        }
-      } catch (error) {
-        console.error('Error during programmatic search:', error);
-      }
-    }
-  }, [leafletLoaded, initialSearchQuery, hasPerformedInitialSearch]);
+  }, [leafletLoaded, value.latitude, value.longitude]);
 
   // Handle map type selection
   const handleMapTypeChange = (newMapType: string) => {
@@ -492,7 +419,7 @@ const MapLocationSelector: React.FC<MapLocationSelectorProps> = ({
     <div className="w-full space-y-4">
       <div 
         ref={mapRef} 
-        className="w-full h-[400px] bg-gray-100 border border-gray-300 rounded-md relative"
+        className="w-full h-[350px] bg-gray-100 border border-gray-300 rounded-md relative"
       >
         {leafletLoaded && (
           <MapTypeSelector 
@@ -516,11 +443,6 @@ const MapLocationSelector: React.FC<MapLocationSelectorProps> = ({
           <span className="text-sm font-medium text-gray-700 w-24">Address:</span>
           <span className="text-sm text-gray-800">{address}</span>
         </div>
-        
-        <div className="flex items-start">
-          <span className="text-sm font-medium text-gray-700 w-24">District:</span>
-          <span className="text-sm text-gray-800">{district}</span>
-        </div>
       </div>
 
       <div className="flex justify-between items-center">
@@ -541,4 +463,4 @@ const MapLocationSelector: React.FC<MapLocationSelectorProps> = ({
   );
 };
 
-export default MapLocationSelector; 
+export default MapSectionSelector; 

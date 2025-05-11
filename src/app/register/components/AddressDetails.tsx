@@ -18,11 +18,17 @@ const provinceTranslations: Record<string, string> = {
   "सुदुर पश्चिम": "Sudurpashchim"
 };
 
+// Define bilingual field structure to match parent component
+interface BilingualField {
+  en: string;
+  ne: string;
+}
+
 interface AddressFormData {
-  province: string;
-  district: string;
-  municipality: string;
-  ward: string;
+  province: BilingualField;
+  district: BilingualField;
+  municipality: BilingualField;
+  ward: BilingualField;
   city: string;
   tole: string;
 }
@@ -57,9 +63,9 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
   const [wards, setWards] = useState<string[]>([]);
   
   // Refs to track previous values
-  const prevProvinceRef = useRef(formData.province);
-  const prevDistrictRef = useRef(formData.district);
-  const prevMunicipalityRef = useRef(formData.municipality);
+  const prevProvinceRef = useRef<string>('');
+  const prevDistrictRef = useRef<string>('');
+  const prevMunicipalityRef = useRef<string>('');
   const isUpdatingRef = useRef(false);
 
   // Load all address data from public directory
@@ -118,19 +124,19 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
   useEffect(() => {
     if (isLoading || !addressData.provinceDistrictsMap || isUpdatingRef.current) return;
 
-    if (formData.province) {
-      const selectedDistricts = addressData.provinceDistrictsMap[formData.province] || [];
+    if (formData.province.ne) {
+      const selectedDistricts = addressData.provinceDistrictsMap[formData.province.ne] || [];
       setDistricts(selectedDistricts);
       
       // Only reset if province changed and district is no longer valid
-      if (prevProvinceRef.current !== formData.province && 
-          formData.district && 
-          !selectedDistricts.includes(formData.district)) {
+      if (prevProvinceRef.current !== formData.province.ne && 
+          formData.district.ne && 
+          !selectedDistricts.includes(formData.district.ne)) {
         isUpdatingRef.current = true;
         const resetData = {
-          district: "",
-          municipality: "",
-          ward: ""
+          district: { en: "", ne: "" },
+          municipality: { en: "", ne: "" },
+          ward: { en: "", ne: "" }
         };
         updateFormData(resetData);
         setTimeout(() => {
@@ -138,17 +144,17 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
         }, 0);
       }
       
-      prevProvinceRef.current = formData.province;
+      prevProvinceRef.current = formData.province.ne;
     } else {
       setDistricts([]);
     }
-  }, [formData.province, formData.district, isLoading, addressData.provinceDistrictsMap]);
+  }, [formData.province.ne, formData.district.ne, isLoading, addressData.provinceDistrictsMap, updateFormData]);
 
   // Add additional debugging for municipalities
   useEffect(() => {
-    if (formData.district && addressData.districtMunicipalitiesMap && addressData.municipalityTranslations) {
-      console.log("District selected:", formData.district);
-      const districtMunicipalities = addressData.districtMunicipalitiesMap[formData.district] || [];
+    if (formData.district.ne && addressData.districtMunicipalitiesMap && addressData.municipalityTranslations) {
+      console.log("District selected:", formData.district.ne);
+      const districtMunicipalities = addressData.districtMunicipalitiesMap[formData.district.ne] || [];
       console.log("Municipalities for district:", districtMunicipalities.length);
       
       // Check for missing translations
@@ -160,24 +166,24 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
         console.log("Municipalities missing translations:", missingTranslations);
       }
     }
-  }, [formData.district, addressData.districtMunicipalitiesMap, addressData.municipalityTranslations]);
+  }, [formData.district.ne, addressData.districtMunicipalitiesMap, addressData.municipalityTranslations]);
 
   // Update municipalities when district changes
   useEffect(() => {
     if (isLoading || !addressData.districtMunicipalitiesMap || isUpdatingRef.current) return;
 
-    if (formData.district) {
-      const selectedMunicipalities = addressData.districtMunicipalitiesMap[formData.district] || [];
+    if (formData.district.ne) {
+      const selectedMunicipalities = addressData.districtMunicipalitiesMap[formData.district.ne] || [];
       setMunicipalities(selectedMunicipalities);
       
       // Only reset if district changed and municipality is no longer valid
-      if (prevDistrictRef.current !== formData.district && 
-          formData.municipality && 
-          !selectedMunicipalities.includes(formData.municipality)) {
+      if (prevDistrictRef.current !== formData.district.ne && 
+          formData.municipality.ne && 
+          !selectedMunicipalities.includes(formData.municipality.ne)) {
         isUpdatingRef.current = true;
         const resetData = {
-          municipality: "",
-          ward: ""
+          municipality: { en: "", ne: "" },
+          ward: { en: "", ne: "" }
         };
         updateFormData(resetData);
         setTimeout(() => {
@@ -185,27 +191,27 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
         }, 0);
       }
       
-      prevDistrictRef.current = formData.district;
+      prevDistrictRef.current = formData.district.ne;
     } else {
       setMunicipalities([]);
     }
-  }, [formData.district, formData.municipality, isLoading, addressData.districtMunicipalitiesMap]);
+  }, [formData.district.ne, formData.municipality.ne, isLoading, addressData.districtMunicipalitiesMap, updateFormData]);
 
   // Update wards when municipality changes
   useEffect(() => {
     if (isLoading || !addressData.municipalitiesWardsMap || isUpdatingRef.current) return;
 
-    if (formData.municipality) {
-      const selectedWards = addressData.municipalitiesWardsMap[formData.municipality] || [];
+    if (formData.municipality.ne) {
+      const selectedWards = addressData.municipalitiesWardsMap[formData.municipality.ne] || [];
       setWards(selectedWards);
       
       // Only reset if municipality changed and ward is no longer valid
-      if (prevMunicipalityRef.current !== formData.municipality && 
-          formData.ward && 
-          !selectedWards.includes(formData.ward)) {
+      if (prevMunicipalityRef.current !== formData.municipality.ne && 
+          formData.ward.ne && 
+          !selectedWards.includes(formData.ward.ne)) {
         isUpdatingRef.current = true;
         const resetData = {
-          ward: ""
+          ward: { en: "", ne: "" }
         };
         updateFormData(resetData);
         setTimeout(() => {
@@ -213,17 +219,66 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
         }, 0);
       }
       
-      prevMunicipalityRef.current = formData.municipality;
+      prevMunicipalityRef.current = formData.municipality.ne;
     } else {
       setWards([]);
     }
-  }, [formData.municipality, formData.ward, isLoading, addressData.municipalitiesWardsMap]);
+  }, [formData.municipality.ne, formData.ward.ne, isLoading, addressData.municipalitiesWardsMap, updateFormData]);
 
   // Handle dropdown changes
   const handleChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
-    updateFormData({ [name]: value });
-  }, [updateFormData]);
+    
+    // For addressable fields, store both Nepali and English values
+    if (name === 'province' && value) {
+      const englishValue = provinceTranslations[value] || value;
+      console.log(`Selected province: ${value} / English: ${englishValue}`);
+      
+      updateFormData({ 
+        [name]: {
+          ne: value,
+          en: englishValue
+        }
+      });
+    }
+    else if (name === 'district' && value) {
+      const englishValue = addressData.districtTranslations[value] || value;
+      console.log(`Selected district: ${value} / English: ${englishValue}`);
+      
+      updateFormData({ 
+        [name]: {
+          ne: value,
+          en: englishValue
+        }
+      });
+    }
+    else if (name === 'municipality' && value) {
+      const englishValue = findBestTranslationMatch(value, addressData.municipalityTranslations);
+      console.log(`Selected municipality: ${value} / English: ${englishValue}`);
+      
+      updateFormData({ 
+        [name]: {
+          ne: value,
+          en: englishValue
+        }
+      });
+    }
+    else if (name === 'ward' && value) {
+      const englishValue = translateWard(value);
+      console.log(`Selected ward: ${value} / English: ${englishValue}`);
+      
+      updateFormData({ 
+        [name]: {
+          ne: value,
+          en: englishValue
+        }
+      });
+    }
+    else {
+      // For non-address fields like city, tole
+      updateFormData({ [name]: value });
+    }
+  }, [updateFormData, addressData.districtTranslations, addressData.municipalityTranslations]);
 
   // Convert numeric wards to English
   const translateWard = (ward: string): string => {
@@ -334,7 +389,7 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
             <select
               id="province"
               name="province"
-              value={formData.province}
+              value={formData.province.ne}
               onChange={handleChange}
               className="appearance-none block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
               required
@@ -363,11 +418,11 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
             <select
               id="district"
               name="district"
-              value={formData.district}
+              value={formData.district.ne}
               onChange={handleChange}
               className="appearance-none block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
               required
-              disabled={!formData.province}
+              disabled={!formData.province.ne}
             >
               <option value="">Select District / जिल्ला छनोट गर्नुहोस्</option>
               {districts.map((district) => (
@@ -393,11 +448,11 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
             <select
               id="municipality"
               name="municipality"
-              value={formData.municipality}
+              value={formData.municipality.ne}
               onChange={handleChange}
               className="appearance-none block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
               required
-              disabled={!formData.district}
+              disabled={!formData.district.ne}
             >
               <option value="">Select Municipality / नगरपालिका छनोट गर्नुहोस्</option>
               {municipalities.map((municipality) => {
@@ -428,11 +483,11 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
             <select
               id="ward"
               name="ward"
-              value={formData.ward}
+              value={formData.ward.ne}
               onChange={handleChange}
               className="appearance-none block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
               required
-              disabled={!formData.municipality}
+              disabled={!formData.municipality.ne}
             >
               <option value="">Select Ward / वडा छनोट गर्नुहोस्</option>
               {wards.map((ward) => (
