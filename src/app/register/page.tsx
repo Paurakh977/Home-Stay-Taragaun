@@ -349,7 +349,7 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
         latitude: formData.latitude,
         longitude: formData.longitude,
         
-        // Create an official for the operator (This is the important part we're fixing)
+        // Create an official for the operator
         officials: [
           // Add operator as an official with role 'operator'
           {
@@ -362,13 +362,19 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
           ...formData.officials
         ],
         
-        // Address information
-        province: formData.province,
-        district: formData.district,
-        municipality: formData.municipality,
-        ward: formData.ward,
+        // Extract string values from address information
+        province: formData.province.ne,
+        district: formData.district.ne,
+        municipality: formData.municipality.ne,
+        ward: formData.ward.ne,
         city: formData.city,
         tole: formData.tole,
+        
+        // Also include English translations
+        provinceEn: formData.province.en,
+        districtEn: formData.district.en,
+        municipalityEn: formData.municipality.en,
+        wardEn: formData.ward.en,
         
         // Features
         localAttractions: formData.localAttractions,

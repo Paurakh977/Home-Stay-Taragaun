@@ -494,10 +494,10 @@ export async function POST(req: NextRequest) {
     console.log(`Processing registration for: ${body.homeStayName}, ID: ${homestayId}`);
     
     // Get English translations for the address fields
-    const provinceEn = provinceTranslations[body.province] || body.province;
-    const districtEn = findBestTranslation(body.district, 'district');
-    const municipalityEn = findBestTranslation(body.municipality, 'municipality');
-    const wardEn = translateWard(body.ward);
+    const provinceEn = body.provinceEn || provinceTranslations[body.province] || body.province;
+    const districtEn = body.districtEn || findBestTranslation(body.district, 'district');
+    const municipalityEn = body.municipalityEn || findBestTranslation(body.municipality, 'municipality');
+    const wardEn = body.wardEn || translateWard(body.ward);
     
     // Create formatted addresses in both languages
     const formattedAddressNe = `${body.tole}, ${body.city}, ${body.municipality}, ${body.district}, ${body.province}`;
@@ -613,8 +613,8 @@ export async function POST(req: NextRequest) {
         city: body.city || '',
         tole: body.tole || '',
         formattedAddress: {
-          ne: `${body.tole || ''}, ${body.city || ''}, ${body.ward}, ${body.municipality}, ${body.district}, ${body.province}`,
-          en: `${body.tole || ''}, ${body.city || ''}, ${wardEn}, ${municipalityEn}, ${districtEn}, ${provinceEn}`
+          ne: formattedAddressNe,
+          en: formattedAddressEn
         },
         isVerified: false
       };
