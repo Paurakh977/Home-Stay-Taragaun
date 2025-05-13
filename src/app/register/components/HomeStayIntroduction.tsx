@@ -172,7 +172,7 @@ const HomeStayIntroduction: React.FC<HomeStayIntroductionProps> = ({ formData, u
                   className="appearance-none block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
                   required
                 >
-                  {createRange(1, 50).map((num) => (
+                  {createRange(1, 500).map((num) => (
                     <option key={`home-${num}`} value={num}>
                       {num}
                     </option>
@@ -200,7 +200,7 @@ const HomeStayIntroduction: React.FC<HomeStayIntroductionProps> = ({ formData, u
                   className="appearance-none block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
                   required
                 >
-                  {createRange(1, 100).map((num) => (
+                  {createRange(1, 1000).map((num) => (
                     <option key={`room-${num}`} value={num}>
                       {num}
                     </option>
@@ -228,7 +228,7 @@ const HomeStayIntroduction: React.FC<HomeStayIntroductionProps> = ({ formData, u
                   className="appearance-none block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
                   required
                 >
-                  {createRange(1, 200).map((num) => (
+                  {createRange(1, 1000).map((num) => (
                     <option key={`bed-${num}`} value={num}>
                       {num}
                     </option>
