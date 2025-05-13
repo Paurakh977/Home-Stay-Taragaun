@@ -31,6 +31,7 @@ interface AddressFormData {
   ward: BilingualField;
   city: string;
   tole: string;
+  villageName: string;
 }
 
 type AddressDetailsProps = {
@@ -100,6 +101,12 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
           districtTranslations: districtTranslations,
           municipalityTranslations: municipalityTranslations
         });
+        
+        // Ensure tole is always an empty string
+        if (formData.tole !== "") {
+          updateFormData({ tole: "" });
+        }
+        
         setIsLoading(false);
       } catch (error) {
         console.error("Error loading address data:", error);
@@ -108,16 +115,18 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
     };
 
     fetchAddressData();
-  }, []);
+  }, [updateFormData]);
 
   // Add debugging useEffect
   useEffect(() => {
-    console.log("AddressDetails rendered with:", {
-      province: formData.province,
-      district: formData.district,
-      municipality: formData.municipality,
-      ward: formData.ward
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log("AddressDetails rendered with:", {
+        province: formData.province,
+        district: formData.district,
+        municipality: formData.municipality,
+        ward: formData.ward
+      });
+    }
   }, [formData.province, formData.district, formData.municipality, formData.ward]);
 
   // Update districts when province changes
@@ -152,7 +161,7 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
 
   // Add additional debugging for municipalities
   useEffect(() => {
-    if (formData.district.ne && addressData.districtMunicipalitiesMap && addressData.municipalityTranslations) {
+    if (process.env.NODE_ENV === 'development' && formData.district.ne && addressData.districtMunicipalitiesMap && addressData.municipalityTranslations) {
       console.log("District selected:", formData.district.ne);
       const districtMunicipalities = addressData.districtMunicipalitiesMap[formData.district.ne] || [];
       console.log("Municipalities for district:", districtMunicipalities.length);
@@ -520,20 +529,32 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
           />
         </div>
 
-        {/* Tole Input */}
+        {/* Homestay Village Input (replacing Tole) */}
         <div>
-          <label htmlFor="tole" className="block text-sm font-medium text-gray-700 mb-1">
-            Tole of your homestay/टोल
+          <label htmlFor="villageName" className="block text-sm font-medium text-gray-700 mb-1">
+            Home stays&apos; Village Name/होमस्टे गाउँको नाम
+            <span className="text-red-500 ml-1">*</span>
           </label>
           <input
             type="text"
-            id="tole"
-            name="tole"
-            value={formData.tole || ""}
-            onChange={(e) => updateFormData({ tole: e.target.value })}
-            className="appearance-none block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+            id="villageName"
+            name="villageName"
+            value={formData.villageName || ""}
+            onChange={(e) => {
+              // Update both values in a single state update to avoid multiple renders
+              updateFormData({ 
+                villageName: e.target.value,
+                tole: "" 
+              });
+            }}
+            className={`appearance-none block w-full px-3 py-2 bg-white border ${
+              !formData.villageName ? 'border-red-300' : 'border-gray-300'
+            } rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary`}
             required
           />
+          {!formData.villageName && 
+            <p className="mt-1 text-xs text-red-500">This field is required</p>
+          }
         </div>
       </div>
     </div>

@@ -315,7 +315,7 @@ const homestaySchema = new Schema<IHomestaySingle>(
       municipality: bilingualField,
       ward: bilingualField,
       city: { type: String, required: true },
-      tole: { type: String, required: true },
+      tole: { type: String, required: false, default: "" },
       formattedAddress: bilingualField
     },
     

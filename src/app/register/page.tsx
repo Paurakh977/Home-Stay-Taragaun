@@ -230,7 +230,6 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
     if (!formData.municipality.en || !formData.municipality.ne) errors.push("Municipality is required");
     if (!formData.ward.en || !formData.ward.ne) errors.push("Ward is required");
     if (!formData.city) errors.push("City is required");
-    if (!formData.tole) errors.push("Tole is required");
     
     // Homestay Features (step 5)
     if (!formData.localAttractions?.length) errors.push("At least one Local Attraction is required");
@@ -372,7 +371,7 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
         municipality: formData.municipality.ne,
         ward: formData.ward.ne,
         city: formData.city,
-        tole: formData.tole,
+        tole: "", // Always set tole to empty string
         
         // Also include English translations
         provinceEn: formData.province.en,

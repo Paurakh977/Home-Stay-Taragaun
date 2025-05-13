@@ -499,9 +499,10 @@ export async function POST(req: NextRequest) {
     const municipalityEn = body.municipalityEn || findBestTranslation(body.municipality, 'municipality');
     const wardEn = body.wardEn || translateWard(body.ward);
     
-    // Create formatted addresses in both languages
-    const formattedAddressNe = `${body.tole}, ${body.city}, ${body.municipality}, ${body.district}, ${body.province}`;
-    const formattedAddressEn = `${body.tole}, ${body.city}, ${municipalityEn}, ${districtEn}, ${provinceEn}`;
+    // Create formatted addresses in both languages - exclude tole if it's empty
+    const tolePrefix = body.tole ? `${body.tole}, ` : '';
+    const formattedAddressNe = `${tolePrefix}${body.city}, ${body.municipality}, ${body.district}, ${body.province}`;
+    const formattedAddressEn = `${tolePrefix}${body.city}, ${municipalityEn}, ${districtEn}, ${provinceEn}`;
     
     // Generate DHSR number
     const dhsrNo = await generateDHSRNumber(body.province, body.homeStayType);

@@ -25,7 +25,7 @@ const locationSchema = new Schema(
     
     // These fields remain as simple strings (not bilingual)
     city: { type: String, required: true },
-    tole: { type: String, required: true },
+    tole: { type: String, required: false, default: "" },
     
     // Formatted address with bilingual support
     formattedAddress: bilingualField,
