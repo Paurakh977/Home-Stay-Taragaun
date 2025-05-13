@@ -19,9 +19,9 @@ export const attractionsCategories = [
     id: 'natural',
     name: 'Natural Attractions / प्राकृतिक सम्पदा',
     options: [
-      { value: "Chitwan National Park/चितवन राष्ट्रिय निकुञ्ज", checked: false },
-      { value: "Nepal's deepest and widest Narayani River/नेपालकै गहिरो तथा विशाल नारायणी नदी", checked: false },
-      { value: "Fish Pond/माछा पोखरी", checked: false },
+      { value: "National Parks & Conservation Areas/राष्ट्रिय निकुञ्ज तथा संरक्षित क्षेत्र", checked: false },
+      { value: "Major Rivers & Lakes/प्रमुख नदी तथा तालहरू", checked: false },
+      { value: "Ponds/पोखरी", checked: false },
       { value: "Viewpoint Tower/दृश्यावलोकन स्थल (भ्यू टावर)", checked: false },
       { value: "Watchtowers, wetlands, and grasslands/मचान तथा सिमसार क्षेत्र, घासे मैदान", checked: false },
     ]
@@ -30,9 +30,9 @@ export const attractionsCategories = [
     id: 'cultural',
     name: 'Ethnic & Cultural Heritage / जातीय/सांस्कृतिक सम्पदा',
     options: [
-      { value: "Indigenous Tharu Museum/आदिवासी थारू संग्रहालय", checked: false },
-      { value: "Culture of local Tharu, Bote, and Musahar communities/स्थानीय थारू, बोटे र मुसहर समुदायको संस्कृति", checked: false },
-      { value: "Traditional food and culture of the Tharu community/थारू समुदायको परम्परागत भोजन र संस्कृति", checked: false },
+      { value: "Museums & Cultural Centers/आदिवासी संग्रहालय तथा संस्कृति केन्द्रहरू", checked: false },
+      { value: "Traditional Festivals, Dances & Rituals/परम्परागत पर्व, नाच तथा विधिहरू", checked: false },
+      { value: "Local Community Lifestyle & Architecture/स्थानीय जीवनशैली तथा वास्तुकला", checked: false },
     ]
   },
   {
@@ -40,24 +40,24 @@ export const attractionsCategories = [
     name: 'Organic & Local Products / जैविक उत्पादन तथा स्थानीय भोजन',
     options: [
       { value: "Organic Food/Organic खाना", checked: false },
-      { value: "Traditional Dishes: Chichar, Dhikri, Ghoghi, Mod, Nijai, etc./परम्परागत खाना: चिचर, ढिकरी, घोगी, मोद, निजई आदि", checked: false },
+      { value: "Traditional Dishes & Recipes/परम्परागत परिकारहरू", checked: false },
     ]
   },
   {
     id: 'forest',
     name: 'Community Forest & Trails / सामुदायिक वन तथा पदयात्रा',
     options: [
-      { value: "Gunddahi Dhakaha Community Forest/गुन्द्धही ढकाहा सामुदायिक वन", checked: false },
-      { value: "Community Forest Trekking Trail/सामुदायिक वन पदयात्रा मार्ग", checked: false },
+      { value: "Community-managed Forests/सामुदायिक वन क्षेत्रहरू", checked: false },
+      { value: "Nature Walks & Eco Trails/प्रकृति पदमार्ग तथा पदयात्रा", checked: false },
     ]
   },
   {
     id: 'wildlife',
     name: 'Wildlife & Birdwatching / वन्यजन्तु तथा चराचुरुङ्गी',
     options: [
-      { value: "One-horned Rhinoceros/एक सिङ्गे गैडा", checked: false },
-      { value: "Royal Bengal Tiger/पाटेबाघ", checked: false },
-      { value: "Gharial Crocodile/घडियाल", checked: false },
+      { value: "Iconic & Endangered Wildlife/प्रमुख तथा लोपोन्मुख जनावरहरू", checked: false },
+      { value: "Birdwatching Hotspots/चराचुरुङ्गी हेर्ने स्थानहरू", checked: false },
+      { value: "Community-led Wildlife Conservation/सामुदायिक वन्यजन्तु संरक्षण प्रयासहरू", checked: false },
       { value: "Other endangered wildlife and birds/अन्य लोपोन्मुख वन्यजन्तु तथा चराचुरुङ्गी", checked: false },
     ]
   },
@@ -65,13 +65,13 @@ export const attractionsCategories = [
     id: 'adventure',
     name: 'Adventure & Eco-tourism Activities / साहसिक तथा पारिस्थितिक पर्यटन',
     options: [
-      { value: "Himalayan Climbing and Trekking/हिमाली आरोहण तथा ट्रेकिङ", checked: false },
+      { value: "Trekking, Climbing & Hiking Routes/ट्रेकिङ, आरोहण तथा हाइकिङ मार्गहरू", checked: false },
       { value: "Eco-tourism based exploration/Eco-tourism based exploration", checked: false },
       { value: "Adventure Sports like: Boating, Hiking, Jungle Walk, Elephant Safari, Jeep Safari/साहसिक खेलहरू (जस्तै: बोटिङ, हाइकिङ, जंगल वाक, हात्ती सफारी, जीप सफारी)", checked: false },
       { value: "Fishing in the fish pond/माछा पोखरीमा फिसिङ", checked: false },
-      { value: "Tharu village tour, cycling, mobile cart ride/थारू गाउँ सयर (भिलेज वाक), साइकल यात्रा, मोबाइल गाडा सयर", checked: false },
-      { value: "Sunset viewing from the Narayani riverside/नारायणी नदीको किनारबाट सूर्यास्त दृश्य अवलोकन", checked: false },
-      { value: "Elephant Bathing/हात्ती बाथ", checked: false },
+      { value: "Jungle Walks & Wildlife Safaris/जंगल पदयात्रा तथा सफारी", checked: false },
+      { value: "Sunset/Sunrise Viewing Points/सूर्यास्त/सूर्योदय हेर्ने स्थानहरू", checked: false },
+      { value: "Cultural Village Tours, Cycling & Local Mobility/गाउँ सयर, साइकल यात्रा, स्थानीय सवारी अनुभव", checked: false },
     ]
   }
 ];

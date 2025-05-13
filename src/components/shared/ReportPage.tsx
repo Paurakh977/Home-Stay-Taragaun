@@ -401,10 +401,18 @@ export default function ReportPage({
         categories.wildlife++;
       } else if (attr.startsWith('adventure:')) {
         categories.adventure++;
-      } else if (attr.includes('Park') || attr.includes('National') || attr.includes('River')) {
+      } else if (attr.includes('National Parks') || attr.includes('Conservation Areas') || attr.includes('Rivers') || attr.includes('Lakes') || attr.includes('Ponds')) {
         categories.natural++;
-      } else if (attr.includes('Museum') || attr.includes('Heritage') || attr.includes('Traditional')) {
+      } else if (attr.includes('Museums') || attr.includes('Cultural') || attr.includes('Festivals') || attr.includes('Traditional') || attr.includes('Community Lifestyle')) {
         categories.cultural++;
+      } else if (attr.includes('Wildlife') || attr.includes('Birdwatching') || attr.includes('Conservation')) {
+        categories.wildlife++;
+      } else if (attr.includes('Forests') || attr.includes('Nature Walks') || attr.includes('Eco Trails')) {
+        categories.forest++;
+      } else if (attr.includes('Trekking') || attr.includes('Climbing') || attr.includes('Hiking') || attr.includes('Safaris') || attr.includes('Village Tours')) {
+        categories.adventure++;
+      } else if (attr.includes('Dishes') || attr.includes('Recipes') || attr.includes('Organic')) {
+        categories.products++;
       } else {
         categories.other++;
       }
@@ -1989,7 +1997,14 @@ export default function ReportPage({
                     <p className="font-medium">Cultural Sites</p>
                     <p className="text-sm text-gray-500 mt-2">
                       {homestays.reduce((count, h) => {
-                        return count + (h.features?.localAttractions?.filter(a => a.startsWith('cultural:') || a.includes('Museum') || a.includes('संग्रहालय')).length || 0);
+                        return count + (h.features?.localAttractions?.filter(a => 
+                          a.startsWith('cultural:') || 
+                          a.includes('Museums') || 
+                          a.includes('Cultural') ||
+                          a.includes('Festivals') ||
+                          a.includes('Traditional') ||
+                          a.includes('Community Lifestyle')
+                        ).length || 0);
                       }, 0)} cultural sites listed
                     </p>
                   </div>
@@ -1997,7 +2012,14 @@ export default function ReportPage({
                     <p className="font-medium">Natural Attractions</p>
                     <p className="text-sm text-gray-500 mt-2">
                       {homestays.reduce((count, h) => {
-                        return count + (h.features?.localAttractions?.filter(a => a.startsWith('natural:') || a.includes('Park') || a.includes('River') || a.includes('नदी')).length || 0);
+                        return count + (h.features?.localAttractions?.filter(a => 
+                          a.startsWith('natural:') || 
+                          a.includes('National Parks') || 
+                          a.includes('Conservation Areas') || 
+                          a.includes('Rivers') || 
+                          a.includes('Lakes') || 
+                          a.includes('Ponds')
+                        ).length || 0);
                       }, 0)} natural attractions
                     </p>
                   </div>
