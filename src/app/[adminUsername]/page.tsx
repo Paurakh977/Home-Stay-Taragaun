@@ -6,6 +6,7 @@ import CtaSection from "@/components/home/CtaSection";
 import ScrollPopup from "@/components/ui/ScrollPopup";
 import { User } from "@/lib/models";
 import dbConnect from "@/lib/mongodb";
+import Link from "next/link";
 
 // Configure the page to use dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -31,10 +32,19 @@ export async function generateMetadata({ params }: { params: { adminUsername: st
       };
     }
 
+    // TEMPORARY: Changed metadata for unavailable page
+    return {
+      title: "Page Unavailable",
+      description: "This page is temporarily unavailable"
+    };
+    
+    // ORIGINAL METADATA (commented out temporarily)
+    /*
     return {
       title: `${adminUsername} - Hamro Home Stay | Authentic Nepali Hospitality`,
       description: `${adminUsername}'s portal for authentic Nepali culture and hospitality with carefully selected home stays.`
     };
+    */
   } catch (error) {
     console.error(`Error generating metadata for ${adminUsername}:`, error);
     return {
@@ -62,6 +72,49 @@ export default async function AdminHomePage({ params }: { params: { adminUsernam
       notFound();
     }
 
+    // TEMPORARY: Return the page unavailable message with full-page styling
+    // This completely minimizes the page and hides everything else
+    return (
+      <div 
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'white',
+          zIndex: 9999, // Very high z-index to cover everything
+        }}
+      >
+        <Link 
+          href="/homestays" 
+          style={{
+            padding: '12px 24px',
+            backgroundColor: '#4F46E5', // Indigo color
+            color: 'white',
+            borderRadius: '8px',
+            fontWeight: 'bold',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+            textDecoration: 'none',
+            transition: 'all 0.2s ease',
+            cursor: 'pointer',
+            fontSize: '16px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          Explore Homestays
+        </Link>
+      </div>
+    );
+    
+    // ORIGINAL CONTENT (commented out temporarily)
+    /*
     return (
       <div className="flex flex-col w-full">
         <ImageSlider />
@@ -71,6 +124,7 @@ export default async function AdminHomePage({ params }: { params: { adminUsernam
         <ScrollPopup />
       </div>
     );
+    */
   } catch (error) {
     console.error(`Error in admin home page for ${adminUsername}:`, error);
     notFound();

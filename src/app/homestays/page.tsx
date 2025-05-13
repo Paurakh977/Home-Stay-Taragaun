@@ -667,8 +667,9 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
             {filteredHomestays.map((homestay) => (
               <div 
                 key={homestay._id} 
-                onClick={() => router.push(`/homestays/${homestay.homestayId}`)}
-                className="bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow group"
+                // TEMPORARILY DISABLED: Remove this comment to re-enable navigation
+                // onClick={() => router.push(`/homestays/${homestay.homestayId}`)}
+                className="bg-white rounded-xl shadow-sm overflow-hidden cursor-default hover:shadow-md transition-shadow group"
               >
                 {/* Image */}
                 <div className="h-48 bg-gray-200 relative overflow-hidden">
@@ -790,11 +791,10 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
                   </div>
                 </div>
                 
-                {/* View button */}
+                {/* View button - TEMPORARILY DISABLED */}
                 <div className="px-4 pb-4 flex">
-                  <div className="w-full group-hover:bg-primary/5 rounded-lg p-2 text-center text-sm font-medium text-primary flex justify-center items-center transition-colors">
-                    <span>View Details</span>
-                    <ArrowRight size={16} className="ml-1 transform transition-transform group-hover:translate-x-1" />
+                  <div className="w-full rounded-lg p-2 text-center text-sm bg-gray-100 text-gray-500 flex justify-center items-center">
+                    <span>Details Currently Unavailable</span>
                   </div>
                 </div>
               </div>

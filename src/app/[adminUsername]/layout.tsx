@@ -36,7 +36,8 @@ export default async function AdminLayout({
     
     // Fetch branding data for this admin
     const brandingData = await getBrandingByAdminUsername(adminUsername);
-
+    
+    // Return regular layout - our page.tsx now uses a fixed overlay to hide everything
     return (
       <BrandingProviderClient brandingData={brandingData}>
         <Navbar adminUsername={adminUsername} />
