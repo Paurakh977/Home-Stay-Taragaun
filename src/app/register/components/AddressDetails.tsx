@@ -102,11 +102,6 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
           municipalityTranslations: municipalityTranslations
         });
         
-        // Ensure tole is always an empty string
-        if (formData.tole !== "") {
-          updateFormData({ tole: "" });
-        }
-        
         setIsLoading(false);
       } catch (error) {
         console.error("Error loading address data:", error);
@@ -115,21 +110,7 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
     };
 
     fetchAddressData();
-  }, [updateFormData]);
-
-  // Add debugging useEffect
-  /*
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log("AddressDetails rendered with:", {
-        province: formData.province,
-        district: formData.district,
-        municipality: formData.municipality,
-        ward: formData.ward
-      });
-    }
-  }, [formData.province, formData.district, formData.municipality, formData.ward]);
-  */
+  }, []);
 
   // Update districts when province changes
   useEffect(() => {
@@ -539,10 +520,9 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
             name="villageName"
             value={formData.villageName || ""}
             onChange={(e) => {
-              // Update both values in a single state update to avoid multiple renders
+              // Update only villageName, not tole - this prevents unnecessary rerenders
               updateFormData({ 
-                villageName: e.target.value,
-                tole: "" 
+                villageName: e.target.value
               });
             }}
             className={`appearance-none block w-full px-3 py-2 bg-white border ${
