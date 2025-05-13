@@ -137,6 +137,18 @@ async function generateDHSRNumber(province: string, homeStayType: string): Promi
   }
 }
 
+// Helper function to format the homestay name properly
+function formatHomeStayName(originalName: string, homeStayType: string): string {
+  // Capitalize first letter of each word
+  const capitalized = originalName.trim().replace(/\b\w/g, c => c.toUpperCase());
+  
+  // Add the type in parentheses - Samudaik for community, Niji for private
+  const typeText = homeStayType === 'community' ? 'Samudaik' : 'Niji';
+  
+  // Return the formatted name: [Original Name] ([Type]) Homestay
+  return `${capitalized} ${typeText} Homestay`;
+}
+
 export async function GET(req: NextRequest) {
   try {
     await dbConnect();
@@ -493,6 +505,9 @@ export async function POST(req: NextRequest) {
     
     console.log(`Processing registration for: ${body.homeStayName}, ID: ${homestayId}`);
     
+    // Format the homestay name: capitalize first letters, add type and "Homestay" suffix
+    const formattedHomeStayName = formatHomeStayName(body.homeStayName, body.homeStayType);
+    
     // Get English translations for the address fields
     const provinceEn = body.provinceEn || provinceTranslations[body.province] || body.province;
     const districtEn = body.districtEn || findBestTranslation(body.district, 'district');
@@ -514,7 +529,7 @@ export async function POST(req: NextRequest) {
       password: hashedPassword,
       dhsrNo, // Add DHSR number
       adminUsername: body.adminUsername, // Store the admin username
-      homeStayName: body.homeStayName,
+      homeStayName: formattedHomeStayName,
       villageName: body.villageName,
       homeCount: body.homeCount,
       roomCount: body.roomCount,
@@ -572,7 +587,7 @@ export async function POST(req: NextRequest) {
     };
     
     // Add the default content
-    const defaultContent = getDefaultHomestayContent(homestayData.homeStayName, homestayData.villageName);
+    const defaultContent = getDefaultHomestayContent(formattedHomeStayName, homestayData.villageName);
     
     // Check if galleryImages are explicitly provided in the request body
     const galleryImages = body.galleryImages !== undefined ? 

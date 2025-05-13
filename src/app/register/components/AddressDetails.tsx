@@ -118,6 +118,7 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
   }, [updateFormData]);
 
   // Add debugging useEffect
+  /*
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
       console.log("AddressDetails rendered with:", {
@@ -128,6 +129,7 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
       });
     }
   }, [formData.province, formData.district, formData.municipality, formData.ward]);
+  */
 
   // Update districts when province changes
   useEffect(() => {
@@ -160,6 +162,7 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
   }, [formData.province.ne, formData.district.ne, isLoading, addressData.provinceDistrictsMap, updateFormData]);
 
   // Add additional debugging for municipalities
+  /*
   useEffect(() => {
     if (process.env.NODE_ENV === 'development' && formData.district.ne && addressData.districtMunicipalitiesMap && addressData.municipalityTranslations) {
       console.log("District selected:", formData.district.ne);
@@ -176,6 +179,7 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
       }
     }
   }, [formData.district.ne, addressData.districtMunicipalitiesMap, addressData.municipalityTranslations]);
+  */
 
   // Update municipalities when district changes
   useEffect(() => {
@@ -241,8 +245,6 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
     // For addressable fields, store both Nepali and English values
     if (name === 'province' && value) {
       const englishValue = provinceTranslations[value] || value;
-      console.log(`Selected province: ${value} / English: ${englishValue}`);
-      
       updateFormData({ 
         [name]: {
           ne: value,
@@ -252,8 +254,6 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
     }
     else if (name === 'district' && value) {
       const englishValue = addressData.districtTranslations[value] || value;
-      console.log(`Selected district: ${value} / English: ${englishValue}`);
-      
       updateFormData({ 
         [name]: {
           ne: value,
@@ -263,8 +263,6 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
     }
     else if (name === 'municipality' && value) {
       const englishValue = findBestTranslationMatch(value, addressData.municipalityTranslations);
-      console.log(`Selected municipality: ${value} / English: ${englishValue}`);
-      
       updateFormData({ 
         [name]: {
           ne: value,
@@ -274,8 +272,6 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
     }
     else if (name === 'ward' && value) {
       const englishValue = translateWard(value);
-      console.log(`Selected ward: ${value} / English: ${englishValue}`);
-      
       updateFormData({ 
         [name]: {
           ne: value,
@@ -306,6 +302,7 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
   };
 
   // Add this debugging effect
+  /*
   useEffect(() => {
     // Log debug info when municipalities change
     if (municipalities.length > 0 && addressData.municipalityTranslations) {
@@ -348,6 +345,7 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({ formData, updateFormDat
       }
     }
   }, [municipalities, addressData.municipalityTranslations]);
+  */
 
   // Add this helper function before the component return
   const findBestTranslationMatch = (municipality: string, translations: Record<string, string>): string => {
