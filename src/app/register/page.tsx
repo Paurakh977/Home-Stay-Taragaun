@@ -262,6 +262,8 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
       setShowValidationErrors(false);
+      // Scroll to top when navigating to previous step
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -282,6 +284,8 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
       
       setCurrentStep(currentStep + 1);
       setShowValidationErrors(false);
+      // Scroll to top when navigating to next step
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       // Validate all form data before submission
       if (validateForm()) {
