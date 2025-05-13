@@ -135,7 +135,7 @@ export default function OfficerLoginForm({ adminUsername }: OfficerLoginFormProp
               {branding.brandName || 'Officer Portal'}
             </h1>
             <p className="text-gray-500 text-sm">
-              {greeting}, <span className="font-semibold">Officer</span>
+              {branding.contactInfo?.address || 'Kathmandu, Nepal'}, <span className="font-semibold">Officer</span>
             </p>
             <p className="text-xs text-gray-400 mt-1">
               Admin: {adminUsername}
@@ -209,16 +209,6 @@ export default function OfficerLoginForm({ adminUsername }: OfficerLoginFormProp
               </button>
             </form>
           </div>
-        </div>
-        
-        {/* Back link */}
-        <div className="text-center mt-6">
-          <Link 
-            href="/officer/login"
-            className="text-sm text-gray-600 hover:text-primary transition-colors"
-          >
-            Return to Officer Login
-          </Link>
         </div>
       </div>
     </div>
