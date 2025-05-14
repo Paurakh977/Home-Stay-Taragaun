@@ -131,17 +131,17 @@ export default function OfficerLoginForm({ adminUsername }: OfficerLoginFormProp
                 </div>
               )}
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">
-              {branding.brandName || 'Officer Portal'}
+            <h1 className="text-2x font-bold text-gray-900 mb-1">
+              {branding.brandName || 'Officer Portal'} Development Committee
             </h1>
             <p className="text-gray-500 text-sm">
-              {branding.contactInfo?.address || 'Kathmandu, Nepal'}, <span className="font-semibold">Officer</span>
+              {branding.contactInfo?.address || 'Kathmandu, Nepal'}
             </p>
-            <p className="text-xs text-gray-400 mt-1">
-              Admin: {adminUsername}
+            <p className="text-xs text-gray-800 mt-1">
+              {adminUsername}
             </p>
             {branding.brandDescription && (
-              <p className="mt-2 text-xs text-gray-500">{branding.brandDescription}</p>
+              <p className="mt-2 text-xs text-gray-500">Homestay Digital Marketing Platform</p>
             )}
           </div>
           

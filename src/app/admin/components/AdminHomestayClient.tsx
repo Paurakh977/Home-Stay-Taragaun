@@ -762,7 +762,11 @@ export default function AdminHomestayClient({
   return (
     <div className="p-6 max-w-full overflow-x-auto flex-1">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-        <h1 className="text-2xl font-bold text-gray-900">{propUsername || (isOfficer && officerData?.parentAdmin) || ''} Homestay Management</h1>
+      <h1 className="text-2xl font-bold text-gray-900">
+        {((propUsername || (isOfficer && officerData?.parentAdmin) || '')).charAt(0).toUpperCase() +
+        ((propUsername || (isOfficer && officerData?.parentAdmin) || '')).slice(1)} Homestay Digital Marketing Platform
+      </h1>
+
         
         {/* Logout button only shown on mobile */}
         <button

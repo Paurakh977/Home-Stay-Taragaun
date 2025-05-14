@@ -120,22 +120,22 @@ export default function AdminLoginForm({ adminUsername }: AdminLoginFormProps) {
                 </div>
               ) : (
                 <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-primary text-white text-3xl font-bold shadow-sm">
-                  {branding.brandName?.charAt(0) || adminUsername.charAt(0).toUpperCase()}
+                  {branding.brandName?.charAt(0) || adminUsername.charAt(0).toUpperCase()} 
                 </div>
               )}
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">
-              {branding.brandName || 'एडमिन पोर्टल'}
+            <h1 className="text-2x font-bold text-gray-900 mb-1">
+              {branding.brandName || 'एडमिन पोर्टल'} Development Committee
             </h1>
             <p className="text-gray-500 text-sm">
               {branding.contactInfo?.address || 'Kathmandu, Nepal'}
             </p>
             {branding.brandDescription && (
-              <p className="mt-2 text-xs text-gray-500">{branding.brandDescription}</p>
+              <p className="mt-2 text-xs text-gray-800">{branding.brandName}</p>
             )}
             
           <p className="mt-1 text-xs text-gray-500">
-            <span className="font-bold">{branding.brandName} Homestay Digital Marketing Platform  </span>
+            <span className="font-bold">Homestay Digital Marketing Platform  </span>
           </p>
           </div>
           
