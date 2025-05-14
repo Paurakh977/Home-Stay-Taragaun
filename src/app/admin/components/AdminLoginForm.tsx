@@ -128,12 +128,15 @@ export default function AdminLoginForm({ adminUsername }: AdminLoginFormProps) {
               {branding.brandName || 'एडमिन पोर्टल'}
             </h1>
             <p className="text-gray-500 text-sm">
-              {branding.contactInfo?.address || 'Kathmandu, Nepal'}, <span className="font-semibold">{adminUsername}</span>
+              {branding.contactInfo?.address || 'Kathmandu, Nepal'}
             </p>
             {branding.brandDescription && (
               <p className="mt-2 text-xs text-gray-500">{branding.brandDescription}</p>
             )}
-            <p className="mt-1 text-xs text-gray-500">Homestay Digitization</p>
+            
+          <p className="mt-1 text-xs text-gray-500">
+            <span className="font-bold">{branding.brandName} Homestay Digital Marketing Platform  </span>
+          </p>
           </div>
           
           {/* Login Form */}
