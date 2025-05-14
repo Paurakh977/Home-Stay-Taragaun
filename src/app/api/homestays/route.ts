@@ -143,7 +143,7 @@ function formatHomeStayName(originalName: string, homeStayType: string): string 
   const capitalized = originalName.trim().replace(/\b\w/g, c => c.toUpperCase());
   
   // Add the type in parentheses - Samudaik for community, Niji for private
-  const typeText = homeStayType === 'community' ? 'Samudaik' : 'Niji';
+  const typeText = homeStayType === 'community' ? 'Community' : 'Private';
   
   // Return the formatted name: [Original Name] ([Type]) Homestay
   return `${capitalized} ${typeText} Homestay`;
