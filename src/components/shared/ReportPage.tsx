@@ -1504,14 +1504,7 @@ export default function ReportPage({
             <FileText className="h-4 w-4 mr-2" />
             <span>PDF</span>
           </button>
-          <button 
-            onClick={() => handleExport('excel')}
-            className="flex items-center px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-            disabled={loading || homestays.length === 0}
-          >
-            <FileSpreadsheet className="h-4 w-4 mr-2" />
-            <span>Excel</span>
-          </button>
+
         </div>
       </div>
       
