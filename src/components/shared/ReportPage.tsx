@@ -469,7 +469,6 @@ export default function ReportPage({
         // Create a header/branding worksheet - REMOVED FILTER INFO
         const brandingWorksheet = XLSX.utils.aoa_to_sheet([
           [`${branding.brandName || 'Department of Tourism'}`],
-          ['Government of Nepal'],
           ['Homestay Management System'],
           [''],
           [`Report: ${title}`],
@@ -660,7 +659,7 @@ export default function ReportPage({
           // Add document title
           doc.setFontSize(16);
           doc.setFont('helvetica', 'bold');
-          doc.text(`${branding.brandName || 'Department of Tourism'}`, centerX, 40, { align: 'center' });
+          doc.text(`${branding.brandDescription || 'Development Committee'}`, centerX, 40, { align: 'center' });
           
           // Add contact information immediately after brand name
           doc.setFontSize(8);
@@ -688,11 +687,9 @@ export default function ReportPage({
             contactY += 6; // Add more space after contact info
           }
           
-          // Government and system info after contact info
-          doc.setFontSize(12);
-          doc.text('Government of Nepal', centerX, contactY, { align: 'center' });
-          contactY += 6;
-          doc.text('Homestay Management System', centerX, contactY, { align: 'center' });
+          // system info after contact info
+          doc.setFontSize(12); 
+          doc.text('Homestay Digitization Marketing Platform', centerX, contactY, { align: 'center' });
           contactY += 8;
           
           // Add report title and description
@@ -818,7 +815,7 @@ export default function ReportPage({
                   // Add branding first
                   doc.setFontSize(12);
                   doc.setFont('helvetica', 'bold');
-                  doc.text(`${branding.brandName || 'Department of Tourism'}`, centerX, 15, { align: 'center' });
+                  doc.text(`${branding.brandDescription || 'Development Committee'}`, centerX, 15, { align: 'center' });
                   
                   // Add logo to continuation pages - use a synchronous approach
                   if (branding.logoPath) {
@@ -871,8 +868,7 @@ export default function ReportPage({
                   }
                   
                   doc.setFontSize(10);
-                  doc.text('Government of Nepal', centerX, contPageContactY + 2, { align: 'center' });
-                  doc.text('Homestay Management System', centerX, contPageContactY + 7, { align: 'center' });
+                  doc.text('Homestay Digitization Marketing Platform', centerX, contPageContactY + 7, { align: 'center' });
                   
                   doc.setFont('helvetica', 'bold');
                   doc.text(`Tourism Attractions Report - Continued`, centerX, contPageContactY + 12, { align: 'center' });
@@ -991,7 +987,7 @@ export default function ReportPage({
                   // Add branding first
                   doc.setFontSize(12);
                   doc.setFont('helvetica', 'bold');
-                  doc.text(`${branding.brandName || 'Department of Tourism'}`, centerX, 15, { align: 'center' });
+                  doc.text(`${branding.brandDescription || 'Development Committee'}`, centerX, 15, { align: 'center' });
                   
                   // Add logo to continuation pages - use a synchronous approach
                   if (branding.logoPath) {
@@ -1044,8 +1040,7 @@ export default function ReportPage({
                   }
                   
                   doc.setFontSize(10);
-                  doc.text('Government of Nepal', centerX, contPageContactY + 2, { align: 'center' });
-                  doc.text('Homestay Management System', centerX, contPageContactY + 7, { align: 'center' });
+                  doc.text('Homestay Digitization Marketing Platform', centerX, contPageContactY + 7, { align: 'center' });
                   
                   doc.setFont('helvetica', 'bold');
                   doc.text(`Infrastructure Report - Continued`, centerX, contPageContactY + 12, { align: 'center' });
@@ -1163,7 +1158,7 @@ export default function ReportPage({
                   // Add branding first
                   doc.setFontSize(12);
                   doc.setFont('helvetica', 'bold');
-                  doc.text(`${branding.brandName || 'Department of Tourism'}`, centerX, 15, { align: 'center' });
+                  doc.text(`${branding.brandDescription || 'Development Committee'}`, centerX, 15, { align: 'center' });
                   
                   // Add logo to continuation pages - use a synchronous approach
                   if (branding.logoPath) {
@@ -1216,8 +1211,7 @@ export default function ReportPage({
                   }
                   
                   doc.setFontSize(10);
-                  doc.text('Government of Nepal', centerX, contPageContactY + 2, { align: 'center' });
-                  doc.text('Homestay Management System', centerX, contPageContactY + 7, { align: 'center' });
+                  doc.text('Homestay Digitization Marketing Platform', centerX, contPageContactY + 7, { align: 'center' });
                   
                   doc.setFont('helvetica', 'bold');
                   doc.text(`Homestay Services Report - Continued`, centerX, contPageContactY + 12, { align: 'center' });
@@ -1283,7 +1277,7 @@ export default function ReportPage({
               if (pageData.pageNumber > 1) {
                 doc.setFontSize(12);
                 doc.setFont('helvetica', 'bold');
-                doc.text(`${branding.brandName || 'Department of Tourism'}`, centerX, 15, { align: 'center' });
+                doc.text(`${branding.brandDescription || 'Development Committee'}`, centerX, 15, { align: 'center' });
                 
                 // Add logo to continuation pages - use a synchronous approach
                 if (branding.logoPath) {
@@ -1336,8 +1330,7 @@ export default function ReportPage({
                 }
                 
                 doc.setFontSize(10);
-                doc.text('Government of Nepal', centerX, contPageContactY + 2, { align: 'center' });
-                doc.text('Homestay Management System', centerX, contPageContactY + 7, { align: 'center' });
+                doc.text('Homestay Digitization Marketing Platform', centerX, contPageContactY + 7, { align: 'center' });
                 
                 doc.setFont('helvetica', 'bold');
                 doc.text(`Geographical Classification Report - Continued`, centerX, contPageContactY + 12, { align: 'center' });
@@ -1542,9 +1535,8 @@ export default function ReportPage({
               </div>
             )}
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900">{branding.brandName || 'Department of Tourism'}</h2>
-              <p className="text-md text-gray-700">Government of Nepal</p>
-              <p className="text-sm text-gray-600">Homestay Management System</p>
+              <h2 className="text-2xl font-bold text-gray-900">{branding.brandDescription || 'Department of Tourism'}</h2>
+              <p className="text-sm text-gray-600">Homestay Digital Marketing Platform</p>
             </div>
           </div>
           
