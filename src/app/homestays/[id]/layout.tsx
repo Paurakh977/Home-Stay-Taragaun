@@ -117,7 +117,15 @@ export default function HomestayLayout({
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
-      {/* Navbar */}
+      {/* 
+      =====================================================================
+      NAVIGATION HEADER IS COMMENTED OUT
+      To restore the navigation header:
+      1. Remove the comment markers around this section
+      2. Save the file
+      =====================================================================
+      */}
+      {/* 
       <header className="bg-white shadow-sm sticky top-0 z-30">
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center h-16">
@@ -176,7 +184,6 @@ export default function HomestayLayout({
               </Link>
             </nav>
             
-            {/* Mobile menu button */}
             <div className="md:hidden">
               <button 
                 onClick={toggleMobileMenu}
@@ -189,7 +196,6 @@ export default function HomestayLayout({
           </div>
         </div>
         
-        {/* Mobile menu */}
         {mobileMenuOpen && (
           <div className="md:hidden bg-white border-t border-gray-100 py-2">
             <div className="container mx-auto px-4 space-y-2">
@@ -237,13 +243,22 @@ export default function HomestayLayout({
           </div>
         )}
       </header>
+      */}
 
       {/* Main content */}
       <main className="flex-grow">
         {children}
       </main>
 
-      {/* Footer */}
+      {/* 
+      =====================================================================
+      FOOTER IS COMMENTED OUT
+      To restore the footer:
+      1. Remove the comment markers around this section
+      2. Save the file
+      =====================================================================
+      */}
+      {/* 
       <footer className="bg-white border-t py-6">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -328,7 +343,6 @@ export default function HomestayLayout({
                   {contactPhone}
                 </p>
                 
-                {/* Social Media Links */}
                 {primaryContact && (
                   <div className="flex space-x-3 mt-3">
                     {primaryContact.facebook && (
@@ -396,6 +410,7 @@ export default function HomestayLayout({
           </div>
         </div>
       </footer>
+      */}
     </div>
   );
 } 

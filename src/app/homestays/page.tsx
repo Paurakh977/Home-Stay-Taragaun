@@ -734,7 +734,7 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
                     <h3 className="text-lg font-semibold text-gray-900 mb-1 group-hover:text-primary transition-colors">
                       {homestay.homeStayName}
                     </h3>
-                    {renderRating(homestay.averageRating)}
+                    {/* {renderRating(homestay.averageRating)} */}
                   </div>
                   
                   <div className="flex items-start gap-1 text-gray-500 mb-2">
@@ -743,9 +743,9 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
                   </div>
                   
                   {/* Description */}
-                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                  {/* <p className="text-sm text-gray-600 mb-3 line-clamp-2">
                     {formatDescription(homestay.description)}
-                  </p>
+                  </p> */}
                   
                   {/* DHSR Number */}
                   {homestay.dhsrNo && (
@@ -793,9 +793,12 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
                 
                 {/* View button - TEMPORARILY DISABLED */}
                 <div className="px-4 pb-4 flex">
-                  <div className="w-full rounded-lg p-2 text-center text-sm bg-gray-100 text-gray-500 flex justify-center items-center">
-                    <span>Details Currently Unavailable</span>
-                  </div>
+                  <Link
+                    href={`/homestays/${homestay.homestayId}/temporary`}
+                    className="w-full rounded-lg p-2 text-center text-sm bg-primary text-white hover:bg-primary/90 transition-colors flex justify-center items-center"
+                  >
+                    <span>View Details</span> <ArrowRight className="ml-1 w-4 h-4" />
+                  </Link>
                 </div>
               </div>
             ))}
