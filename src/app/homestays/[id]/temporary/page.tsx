@@ -473,7 +473,7 @@ export default function TemporaryHomestayPage() {
         </div>
         
         {/* Officials - Enhanced */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        {/* <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4 flex items-center">
             <Users className="w-5 h-5 text-primary mr-2" />
             Homestay Officials
@@ -503,7 +503,7 @@ export default function TemporaryHomestayPage() {
               </p>
             </div>
           )}
-        </div>
+        </div> */}
         
         {/* Location - Enhanced and more prominent */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
