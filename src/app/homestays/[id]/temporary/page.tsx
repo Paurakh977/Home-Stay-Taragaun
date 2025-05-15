@@ -145,6 +145,7 @@ const formatImageUrl = (imagePath: string | undefined): string => {
   return imagePath;
 };
 
+// Add useEffect to redirect superadmins
 export default function TemporaryHomestayPage() {
   const router = useRouter();
   const params = useParams();
@@ -156,6 +157,7 @@ export default function TemporaryHomestayPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [galleryImages, setGalleryImages] = useState<{src: string, alt: string}[]>([]);
+  const [redirecting, setRedirecting] = useState(false);
   
   // Separate state for contacts and officials
   const [contacts, setContacts] = useState<HomestayData['contacts']>([]);
@@ -172,7 +174,7 @@ export default function TemporaryHomestayPage() {
     };
   }, []);
   
-  // Add check for superadmin and redirect if necessary
+  // Check for superadmin and redirect if necessary
   useEffect(() => {
     const checkSuperadminStatus = async () => {
       try {
@@ -183,6 +185,8 @@ export default function TemporaryHomestayPage() {
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.user && data.user.role === 'superadmin') {
+            // Set redirecting state
+            setRedirecting(true);
             // Redirect superadmins to the main page
             router.replace(`/homestays/${homestayId}`);
           }
@@ -194,6 +198,15 @@ export default function TemporaryHomestayPage() {
 
     checkSuperadminStatus();
   }, [homestayId, router]);
+  
+  // If redirecting, show a loading state
+  if (redirecting) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-primary rounded-full border-t-transparent"></div>
+      </div>
+    );
+  }
   
   // Fetch homestay data
   useEffect(() => {
