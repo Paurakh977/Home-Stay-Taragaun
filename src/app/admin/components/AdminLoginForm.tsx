@@ -8,6 +8,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useBranding } from "@/context/BrandingContext";
 import { getImageUrl } from "@/lib/utils";
+import TranslateButton from "@/components/ui/translate-button";
 
 interface AdminLoginFormProps {
   adminUsername: string;
@@ -107,6 +108,9 @@ export default function AdminLoginForm({ adminUsername }: AdminLoginFormProps) {
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           {/* Header with brand logo */}
           <div className="p-8 text-center">
+            <div className="absolute top-4 right-4">
+              <TranslateButton variant="ghost" size="sm" />
+            </div>
             <div className="flex justify-center mb-4">
               {branding.logoPath ? (
                 <div className="relative h-24 w-24 rounded-full overflow-hidden border-2 border-white shadow-sm">

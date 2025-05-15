@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
 import Script from 'next/script';
+import { TranslateProvider } from "@/components/shared/TranslateProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -125,7 +126,75 @@ export default function RootLayout({
           `}
         </Script>
         
-        {children}
+        {/* Script to handle Google Translate cookies and maintain translation state */}
+        <Script id="google-translate-helper" strategy="afterInteractive">
+          {`
+            // Function to set Google Translate cookies
+            function setGoogleTranslateCookies(lang) {
+              if (!lang || lang === 'en') return;
+              
+              const hostname = window.location.hostname;
+              const domain = hostname.split('.').slice(-2).join('.');
+              
+              // Set cookies at various levels to ensure they work
+              document.cookie = 'googtrans=/auto/' + lang + '; path=/; domain=.' + hostname;
+              document.cookie = 'googtrans=/auto/' + lang + '; path=/; domain=' + hostname;
+              document.cookie = 'googtrans=/auto/' + lang + '; path=/';
+              
+              // Dispatch custom event to notify page change
+              const event = new CustomEvent('nextjs:afterPageTransition');
+              document.dispatchEvent(event);
+            }
+            
+            // Check for existing translation settings on page load
+            const getCookie = (name) => {
+              const value = '; ' + document.cookie;
+              const parts = value.split('; ' + name + '=');
+              if (parts.length === 2) return parts.pop().split(';').shift();
+            };
+            
+            // Apply existing translation
+            const savedLang = getCookie('googtrans');
+            if (savedLang) {
+              const lang = savedLang.split('/').pop();
+              if (lang && lang !== 'en') {
+                setTimeout(() => setGoogleTranslateCookies(lang), 1000);
+              }
+            }
+            
+            // Handle Next.js page transitions
+            const handlePageChange = () => {
+              const savedLang = getCookie('googtrans');
+              if (savedLang) {
+                const lang = savedLang.split('/').pop();
+                if (lang && lang !== 'en') {
+                  setTimeout(() => {
+                    // Dispatch custom event to notify page change
+                    const event = new CustomEvent('nextjs:afterPageTransition');
+                    document.dispatchEvent(event);
+                  }, 500);
+                }
+              }
+            };
+            
+            // Set up listeners for Next.js page changes
+            if (typeof window !== 'undefined') {
+              // Listen for route changes
+              window.addEventListener('popstate', handlePageChange);
+              
+              // This will catch Next.js Link component navigation
+              const originalPushState = history.pushState;
+              history.pushState = function() {
+                originalPushState.apply(this, arguments);
+                handlePageChange();
+              };
+            }
+          `}
+        </Script>
+        
+        <TranslateProvider>
+          {children}
+        </TranslateProvider>
         <Toaster position="top-right" richColors />
       </body>
     </html>

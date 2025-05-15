@@ -8,6 +8,7 @@ import { Menu, X, LogOut, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBranding } from "@/context/BrandingContext";
 import { getImageUrl } from "@/lib/utils";
+import TranslateButton from "@/components/ui/translate-button";
 
 interface UserInfo {
   homestayId: string;
@@ -220,6 +221,9 @@ const Navbar = ({ adminUsername }: NavbarProps) => {
                 </span>
               </Link>
             )}
+            
+            {/* Translate Button */}
+            <TranslateButton />
           </div>
           
           {/* Mobile menu button */}
@@ -253,6 +257,9 @@ const Navbar = ({ adminUsername }: NavbarProps) => {
                   Register
                 </button>
               </Link>
+              
+              {/* Translate Button (Mobile) */}
+              <TranslateButton size="sm" />
             </div>
             
             <Button

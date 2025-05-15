@@ -209,3 +209,60 @@
 .animate-accordion-up {
   animation: accordion-up 0.2s ease-out;
 }
+
+/* Google Translate Element fixes */
+
+/* Hide Google Translate attribution */
+.goog-logo-link {
+  display: none !important;
+}
+.goog-te-gadget {
+  height: 0 !important;
+  overflow: hidden !important;
+}
+.goog-te-banner-frame {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Fix top margin when Google Translate top bar is active */
+body {
+  top: 0 !important;
+  position: static !important;
+}
+.skiptranslate {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Hide Google Translate tooltip */
+#goog-gt-tt, .goog-te-balloon-frame {
+  display: none !important;
+}
+
+/* CSS to remove Google translate duplicate images */
+.goog-text-highlight {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Make translated elements look normal */
+body > .skiptranslate {
+  display: none !important;
+}
+
+/* Hide the original select element */
+#google_translate_element select {
+  display: none !important;
+}
+
+/* Fix for dark mode text after translation */
+.translated-ltr,
+.translated-rtl {
+  color: inherit !important;
+}
+
+/* Fix for images being duplicated in translation */
+img[goog-data-img="false"] {
+  display: none !important;
+}

@@ -8,6 +8,7 @@ import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWebContent } from "@/context/WebContentContext";
 import { getImageUrl, shouldUseUnoptimizedImage } from "@/lib/imageUtils";
+import TranslateButton from "@/components/ui/translate-button";
 
 const PlatformNavbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -115,10 +116,16 @@ const PlatformNavbar = () => {
                 </div>
               </Link>
             ))}
+            
+            {/* Translate Button */}
+            <TranslateButton variant="ghost" />
           </div>
           
           {/* Mobile menu button */}
           <div className="md:hidden flex items-center">
+            {/* Translate Button (Mobile) */}
+            <TranslateButton variant="ghost" size="sm" className="mr-2" />
+            
             <Button
               variant="ghost"
               size="icon"
