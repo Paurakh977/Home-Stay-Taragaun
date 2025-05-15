@@ -7,7 +7,44 @@ import Image from 'next/image';
 import Link from 'next/link';
 // Remove the import from '@/types/homestay' if HomestayData is defined below
 // import { HomestayData } from '@/types/homestay'; 
-import { CheckCircle, XCircle, ArrowLeft, FileText, Loader2, ExternalLink, MapPin, Phone, User, Mail, Building, Globe, Image as ImageIcon, File as FileIcon, List, Edit, Plus, X, Upload, Eye, Download, Trash2, AlertCircle, Key as KeyIcon } from 'lucide-react';
+import { 
+  Edit, 
+  Check, 
+  X, 
+  Save, 
+  Trash2, 
+  MapPin, 
+  Phone, 
+  Mail, 
+  Building, 
+  Star, 
+  Clipboard, 
+  ClipboardCheck,
+  Users, 
+  User, 
+  Home, 
+  Bed, 
+  Upload, 
+  Paperclip,
+  File as FileIcon,
+  FileText,
+  Image as ImageIcon,
+  PlusCircle,
+  Maximize2,
+  AlertCircle,
+  CheckCircle,
+  FileImage,
+  Lock,
+  ExternalLink,
+  ArrowLeft,
+  Download,
+  Eye,
+  XCircle,
+  Loader2,
+  Plus,
+  List,
+  Key as KeyIcon,
+} from "lucide-react";
 import { useAdminOfficer } from '@/context/AdminOfficerContext';
 
 // --- Comprehensive Type Definition (Move to types/homestay.ts if preferred) ---
@@ -113,6 +150,10 @@ export interface HomestayData {
   
   features?: FeaturesData; 
   documents?: DocumentInfo[]; 
+  
+  // Geographical coordinates
+  latitude?: number;
+  longitude?: number;
   
   // Data from joined collections (used less now)
   location?: LocationData; // Joined location data (may have less info)
@@ -1765,6 +1806,35 @@ export default function AdminHomestayDetailPage() {
                  <InfoItem label="Village Name" value={homestay.villageName} /> 
                  <InfoItem label="Full Address (EN)" value={homestay.address?.formattedAddress?.en} />
                  <InfoItem label="Full Address (NE)" value={homestay.address?.formattedAddress?.ne} />
+                 
+                 {/* Map Display - Show when coordinates are available */}
+                 {homestay.latitude && homestay.longitude && (
+                   <div className="mt-4 border-t pt-4">
+                     <h3 className="text-sm font-medium mb-2">Location Map</h3>
+                     <div className="aspect-video relative rounded-md overflow-hidden border border-gray-200">
+                       <iframe 
+                         src={`https://maps.google.com/maps?q=${homestay.latitude},${homestay.longitude}&z=15&output=embed`}
+                         className="absolute inset-0 w-full h-full"
+                         frameBorder="0"
+                         allowFullScreen
+                         aria-hidden="false"
+                         tabIndex={0}
+                         title="Homestay Location"
+                       ></iframe>
+                     </div>
+                     <div className="mt-2 flex justify-end">
+                       <a 
+                         href={`https://www.google.com/maps/dir/?api=1&destination=${homestay.latitude},${homestay.longitude}`}
+                         target="_blank"
+                         rel="noopener noreferrer"
+                         className="inline-flex items-center text-sm text-primary hover:text-primary/80"
+                       >
+                         <ExternalLink className="h-4 w-4 mr-1" />
+                         Get Directions
+                       </a>
+                     </div>
+                   </div>
+                 )}
                </>
              ) : (
                <>
@@ -1897,6 +1967,64 @@ export default function AdminHomestayDetailPage() {
                  {/* Read-only formatted address */}
                  <InfoItem label="Full Address (EN)" value={homestay.address?.formattedAddress?.en} />
                  <InfoItem label="Full Address (NE)" value={homestay.address?.formattedAddress?.ne} />
+                 
+                 {/* Add Coordinate Editing Fields */}
+                 <div className="grid grid-cols-3 gap-2 py-1.5 mt-4 border-t pt-4">
+                   <div className="text-gray-500 font-medium">Map Coordinates</div>
+                   <div className="col-span-2 grid grid-cols-2 gap-2">
+                     <div>
+                       <label className="text-xs text-gray-500 block mb-1">Latitude</label>
+                       <input 
+                         type="number" 
+                         step="0.000001"
+                         value={getCurrentValue('latitude') || ''}
+                         onChange={(e) => handleInputChange('latitude', parseFloat(e.target.value) || '')}
+                         placeholder="e.g. 27.700769"
+                         className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                       />
+                     </div>
+                     <div>
+                       <label className="text-xs text-gray-500 block mb-1">Longitude</label>
+                       <input 
+                         type="number"
+                         step="0.000001"
+                         value={getCurrentValue('longitude') || ''}
+                         onChange={(e) => handleInputChange('longitude', parseFloat(e.target.value) || '')}
+                         placeholder="e.g. 85.300140"
+                         className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                       />
+                     </div>
+                   </div>
+                 </div>
+                 
+                 {/* Map Preview in Edit Mode */}
+                 {(editedData.latitude || homestay.latitude) && (editedData.longitude || homestay.longitude) && (
+                   <div className="mt-4 border-t pt-4">
+                     <h3 className="text-sm font-medium mb-2">Map Preview</h3>
+                     <div className="aspect-video relative rounded-md overflow-hidden border border-gray-200">
+                       <iframe 
+                         src={`https://maps.google.com/maps?q=${editedData.latitude || homestay.latitude},${editedData.longitude || homestay.longitude}&z=15&output=embed`}
+                         className="absolute inset-0 w-full h-full"
+                         frameBorder="0"
+                         allowFullScreen
+                         aria-hidden="false"
+                         tabIndex={0}
+                         title="Homestay Location"
+                       ></iframe>
+                     </div>
+                     <div className="mt-2 flex justify-end">
+                       <a 
+                         href={`https://www.google.com/maps/dir/?api=1&destination=${editedData.latitude || homestay.latitude},${editedData.longitude || homestay.longitude}`}
+                         target="_blank"
+                         rel="noopener noreferrer"
+                         className="inline-flex items-center text-sm text-primary hover:text-primary/80"
+                       >
+                         <ExternalLink className="h-4 w-4 mr-1" />
+                         Get Directions
+                       </a>
+                     </div>
+                   </div>
+                 )}
                </>
              )}
           </InfoSection>
