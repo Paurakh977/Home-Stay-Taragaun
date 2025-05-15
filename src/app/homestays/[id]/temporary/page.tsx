@@ -90,6 +90,16 @@ interface HomestayData {
   }[];
 }
 
+// Helper function to convert text to title case (like Python's .title())
+const toTitleCase = (text: string): string => {
+  if (!text) return '';
+  return text
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
 // Simple star rating component
 const StarRating = ({ rating }: { rating: number }) => {
   return (
@@ -434,7 +444,7 @@ export default function TemporaryHomestayPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {contacts.map((contact, index) => (
                 <div key={index} className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors border-l-4 border-primary">
-                  <h3 className="font-medium text-gray-800 mb-2">{contact.name}</h3>
+                  <h3 className="font-medium text-gray-800 mb-2">{toTitleCase(contact.name)}</h3>
                   
                   <div className="space-y-3">
                     <a href={`tel:${contact.mobile}`} className="flex items-center text-gray-700 hover:text-primary">
@@ -474,7 +484,7 @@ export default function TemporaryHomestayPage() {
               {officials.map((official, index) => (
                 <div key={index} className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors border-l-4 border-blue-400">
                   <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-medium text-gray-800">{official.name}</h3>
+                    <h3 className="font-medium text-gray-800">{toTitleCase(official.name)}</h3>
                     <span className="text-xs bg-primary/10 px-2 py-1 rounded text-primary">{official.role}</span>
                   </div>
                   
@@ -505,7 +515,7 @@ export default function TemporaryHomestayPage() {
           {/* Location address - More prominent */}
           <div className="bg-gray-50 p-4 rounded-lg mb-5 border-l-4 border-primary">
             <h3 className="font-medium text-gray-900 mb-2">Address</h3>
-            <p className="text-gray-700 font-medium">{homestay.address.formattedAddress.en}</p>
+            <p className="text-gray-700 font-medium">{toTitleCase(homestay.address.formattedAddress.en)}</p>
             {homestay.address.formattedAddress.ne && (
               <p className="text-gray-600 mt-1">{homestay.address.formattedAddress.ne}</p>
             )}
@@ -513,12 +523,12 @@ export default function TemporaryHomestayPage() {
               <div className="mt-2 flex flex-wrap gap-2">
                 {homestay.address.province?.en && (
                   <span className="inline-flex items-center text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded-full">
-                    Province: {homestay.address.province.en}
+                    Province: {toTitleCase(homestay.address.province.en)}
                   </span>
                 )}
                 {homestay.address.district?.en && (
                   <span className="inline-flex items-center text-xs px-2 py-1 bg-green-50 text-green-700 rounded-full">
-                    District: {homestay.address.district.en}
+                    District: {toTitleCase(homestay.address.district.en)}
                   </span>
                 )}
               </div>
@@ -583,7 +593,7 @@ export default function TemporaryHomestayPage() {
               ].map((feature, index) => (
                 <div key={index} className="flex items-center bg-gray-50 p-3 rounded-lg transition-all hover:bg-gray-100">
                   <Check className="w-4 h-4 text-green-500 mr-3 flex-shrink-0" />
-                  <span className="text-gray-700">{feature}</span>
+                  <span className="text-gray-700">{toTitleCase(feature)}</span>
                 </div>
               ))}
             </div>
