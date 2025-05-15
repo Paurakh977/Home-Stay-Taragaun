@@ -46,6 +46,15 @@ import {
   Key as KeyIcon,
 } from "lucide-react";
 import { useAdminOfficer } from '@/context/AdminOfficerContext';
+// Import MapSectionSelector component
+import MapSectionSelector from '@/app/dashboard/update-info/components/MapSectionSelector';
+
+// Add Leaflet type declaration
+declare global {
+  interface Window {
+    L: any;
+  }
+}
 
 // --- Comprehensive Type Definition (Move to types/homestay.ts if preferred) ---
 
@@ -1542,6 +1551,78 @@ export default function AdminHomestayDetailPage() {
   };
   // ... existing code ...
 
+  // New state for map interaction
+  // const [mapLoaded, setMapLoaded] = useState(false);
+  // const [mapInstance, setMapInstance] = useState<any>(null);
+  // const [markerInstance, setMarkerInstance] = useState<any>(null);
+  // const mapRef = useRef<HTMLDivElement>(null);
+  
+  // Initialize the map when in edit mode
+  // useEffect(() => {
+  //   if (!isEditing || !mapRef.current || typeof window === 'undefined' || !window.L) return;
+  //   
+  //   // Only initialize once
+  //   if (mapInstance) return;
+  //   
+  //   const initialLatitude = editedData.latitude || homestay?.latitude || 28.3949; // Nepal default
+  //   const initialLongitude = editedData.longitude || homestay?.longitude || 84.1240; // Nepal default
+  //   
+  //   // Create map
+  //   const map = window.L.map(mapRef.current).setView([initialLatitude, initialLongitude], 13);
+  //   
+  //   // Add tile layer
+  //   window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  //     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  //   }).addTo(map);
+  //   
+  //   // Add marker if coordinates exist
+  //   const marker = window.L.marker([initialLatitude, initialLongitude], {
+  //     draggable: true
+  //   }).addTo(map);
+  //   
+  //   // Update coordinates when marker is dragged
+  //   marker.on('dragend', function() {
+  //     const position = marker.getLatLng();
+  //     handleInputChange('latitude', position.lat);
+  //     handleInputChange('longitude', position.lng);
+  //   });
+  //   
+  //   // Update marker when clicking on map
+  //   map.on('click', function(e: any) {
+  //     const { lat, lng } = e.latlng;
+  //     marker.setLatLng([lat, lng]);
+  //     handleInputChange('latitude', lat);
+  //     handleInputChange('longitude', lng);
+  //   });
+  //   
+  //   // Store references
+  //   setMapInstance(map);
+  //   setMarkerInstance(marker);
+  //   setMapLoaded(true);
+  //   
+  //   // Cleanup on unmount
+  //   return () => {
+  //     if (map) {
+  //       map.remove();
+  //       setMapInstance(null);
+  //       setMarkerInstance(null);
+  //     }
+  //   };
+  // }, [isEditing, homestay, editedData]);
+  
+  // Remove the marker position update effect
+  // useEffect(() => {
+  //   if (!markerInstance || !mapInstance) return;
+  //   
+  //   const lat = editedData.latitude || homestay?.latitude;
+  //   const lng = editedData.longitude || homestay?.longitude;
+  //   
+  //   if (lat && lng) {
+  //     markerInstance.setLatLng([lat, lng]);
+  //     mapInstance.setView([lat, lng], mapInstance.getZoom());
+  //   }
+  // }, [editedData.latitude, editedData.longitude, markerInstance, mapInstance, homestay]);
+
   // --- Render Logic ---
 
   // Render loading state or error if necessary
@@ -1968,63 +2049,54 @@ export default function AdminHomestayDetailPage() {
                  <InfoItem label="Full Address (EN)" value={homestay.address?.formattedAddress?.en} />
                  <InfoItem label="Full Address (NE)" value={homestay.address?.formattedAddress?.ne} />
                  
-                 {/* Add Coordinate Editing Fields */}
-                 <div className="grid grid-cols-3 gap-2 py-1.5 mt-4 border-t pt-4">
-                   <div className="text-gray-500 font-medium">Map Coordinates</div>
-                   <div className="col-span-2 grid grid-cols-2 gap-2">
-                     <div>
-                       <label className="text-xs text-gray-500 block mb-1">Latitude</label>
-                       <input 
-                         type="number" 
-                         step="0.000001"
-                         value={getCurrentValue('latitude') || ''}
-                         onChange={(e) => handleInputChange('latitude', parseFloat(e.target.value) || '')}
-                         placeholder="e.g. 27.700769"
-                         className="w-full p-2 border border-gray-300 rounded-md text-sm"
-                       />
-                     </div>
-                     <div>
-                       <label className="text-xs text-gray-500 block mb-1">Longitude</label>
-                       <input 
-                         type="number"
-                         step="0.000001"
-                         value={getCurrentValue('longitude') || ''}
-                         onChange={(e) => handleInputChange('longitude', parseFloat(e.target.value) || '')}
-                         placeholder="e.g. 85.300140"
-                         className="w-full p-2 border border-gray-300 rounded-md text-sm"
-                       />
-                     </div>
+                 {/* Map Location Section */}
+                 <div className="border-t border-gray-200 pt-4 mt-4">
+                   <h3 className="text-sm font-medium mb-4">Map Location</h3>
+                   
+                   {/* Use MapSectionSelector without the readOnly prop */}
+                   <MapSectionSelector 
+                     value={{
+                       latitude: editedData.latitude || homestay?.latitude,
+                       longitude: editedData.longitude || homestay?.longitude,
+                       address: homestay.address?.formattedAddress?.en || '',
+                       district: homestay.address?.district?.en || ''
+                     }}
+                     onChange={(locationData) => {
+                       // Update coordinates in editedData
+                       handleInputChange('latitude', locationData.latitude);
+                       handleInputChange('longitude', locationData.longitude);
+                       
+                       // Optionally update address if needed
+                       if (locationData.address) {
+                         const addressParts = locationData.address.split(', ');
+                         // You might want to parse the address and update relevant fields
+                         // For now, we'll just update the formatted address
+                         if (locationData.address) {
+                           handleAddressChange('formattedAddress', {
+                             en: locationData.address,
+                             ne: homestay.address?.formattedAddress?.ne || ''
+                           });
+                         }
+                         
+                         // Update district if available and different
+                         if (locationData.district && (!editedData.address?.district?.en || editedData.address.district.en !== locationData.district)) {
+                           handleAddressChange('district', {
+                             en: locationData.district,
+                             ne: homestay.address?.district?.ne || locationData.district
+                           });
+                         }
+                       }
+                     }}
+                   />
+                   
+                   <div className="text-xs text-gray-500 mt-2">
+                     <p>• Make sure to place the marker at the exact location of your homestay</p>
+                     <p>• Accurate coordinates help visitors find your homestay easily</p>
                    </div>
                  </div>
                  
-                 {/* Map Preview in Edit Mode */}
-                 {(editedData.latitude || homestay.latitude) && (editedData.longitude || homestay.longitude) && (
-                   <div className="mt-4 border-t pt-4">
-                     <h3 className="text-sm font-medium mb-2">Map Preview</h3>
-                     <div className="aspect-video relative rounded-md overflow-hidden border border-gray-200">
-                       <iframe 
-                         src={`https://maps.google.com/maps?q=${editedData.latitude || homestay.latitude},${editedData.longitude || homestay.longitude}&z=15&output=embed`}
-                         className="absolute inset-0 w-full h-full"
-                         frameBorder="0"
-                         allowFullScreen
-                         aria-hidden="false"
-                         tabIndex={0}
-                         title="Homestay Location"
-                       ></iframe>
-                     </div>
-                     <div className="mt-2 flex justify-end">
-                       <a 
-                         href={`https://www.google.com/maps/dir/?api=1&destination=${editedData.latitude || homestay.latitude},${editedData.longitude || homestay.longitude}`}
-                         target="_blank"
-                         rel="noopener noreferrer"
-                         className="inline-flex items-center text-sm text-primary hover:text-primary/80"
-                       >
-                         <ExternalLink className="h-4 w-4 mr-1" />
-                         Get Directions
-                       </a>
-                     </div>
-                   </div>
-                 )}
+                 {/* Remove the old Map Preview section if you want to keep only MapSectionSelector */}
+                 {/* Preview is now part of the MapSectionSelector component */}
                </>
              )}
           </InfoSection>
