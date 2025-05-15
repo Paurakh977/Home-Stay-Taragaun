@@ -9,6 +9,17 @@ import {
   Navigation, ExternalLink, Info
 } from "lucide-react";
 
+// Add CSS to explicitly hide any navigation elements that might be visible
+const HideNavStyles = () => (
+  <style jsx global>{`
+    /* Hide any potential navigation and footer for temporary page */
+    .temporary-page header.sticky,
+    .temporary-page footer.border-t {
+      display: none !important;
+    }
+  `}</style>
+);
+
 // Define interfaces for typing
 interface HomestayData {
   _id: string;
@@ -149,6 +160,40 @@ export default function TemporaryHomestayPage() {
   // Separate state for contacts and officials
   const [contacts, setContacts] = useState<HomestayData['contacts']>([]);
   const [officials, setOfficials] = useState<HomestayData['officials']>([]);
+  
+  // Add useEffect to add class to body for CSS targeting
+  useEffect(() => {
+    // Add class to body for CSS targeting
+    document.body.classList.add('temporary-page');
+    
+    // Clean up on unmount
+    return () => {
+      document.body.classList.remove('temporary-page');
+    };
+  }, []);
+  
+  // Add check for superadmin and redirect if necessary
+  useEffect(() => {
+    const checkSuperadminStatus = async () => {
+      try {
+        const response = await fetch('/api/superadmin/auth/me', {
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.user && data.user.role === 'superadmin') {
+            // Redirect superadmins to the main page
+            router.replace(`/homestays/${homestayId}`);
+          }
+        }
+      } catch (err) {
+        console.error('Error checking superadmin status:', err);
+      }
+    };
+
+    checkSuperadminStatus();
+  }, [homestayId, router]);
   
   // Fetch homestay data
   useEffect(() => {
@@ -307,7 +352,10 @@ export default function TemporaryHomestayPage() {
   }
   
   return (
-    <div className="min-h-screen bg-gray-50 pb-16">
+    <div className="min-h-screen bg-gray-50 pb-16 temporary-page">
+      {/* Include the style component to hide navigation */}
+      <HideNavStyles />
+      
       {/* Back button */}
       <div className="sticky top-0 z-10 bg-white shadow-sm p-4">
         <div className="container mx-auto">

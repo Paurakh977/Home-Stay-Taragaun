@@ -72,6 +72,7 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
   
   // Address data state
   const [addressData, setAddressData] = useState<{
@@ -115,6 +116,29 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
     tourismServices: [],
     infrastructure: []
   });
+
+  // Add a check for superadmin role on component mount
+  useEffect(() => {
+    const checkSuperadminStatus = async () => {
+      try {
+        const response = await fetch('/api/superadmin/auth/me', {
+          credentials: 'include' // Important to send the cookies
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.user && data.user.role === 'superadmin') {
+            setIsSuperadmin(true);
+          }
+        }
+      } catch (err) {
+        console.error('Error checking superadmin status:', err);
+        // Don't update state - default is false
+      }
+    };
+
+    checkSuperadminStatus();
+  }, []);
 
   // Load address data
   useEffect(() => {
@@ -794,7 +818,7 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
                 {/* View button - TEMPORARILY DISABLED */}
                 <div className="px-4 pb-4 flex">
                   <Link
-                    href={`/homestays/${homestay.homestayId}/temporary`}
+                    href={isSuperadmin ? `/homestays/${homestay.homestayId}` : `/homestays/${homestay.homestayId}/temporary`}
                     className="w-full rounded-lg p-2 text-center text-sm bg-primary text-white hover:bg-primary/90 transition-colors flex justify-center items-center"
                   >
                     <span>View Details</span> <ArrowRight className="ml-1 w-4 h-4" />
