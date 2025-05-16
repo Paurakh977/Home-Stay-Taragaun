@@ -643,7 +643,7 @@ export default function ReportPage({
               },
               columnStyles: {
                 0: { cellWidth: 10 },   // S.N.
-                1: { cellWidth: 28 },  // Homestay Name
+                1: { cellWidth: 28, overflow: 'linebreak' },  // Homestay Name - Add overflow linebreak
                 2: { cellWidth: 20 },  // DHSR No
                 3: { cellWidth: 22 },  // Type - increased width
                 4: { cellWidth: 70, overflow: 'linebreak' }, // Formatted Address
@@ -815,7 +815,7 @@ export default function ReportPage({
               },
               columnStyles: {
                 0: { cellWidth: 10 },   // S.N.
-                1: { cellWidth: 28 },  // Homestay Name
+                1: { cellWidth: 28, overflow: 'linebreak' },  // Homestay Name - Add overflow linebreak
                 2: { cellWidth: 20 },  // DHSR No
                 3: { cellWidth: 22 },  // Type
                 4: { cellWidth: 70, overflow: 'linebreak' }, // Formatted Address
@@ -986,7 +986,7 @@ export default function ReportPage({
               },
               columnStyles: {
                 0: { cellWidth: 10 },   // S.N.
-                1: { cellWidth: 28 },  // Homestay Name
+                1: { cellWidth: 28, overflow: 'linebreak' },  // Homestay Name - Add overflow linebreak
                 2: { cellWidth: 20 },  // DHSR No
                 3: { cellWidth: 22 },  // Type
                 4: { cellWidth: 70, overflow: 'linebreak' }, // Formatted Address
@@ -1200,20 +1200,10 @@ export default function ReportPage({
           });
           }
           
-          // Add footer with signature
+          // Just set to the last page and save the PDF, no signature
           const lastPage = doc.getNumberOfPages();
           doc.setPage(lastPage);
-          
-          const pageHeight = doc.internal.pageSize.getHeight();
-          // Increase vertical space for signature area - moved up higher on the page
-          const footerY = pageHeight - 50;  
-          doc.setFontSize(10);
-          
-          // Center align the signature properly with more space
-          doc.text('Authorized Signature', pageWidth - 50, footerY, { align: 'center' });
-          doc.line(pageWidth - 90, footerY + 15, pageWidth - 10, footerY + 15);
-          doc.text('Tourism Officer', pageWidth - 50, footerY + 25, { align: 'center' });
-          
+            
           // Save the PDF with appropriate name based on report type
           const reportTypeName = type.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('_');
           doc.save(`Homestay_${reportTypeName}_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -1560,7 +1550,7 @@ export default function ReportPage({
                             className="text-xs hover:bg-gray-50 transition-colors"
                           >
                             <td className="px-4 py-3 text-gray-900">{index + 1}</td>
-                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'dhsrNo') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">
                               {getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private'}
@@ -1795,12 +1785,12 @@ export default function ReportPage({
                             className="text-xs hover:bg-gray-50 transition-colors"
                           >
                             <td className="px-4 py-3 text-gray-900">{index + 1}</td>
-                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'dhsrNo') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">
                               {getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private'}
                             </td>
-                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'address.formattedAddress.en') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'address.formattedAddress.en') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">
                               {formatAttractions(homestay.features?.localAttractions)}
                             </td>
@@ -2013,12 +2003,12 @@ export default function ReportPage({
                             className="text-xs hover:bg-gray-50 transition-colors"
                           >
                             <td className="px-4 py-3 text-gray-900">{index + 1}</td>
-                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'dhsrNo') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">
                               {getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private'}
                             </td>
-                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'address.formattedAddress.en') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'address.formattedAddress.en') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">
                               {formatInfrastructure(homestay.features?.infrastructure)}
                             </td>
@@ -2210,12 +2200,12 @@ export default function ReportPage({
                             className="text-xs hover:bg-gray-50 transition-colors"
                           >
                             <td className="px-4 py-3 text-gray-900">{index + 1}</td>
-                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'dhsrNo') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">
                               {getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private'}
                             </td>
-                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'address.formattedAddress.en') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'address.formattedAddress.en') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">
                               {formatServices(homestay.features?.tourismServices)}
                             </td>
@@ -2268,12 +2258,6 @@ export default function ReportPage({
             <div className="text-sm text-gray-500">
               <p>© {new Date().getFullYear()} {branding.brandName || 'Department of Tourism'}</p>
               <p className="mt-1">Generated on {currentDate}</p>
-            </div>
-            
-            <div className="mt-4 md:mt-0 text-right">
-              <p className="text-sm">Authorized Signature</p>
-              <div className="h-12 mt-2"></div>
-              <p className="text-sm border-t pt-1 border-gray-400">Tourism Officer</p>
             </div>
           </div>
         </div>
