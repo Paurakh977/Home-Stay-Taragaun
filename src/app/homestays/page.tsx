@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Search, MapPin, Star, Bed, Home, Filter, X, ChevronDown, ArrowRight, Utensils, Wifi, Users, Mountain } from "lucide-react";
+import TranslateButton from "@/components/ui/translate-button";
 
 // Types
 interface HomestayListing {
@@ -434,8 +435,15 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-primary/90 to-primary text-white py-16">
         <div className="container mx-auto px-4">
-          <h1 className="text-3xl md:text-4xl font-bold mb-4">Discover Authentic Homestays</h1>
-          <p className="text-lg md:text-xl max-w-2xl opacity-90">Experience the true essence of Nepalese hospitality and culture with our curated homestays.</p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold mb-4">Discover Authentic Homestays</h1>
+              <p className="text-lg md:text-xl max-w-2xl opacity-90">Experience the true essence of Nepalese hospitality and culture with our curated homestays.</p>
+            </div>
+            <div className="hidden md:block">
+              <TranslateButton variant="outline" size="default" className="bg-white/20 hover:bg-white/30 border-white/40" />
+            </div>
+          </div>
         </div>
       </div>
       
@@ -465,15 +473,20 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
               )}
             </div>
             
-            {/* Filter button */}
-            <button 
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <Filter size={20} className="text-primary" />
-              <span className="font-medium">Filters</span>
-              <ChevronDown size={16} className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />
-            </button>
+            <div className="flex gap-2">
+              {/* Filter button */}
+              <button 
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center gap-2 px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <Filter size={20} className="text-primary" />
+                <span className="font-medium">Filters</span>
+                <ChevronDown size={16} className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {/* Translate Button */}
+              <TranslateButton variant="ghost" />
+            </div>
           </div>
           
           {/* Filter options */}

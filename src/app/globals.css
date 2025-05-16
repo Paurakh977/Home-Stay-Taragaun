@@ -266,3 +266,19 @@ body > .skiptranslate {
 img[goog-data-img="false"] {
   display: none !important;
 }
+
+/* Prevent Google Translate from translating specific elements */
+.notranslate {
+  -webkit-user-select: text !important;
+  -webkit-user-modify: read-write !important;
+}
+
+/* Make sure notranslate class actually works */
+.notranslate * {
+  unicode-bidi: embed !important;
+}
+
+/* Add CSS to force notranslate on Google's internal IFrame */
+.VIpgJd-ZVi9od-ORHb .VIpgJd-ZVi9od-l4eHX-hSRGPd {
+  display: none !important;
+}

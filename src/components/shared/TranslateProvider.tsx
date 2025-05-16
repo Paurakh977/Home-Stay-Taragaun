@@ -43,6 +43,7 @@ export function TranslateProvider({ children }: { children: React.ReactNode }) {
       if (!document.getElementById('google_translate_element')) {
         const div = document.createElement('div');
         div.id = 'google_translate_element';
+        div.className = 'notranslate';
         div.style.display = 'none';
         document.body.appendChild(div);
       }
@@ -58,6 +59,16 @@ export function TranslateProvider({ children }: { children: React.ReactNode }) {
           }, 'google_translate_element');
           setInitialized(true);
           console.log('Google Translate initialized');
+          
+          // Add class to prevent Google from translating its own UI
+          document.querySelectorAll('.goog-te-menu-value span').forEach(el => {
+            el.classList.add('notranslate');
+          });
+          
+          // Fix: reset translation on next tick to ensure full page gets the proper translation
+          setTimeout(() => {
+            restoreTranslation();
+          }, 500);
         } catch (error) {
           console.error('Failed to initialize Google Translate:', error);
         }
@@ -87,40 +98,65 @@ export function TranslateProvider({ children }: { children: React.ReactNode }) {
     };
   }, [scriptLoaded, initialized]);
   
-  // Add listener to fix translation issues on route changes
-  useEffect(() => {
-    if (!initialized) return;
+  // Function to restore translation state after route changes
+  const restoreTranslation = () => {
+    // Get the current language from cookie
+    const getCookie = (name: string) => {
+      const value = '; ' + document.cookie;
+      const parts = value.split('; ' + name + '=');
+      if (parts.length === 2) return parts.pop()?.split(';').shift();
+      return null;
+    };
     
-    // Function to restore translation state after route changes
-    const restoreTranslation = () => {
-      // Get the current language from cookie
-      const match = document.cookie.match(/googtrans=\/auto\/([^;]+)/);
-      if (match && match[1] && match[1] !== 'en') {
-        const langCode = match[1];
-        
-        // Try to restore translation
+    const savedLang = getCookie('googtrans');
+    if (savedLang) {
+      const lang = savedLang.split('/').pop();
+      if (lang && lang !== 'en') {
         setTimeout(() => {
           const selectField = document.querySelector('.goog-te-combo') as HTMLSelectElement;
-          if (selectField && selectField.value !== langCode) {
-            selectField.value = langCode;
+          if (selectField && selectField.value !== lang) {
+            selectField.value = lang;
             selectField.dispatchEvent(new Event('change'));
           }
         }, 500);
       }
-    };
+    }
+  };
+  
+  // Add listener to fix translation issues on route changes
+  useEffect(() => {
+    if (!initialized) return;
     
     // Listen for route changes in Next.js
     document.addEventListener('nextjs:afterPageTransition', restoreTranslation);
     
+    // Add MutationObserver to detect page changes (which may not trigger route change events)
+    const observer = new MutationObserver((mutations) => {
+      // Check if we have significant DOM changes that might indicate a page change
+      const significantChanges = mutations.some(mutation => 
+        mutation.addedNodes.length > 3 || 
+        (mutation.target instanceof HTMLElement && 
+         (mutation.target.tagName === 'MAIN' || mutation.target.classList.contains('main-content')))
+      );
+      
+      if (significantChanges) {
+        restoreTranslation();
+      }
+    });
+    
+    // Start observing the document with the configured parameters
+    observer.observe(document.body, { childList: true, subtree: true });
+    
     return () => {
       document.removeEventListener('nextjs:afterPageTransition', restoreTranslation);
+      observer.disconnect();
     };
   }, [initialized]);
   
   return (
     <>
       {children}
-      <div id="google_translate_element" className="hidden" />
+      <div id="google_translate_element" className="hidden notranslate" />
     </>
   );
 }
