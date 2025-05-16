@@ -105,6 +105,10 @@ export interface IHomestaySingle extends Document {
   dhsrNo?: string;
   adminUsername: string; // Added admin username field for multi-tenant support
   
+  // Business registration details
+  registrationAuthority?: string;
+  businessRegistrationNumber?: string;
+  
   // Basic homestay information
   homeStayName: string;
   villageName: string;
@@ -260,6 +264,16 @@ const homestaySchema = new Schema<IHomestaySingle>(
       required: true,
       index: true, // Add index for faster filtering by admin
       trim: true
+    },
+    
+    // Business registration details
+    registrationAuthority: {
+      type: String,
+      default: ""
+    },
+    businessRegistrationNumber: {
+      type: String,
+      default: ""
     },
     
     // Feature access permissions
