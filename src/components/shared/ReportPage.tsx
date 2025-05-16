@@ -1211,13 +1211,13 @@ export default function ReportPage({
                     font: 'helvetica'
                   },
                   columnStyles: {
-                    0: { cellWidth: 8 },   // S.N.
-                    1: { cellWidth: 52, overflow: 'linebreak' },  // Homestay Name - increased width
-                    2: { cellWidth: 60, overflow: 'linebreak' },  // Address - increased width
-                    3: { cellWidth: 28 },  // Type
-                    4: { cellWidth: 40, overflow: 'linebreak' },  // Registration Authority - increased width
-                    5: { cellWidth: 40, overflow: 'linebreak' },  // Business Registration Number - increased width
-                    6: { cellWidth: 40, overflow: 'linebreak' },  // Manager/Operator - increased width
+                    0: { cellWidth: 12 },   // S.N.
+                    1: { cellWidth: 40, overflow: 'linebreak' },  // Homestay Name
+                    2: { cellWidth: 40, overflow: 'linebreak' },  // Address
+                    3: { cellWidth: 25 },  // Type
+                    4: { cellWidth: 35, overflow: 'linebreak' },  // Registration Authority 
+                    5: { cellWidth: 30, overflow: 'linebreak' },  // Business Registration Number 
+                    6: { cellWidth: 30, overflow: 'linebreak' },  // Manager/Operator 
                     7: { cellWidth: 35 }   // Contact Number
                   },
                   headStyles: {
