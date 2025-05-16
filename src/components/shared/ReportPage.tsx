@@ -59,12 +59,18 @@ interface Homestay {
     tourismServices?: string[];
     infrastructure?: string[];
   };
+  contacts?: {
+    name: string;
+    mobile: string;
+  }[];
+  registrationAuthority?: string;
+  businessRegistrationNumber?: string;
 }
 
 interface ReportPageProps {
   title: string;
   description: string;
-  type: 'geographical-classification' | 'service-ratings' | 'tourism-attractions' | 'infrastructure' | 'homestay-services';
+  type: 'geographical-classification' | 'service-ratings' | 'tourism-attractions' | 'infrastructure' | 'homestay-services' | 'district-type';
   userType: 'admin' | 'officer';
   username: string;
 }
@@ -115,7 +121,7 @@ export default function ReportPage({
   // Fetch homestays data
   useEffect(() => {
     const fetchHomestays = async () => {
-      if (type !== 'geographical-classification' && type !== 'tourism-attractions' && type !== 'infrastructure' && type !== 'homestay-services') return;
+      if (type !== 'geographical-classification' && type !== 'tourism-attractions' && type !== 'infrastructure' && type !== 'homestay-services' && type !== 'district-type') return;
       
       try {
         setLoading(true);
@@ -129,6 +135,11 @@ export default function ReportPage({
         if (filters.municipality) queryParams.append('municipality', filters.municipality);
         if (filters.homestayType) queryParams.append('homestayType', filters.homestayType);
         if (filters.status) queryParams.append('status', filters.status);
+        
+        // For district-type report, we need to include contacts
+        if (type === 'district-type') {
+          queryParams.append('includeContacts', 'true');
+        }
         
         // Add attraction filter if applicable
         if (type === 'tourism-attractions' && filters.selectedAttractions && filters.selectedAttractions.length > 0) {
@@ -1078,6 +1089,249 @@ export default function ReportPage({
                 doc.setFontSize(8);
                 doc.text(`Page ${doc.getNumberOfPages()}`, 20, doc.internal.pageSize.getHeight() - 10);
               }
+            });
+          } else if (type === 'district-type') {
+            // First, group homestays by province, then by district
+            const provinceDistrictMap = dataToExport.reduce((provinceAcc: {
+              [province: string]: {
+                [district: string]: Homestay[]
+              }
+            }, homestay) => {
+              const province = getValue(homestay, 'address.province.en') || 'Unknown Province';
+              const district = getValue(homestay, 'address.district.en');
+              if (!district) return provinceAcc;
+              
+              // Initialize province if not exists
+              if (!provinceAcc[province]) {
+                provinceAcc[province] = {};
+              }
+              
+              // Initialize district if not exists
+              if (!provinceAcc[province][district]) {
+                provinceAcc[province][district] = [];
+              }
+              
+              // Add homestay to the district
+              provinceAcc[province][district].push(homestay);
+              return provinceAcc;
+            }, {});
+            
+            // Set up initial PDF properties
+            let currentY = tableStartY;
+            let isFirstDistrict = true;
+            
+            // If province filter is applied, only show that province's districts
+            const provincesToShow = filters.province 
+              ? { [filters.province]: provinceDistrictMap[filters.province] || {} } 
+              : provinceDistrictMap;
+            
+            // Process each province
+            Object.entries(provincesToShow).forEach(([province, districts], provinceIndex) => {
+              // For each province, add a province header
+              if (!isFirstDistrict) {
+                doc.addPage();
+                currentY = 60; // Reset Y position for new page
+              }
+              
+              // Add province header
+              doc.setFontSize(14);
+              doc.setFont('helvetica', 'bold');
+              doc.text(`${province} Province`, centerX, currentY, { align: 'center' });
+              currentY += 15; // Add space after province header
+              
+              // Force a page break after the first district to test continuation headers
+              if (provinceIndex === 0 && Object.keys(districts).length > 1) {
+                console.log("Forcing a test page break to verify headers");
+              }
+              
+              // Process each district in this province
+              Object.entries(districts).forEach(([district, homestays], districtIndex) => {
+                // If not the first district of this province, check if we need a new page
+                if (districtIndex > 0) {
+                  // Check if there's enough space for the next district
+                  if (currentY > doc.internal.pageSize.getHeight() - 100) {
+                    doc.addPage();
+                    currentY = 60; // Reset Y position for new page
+                  } else {
+                    // Just add some space between districts
+                    currentY += 20;
+                  }
+                }
+                
+                // Add district header
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                // Always include province name in district header for better readability in all-provinces export
+                doc.text(`${province} Province - ${district} District`, 20, currentY);
+                currentY += 8;
+                
+                // District table data
+                const normalizedData: Array<(string | number)[]> = [];
+                
+                homestays.forEach((homestay, index) => {
+                  // Find the first contact (manager/operator) for this homestay
+                  const contacts = homestay.contacts || [];
+                  const primaryContact = contacts.length > 0 ? contacts[0] : null;
+                  
+                  normalizedData.push([
+                    index + 1,
+                    getValue(homestay, 'homeStayName') || 'N/A',
+                    getValue(homestay, 'address.formattedAddress.en') || 'N/A',
+                    getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private',
+                    homestay.registrationAuthority || 'N/A',
+                    homestay.businessRegistrationNumber || 'N/A',
+                    primaryContact?.name || 'N/A',
+                    primaryContact?.mobile || 'N/A'
+                  ]);
+                });
+                
+                // Calculate counts for footer
+                const communityCount = homestays.filter(h => h.homeStayType === 'community').length;
+                const privateCount = homestays.filter(h => h.homeStayType === 'private').length;
+                
+                // Add district table with merged cells in footer
+                autoTable(doc, {
+                  startY: currentY,
+                  head: [['S.N.', 'Homestay Name', 'Address', 'Type', 'Registration Authority', 'Business Reg. No.', 'Manager/Operator', 'Contact Number']],
+                  body: normalizedData,
+                  foot: [[
+                    { content: `Total Homestays: ${homestays.length}`, colSpan: 2 },
+                    { content: `Community: ${communityCount}`, colSpan: 1 },
+                    { content: `Private: ${privateCount}`, colSpan: 5 }
+                  ]],
+                  styles: {
+                    fontSize: 8,
+                    cellPadding: 2,
+                    lineColor: [0, 0, 0],
+                    lineWidth: 0.1,
+                    halign: 'left',
+                    valign: 'middle',
+                    overflow: 'ellipsize',
+                    cellWidth: 'auto',
+                    font: 'helvetica'
+                  },
+                  columnStyles: {
+                    0: { cellWidth: 8 },   // S.N.
+                    1: { cellWidth: 52, overflow: 'linebreak' },  // Homestay Name - increased width
+                    2: { cellWidth: 60, overflow: 'linebreak' },  // Address - increased width
+                    3: { cellWidth: 28 },  // Type
+                    4: { cellWidth: 40, overflow: 'linebreak' },  // Registration Authority - increased width
+                    5: { cellWidth: 40, overflow: 'linebreak' },  // Business Registration Number - increased width
+                    6: { cellWidth: 40, overflow: 'linebreak' },  // Manager/Operator - increased width
+                    7: { cellWidth: 35 }   // Contact Number
+                  },
+                  headStyles: {
+                    fillColor: [220, 220, 220],
+                    textColor: [0, 0, 0],
+                    fontStyle: 'bold',
+                    halign: 'center'
+                  },
+                  footStyles: {
+                    fillColor: [245, 245, 245],
+                    fontStyle: 'bold',
+                    textColor: [0, 0, 0]  // Make footer text black
+                  },
+                  alternateRowStyles: {
+                    fillColor: [245, 245, 245]
+                  },
+                  margin: { top: 60 },
+                  didDrawPage: function(pageData) {
+                    // Only add header to pages after the first page to avoid double headers
+                    if (pageData.pageNumber > 1) {
+                      // Add branding first
+                      doc.setFontSize(12);
+                      doc.setFont('helvetica', 'bold');
+                      doc.text(`${branding.brandDescription || 'Development Committee'}`, centerX, 15, { align: 'center' });
+                      
+                      // Add logo to continuation pages
+                      if (branding.logoPath) {
+                        try {
+                          // Create a temporary image element to get dimensions
+                          const tmpImg = document.createElement('img');
+                          tmpImg.src = getImageUrl(branding.logoPath);
+                          
+                          // Default dimensions if image not loaded yet
+                          const imgWidth = 20;
+                          const imgHeight = 20;
+                          
+                          // Add the image directly without waiting for onload
+                          doc.addImage(
+                            getImageUrl(branding.logoPath), 
+                            'JPEG', 
+                            centerX - 55, 
+                            5, 
+                            imgWidth, 
+                            imgHeight
+                          );
+                        } catch (error) {
+                          console.error('Error adding logo to page:', error);
+                        }
+                      }
+                      
+                      // Add contact information on continuation pages
+                      doc.setFontSize(8);
+                      doc.setFont('helvetica', 'normal');
+                      let contPageContactY = 20;
+                      
+                      if (branding.contactInfo?.address) {
+                        doc.text(`${branding.contactInfo.address}`, centerX, contPageContactY, { align: 'center' });
+                        contPageContactY += 4;
+                      }
+                      
+                      if (branding.contactInfo?.email || branding.contactInfo?.phone) {
+                        let contactText = '';
+                        if (branding.contactInfo?.email) {
+                          contactText += branding.contactInfo.email;
+                        }
+                        if (branding.contactInfo?.email && branding.contactInfo?.phone) {
+                          contactText += ' | ';
+                        }
+                        if (branding.contactInfo?.phone) {
+                          contactText += branding.contactInfo.phone;
+                        }
+                        doc.text(contactText, centerX, contPageContactY, { align: 'center' });
+                        contPageContactY += 4;
+                      }
+                      
+                      doc.setFontSize(10);
+                      doc.text('Homestay Digitization Marketing Platform', centerX, contPageContactY + 7, { align: 'center' });
+                      
+                      doc.setFont('helvetica', 'bold');
+                      doc.text(`District-wise Classification Report - Continued`, centerX, contPageContactY + 12, { align: 'center' });
+                      
+                      // Add a visible marker to ensure headers are displaying
+                      doc.setFillColor(255, 0, 0);  // Red color
+                      doc.rect(centerX - 5, contPageContactY + 13, 10, 2, 'F');  // Small red rectangle under text
+                      
+                      doc.setDrawColor(0);
+                      doc.setLineWidth(0.5);
+                      doc.line(20, contPageContactY + 15, pageWidth - 20, contPageContactY + 15);
+                    }
+                    
+                    // Move page numbers to bottom left corner
+                    doc.setFontSize(8);
+                    doc.text(`Page ${doc.getNumberOfPages()}`, 20, doc.internal.pageSize.getHeight() - 10);
+                    
+                    // Create a debugging element to show page numbers and report type
+                    if (pageData.pageNumber > 1) {
+                      doc.setFontSize(8);
+                      doc.setTextColor(220, 0, 0);
+                      doc.text(`DEBUG: District Report Page ${pageData.pageNumber}`, pageWidth - 60, doc.internal.pageSize.getHeight() - 10);
+                      doc.setTextColor(0, 0, 0);
+                    }
+                  },
+                  didDrawCell: function(data: any) {
+                    // Track the last cell drawn using the data object's properties
+                    if (data.section === 'foot') {
+                      // This is the footer section
+                      currentY = data.cell.y + data.cell.height + 20; // Add padding after table
+                    }
+                  }
+                });
+                
+                // Set flag to indicate we've processed the first district
+                isFirstDistrict = false;
+              });
             });
           } else {
             // Original geographical-classification table
@@ -2247,6 +2501,233 @@ export default function ReportPage({
                     </p>
                   </div>
                 </div>
+              </>
+            )}
+
+            {type === 'district-type' && (
+              <>
+                {/* Filters Section */}
+                <div className="mb-8 border p-4 rounded-lg print:hidden">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-medium">Filter Homestays</h2>
+                    <button 
+                      onClick={resetFilters}
+                      className="text-sm text-primary hover:underline flex items-center"
+                    >
+                      <Filter className="h-4 w-4 mr-1" />
+                      Reset Filters
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-4 mb-6">
+                    {/* Province Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Province</label>
+                      <select
+                        value={filters.province || ''}
+                        onChange={(e) => handleFilterChange('province', e.target.value)}
+                        className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary/20 transition-colors"
+                      >
+                        <option value="">All Provinces</option>
+                        {provinces.map(province => (
+                          <option key={province} value={province}>{province}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                
+                {loading ? (
+                  <div className="flex items-center justify-center p-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {homestays.length > 0 ? (
+                      !filters.province ? (
+                        // Show all provinces and districts when no province is selected
+                        Object.entries(
+                          sortedHomestays.reduce((acc: {[key: string]: {[key: string]: Homestay[]}}, homestay) => {
+                            const province = getValue(homestay, 'address.province.en');
+                            const district = getValue(homestay, 'address.district.en');
+                            if (!province || !district) return acc;
+                            
+                            if (!acc[province]) {
+                              acc[province] = {};
+                            }
+                            
+                            if (!acc[province][district]) {
+                              acc[province][district] = [];
+                            }
+                            
+                            acc[province][district].push(homestay);
+                            return acc;
+                          }, {})
+                        ).map(([province, districts], provinceIndex) => (
+                          <div key={province} className="mb-12">
+                            <h2 className="text-2xl font-bold mb-4 border-b pb-2">{province} Province</h2>
+                            
+                            {Object.entries(districts).map(([district, districtHomestays], districtIndex) => (
+                              <div key={district} className="mb-10">
+                                <h3 className="text-xl font-semibold mb-3 border-b pb-2">{district} District</h3>
+                                
+                                <div className="overflow-x-auto border rounded-lg">
+                                  <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-100 text-gray-700 text-xs font-medium border-b">
+                                      <tr>
+                                        <th className="px-4 py-3 text-left w-12">S.N.</th>
+                                        <th className="px-4 py-3 text-left">Homestay Name</th>
+                                        <th className="px-4 py-3 text-left">Address</th>
+                                        <th className="px-4 py-3 text-left">Private or Community</th>
+                                        <th className="px-4 py-3 text-left">Registration Authority</th>
+                                        <th className="px-4 py-3 text-left">Business Reg. No.</th>
+                                        <th className="px-4 py-3 text-left">Manager/Operator</th>
+                                        <th className="px-4 py-3 text-left">Contact Number</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                      {districtHomestays.length > 0 ? (
+                                        districtHomestays.map((homestay, index) => {
+                                          // Find the first contact (manager/operator) for this homestay
+                                          const contacts = homestay.contacts || [];
+                                          const primaryContact = contacts.length > 0 ? contacts[0] : null;
+                                          
+                                          return (
+                                            <tr 
+                                              key={homestay._id} 
+                                              className="text-xs hover:bg-gray-50 transition-colors"
+                                            >
+                                              <td className="px-4 py-3 text-gray-900">{index + 1}</td>
+                                              <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
+                                              <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'address.formattedAddress.en') || 'N/A'}</td>
+                                              <td className="px-4 py-3 text-gray-900">
+                                                {getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private'}
+                                              </td>
+                                              <td className="px-4 py-3 text-gray-900 whitespace-normal">{homestay.registrationAuthority || 'N/A'}</td>
+                                              <td className="px-4 py-3 text-gray-900">{homestay.businessRegistrationNumber || 'N/A'}</td>
+                                              <td className="px-4 py-3 text-gray-900 whitespace-normal">{primaryContact?.name || 'N/A'}</td>
+                                              <td className="px-4 py-3 text-gray-900">{primaryContact?.mobile || 'N/A'}</td>
+                                            </tr>
+                                          );
+                                        })
+                                      ) : (
+                                        <tr>
+                                          <td colSpan={8} className="px-4 py-6 text-center text-gray-500">
+                                            <div className="flex flex-col items-center justify-center py-8">
+                                              <BarChart2 className="h-10 w-10 text-gray-300 mb-3" />
+                                              <h3 className="text-sm font-semibold text-gray-600 mb-1">No homestays found</h3>
+                                              <p className="text-xs text-gray-500">No homestays available in this district</p>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      )}
+                                    </tbody>
+                                    <tfoot className="bg-gray-50 font-medium text-xs">
+                                      <tr>
+                                        <td colSpan={3} className="px-4 py-3 text-right border-t text-black">Total Homestays:</td>
+                                        <td colSpan={5} className="px-4 py-3 text-left border-t text-black">
+                                          {districtHomestays.length} 
+                                          ({districtHomestays.filter(h => h.homeStayType === 'community').length} Community, {districtHomestays.filter(h => h.homeStayType === 'private').length} Private)
+                                        </td>
+                                      </tr>
+                                    </tfoot>
+                                  </table>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ))
+                      ) : (
+                        // Group homestays by district when a specific province is selected
+                        Object.entries(
+                          sortedHomestays.reduce((acc: {[key: string]: Homestay[]}, homestay) => {
+                            const district = getValue(homestay, 'address.district.en');
+                            if (!district) return acc;
+                            
+                            if (!acc[district]) {
+                              acc[district] = [];
+                            }
+                            acc[district].push(homestay);
+                            return acc;
+                          }, {})
+                        ).map(([district, districtHomestays], districtIndex) => (
+                          <div key={district} className="mb-10">
+                            <h3 className="text-xl font-semibold mb-3 border-b pb-2">{district} District</h3>
+                            
+                            <div className="overflow-x-auto border rounded-lg">
+                              <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-100 text-gray-700 text-xs font-medium border-b">
+                                  <tr>
+                                    <th className="px-4 py-3 text-left w-12">S.N.</th>
+                                    <th className="px-4 py-3 text-left">Homestay Name</th>
+                                    <th className="px-4 py-3 text-left">Address</th>
+                                    <th className="px-4 py-3 text-left">Private or Community</th>
+                                    <th className="px-4 py-3 text-left">Registration Authority</th>
+                                    <th className="px-4 py-3 text-left">Business Reg. No.</th>
+                                    <th className="px-4 py-3 text-left">Manager/Operator</th>
+                                    <th className="px-4 py-3 text-left">Contact Number</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                  {districtHomestays.length > 0 ? (
+                                    districtHomestays.map((homestay, index) => {
+                                      // Find the first contact (manager/operator) for this homestay
+                                      const contacts = homestay.contacts || [];
+                                      const primaryContact = contacts.length > 0 ? contacts[0] : null;
+                                      
+                                      return (
+                                        <tr 
+                                          key={homestay._id} 
+                                          className="text-xs hover:bg-gray-50 transition-colors"
+                                        >
+                                          <td className="px-4 py-3 text-gray-900">{index + 1}</td>
+                                          <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
+                                          <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'address.formattedAddress.en') || 'N/A'}</td>
+                                          <td className="px-4 py-3 text-gray-900">
+                                            {getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private'}
+                                          </td>
+                                          <td className="px-4 py-3 text-gray-900 whitespace-normal">{homestay.registrationAuthority || 'N/A'}</td>
+                                          <td className="px-4 py-3 text-gray-900">{homestay.businessRegistrationNumber || 'N/A'}</td>
+                                          <td className="px-4 py-3 text-gray-900 whitespace-normal">{primaryContact?.name || 'N/A'}</td>
+                                          <td className="px-4 py-3 text-gray-900">{primaryContact?.mobile || 'N/A'}</td>
+                                        </tr>
+                                      );
+                                    })
+                                  ) : (
+                                    <tr>
+                                      <td colSpan={8} className="px-4 py-6 text-center text-gray-500">
+                                        <div className="flex flex-col items-center justify-center py-8">
+                                          <BarChart2 className="h-10 w-10 text-gray-300 mb-3" />
+                                          <h3 className="text-sm font-semibold text-gray-600 mb-1">No homestays found</h3>
+                                          <p className="text-xs text-gray-500">No homestays available in this district</p>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                                <tfoot className="bg-gray-50 font-medium text-xs">
+                                  <tr>
+                                    <td colSpan={3} className="px-4 py-3 text-right border-t text-black">Total Homestays:</td>
+                                    <td colSpan={5} className="px-4 py-3 text-left border-t text-black">
+                                      {districtHomestays.length} 
+                                      ({districtHomestays.filter(h => h.homeStayType === 'community').length} Community, {districtHomestays.filter(h => h.homeStayType === 'private').length} Private)
+                                    </td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            </div>
+                          </div>
+                        ))
+                      )
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 border rounded-lg">
+                        <BarChart2 className="h-16 w-16 text-gray-300 mb-4" />
+                        <h3 className="text-lg font-semibold text-gray-600 mb-2">No Homestays Found</h3>
+                        <p className="text-sm text-gray-500">No homestay data available for the selected filters</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>

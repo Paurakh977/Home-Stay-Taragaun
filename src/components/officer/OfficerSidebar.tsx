@@ -59,6 +59,11 @@ const reportItems = [
     title: "Homestay Services",
     href: "/officer/report/homestay-services",
     icon: Users,
+  },
+  {
+    title: "District-wise Classification",
+    href: "/officer/report/district-type",
+    icon: MapPin,
   }
 ];
 
