@@ -1178,8 +1178,8 @@ export default function ReportPage({
                     getValue(homestay, 'homeStayName') || 'N/A',
                     getValue(homestay, 'address.formattedAddress.en') || 'N/A',
                     getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private',
-                    homestay.registrationAuthority || 'N/A',
-                    homestay.businessRegistrationNumber || 'N/A',
+                    getValue(homestay, 'registrationAuthority') || 'N/A',
+                    getValue(homestay, 'businessRegistrationNumber') || 'N/A',
                     primaryContact?.name || 'N/A',
                     primaryContact?.mobile || 'N/A'
                   ]);
@@ -2603,8 +2603,8 @@ export default function ReportPage({
                                               <td className="px-4 py-3 text-gray-900">
                                                 {getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private'}
                                               </td>
-                                              <td className="px-4 py-3 text-gray-900 whitespace-normal">{homestay.registrationAuthority || 'N/A'}</td>
-                                              <td className="px-4 py-3 text-gray-900">{homestay.businessRegistrationNumber || 'N/A'}</td>
+                                              <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'registrationAuthority') || 'N/A'}</td>
+                                              <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'businessRegistrationNumber') || 'N/A'}</td>
                                               <td className="px-4 py-3 text-gray-900 whitespace-normal">{primaryContact?.name || 'N/A'}</td>
                                               <td className="px-4 py-3 text-gray-900">{primaryContact?.mobile || 'N/A'}</td>
                                             </tr>
@@ -2686,8 +2686,8 @@ export default function ReportPage({
                                           <td className="px-4 py-3 text-gray-900">
                                             {getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private'}
                                           </td>
-                                          <td className="px-4 py-3 text-gray-900 whitespace-normal">{homestay.registrationAuthority || 'N/A'}</td>
-                                          <td className="px-4 py-3 text-gray-900">{homestay.businessRegistrationNumber || 'N/A'}</td>
+                                          <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'registrationAuthority') || 'N/A'}</td>
+                                          <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'businessRegistrationNumber') || 'N/A'}</td>
                                           <td className="px-4 py-3 text-gray-900 whitespace-normal">{primaryContact?.name || 'N/A'}</td>
                                           <td className="px-4 py-3 text-gray-900">{primaryContact?.mobile || 'N/A'}</td>
                                         </tr>

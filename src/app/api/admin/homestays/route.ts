@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
 
     // Select all fields needed for the admin overview table and filtering
     const homestays = await HomestaySingle.find(query)
-      .select(`_id homestayId homeStayName villageName address dhsrNo status homeStayType description contactIds roomCount bedCount homeCount ${includeFeatures ? 'features' : ''}`)
+      .select(`_id homestayId homeStayName villageName address dhsrNo status homeStayType description contactIds roomCount bedCount homeCount registrationAuthority businessRegistrationNumber ${includeFeatures ? 'features' : ''}`)
       .sort({ createdAt: -1 })
       .lean();
 
