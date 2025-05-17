@@ -8,6 +8,7 @@ import {
   ChevronLeft, ChevronRight, ArrowLeft, Globe, Check,
   Navigation, ExternalLink, Info
 } from "lucide-react";
+import { TGDCPopup } from "@/components/ui/ScrollPopup";
 
 // Add CSS to explicitly hide any navigation elements that might be visible
 const HideNavStyles = () => (
@@ -368,6 +369,9 @@ export default function TemporaryHomestayPage() {
     <div className="min-h-screen bg-gray-50 pb-16 temporary-page">
       {/* Include the style component to hide navigation */}
       <HideNavStyles />
+      
+      {/* TGDC Popup */}
+      <TGDCPopup />
       
       {/* Back button */}
       <div className="sticky top-0 z-10 bg-white shadow-sm p-4">

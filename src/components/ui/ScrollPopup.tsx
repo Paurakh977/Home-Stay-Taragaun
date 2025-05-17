@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { X, Home } from "lucide-react";
+import { X, Home, Building2, ArrowRight, Globe  } from "lucide-react";
 
 export default function ScrollPopup() {
   const [isVisible, setIsVisible] = useState(false);
@@ -74,4 +74,53 @@ export default function ScrollPopup() {
       </div>
     </div>
   );
-} 
+}
+
+// TGDC version of the popup
+export function TGDCPopup() {
+  const [isVisible, setIsVisible] = useState(true);
+
+  const handleDismiss = () => {
+    setIsVisible(false);
+  };
+
+  if (!isVisible) return null;
+
+  return (
+    <div className="fixed top-6 right-6 z-50">
+      <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-5 w-80 animate-slideUp">
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex items-center">
+            <Building2 className="h-6 w-6 text-black" />
+            <div className="text-xl font-bold text-black ml-2">TGDC</div>
+          </div>
+          <button 
+            onClick={handleDismiss}
+            className="text-gray-600 hover:text-black focus:outline-none"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        
+        <div className="my-4">
+          <div className="text-lg font-medium text-black mb-2">Discover TGDC:</div>
+          <div className="flex items-center">
+            <span className="text-lg font-medium text-black">Stay Local</span>
+            <ArrowRight className="h-5 w-5 text-black mx-3" />
+            <span className="text-lg font-medium text-black">Go Digital</span>
+          </div>
+        </div>
+        
+        <a 
+          href="https://taragaon.gov.np/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 block w-full py-3 bg-black hover:bg-gray-800 text-white text-center font-medium rounded-md transition-colors flex items-center justify-center"
+        >
+          <Globe className="h-5 w-5 mr-2" />
+          Visit Website
+        </a>
+      </div>
+    </div>
+  );
+}
