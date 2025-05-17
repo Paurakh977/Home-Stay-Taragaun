@@ -1236,8 +1236,11 @@ export default function ReportPage({
                   },
                   margin: { top: 60 },
                   didDrawPage: function(pageData) {
-                    // Only add header to pages after the first page to avoid double headers
-                    if (pageData.pageNumber > 1) {
+                    // Check global PDF page number instead of table page number
+                    const globalPageNumber = doc.getNumberOfPages();
+                    
+                    // Only add header to pages after the first page
+                    if (globalPageNumber > 1) {
                       // Add branding first
                       doc.setFontSize(12);
                       doc.setFont('helvetica', 'bold');
@@ -1246,15 +1249,11 @@ export default function ReportPage({
                       // Add logo to continuation pages
                       if (branding.logoPath) {
                         try {
-                          // Create a temporary image element to get dimensions
-                          const tmpImg = document.createElement('img');
-                          tmpImg.src = getImageUrl(branding.logoPath);
-                          
-                          // Default dimensions if image not loaded yet
+                          // Default dimensions for logo
                           const imgWidth = 20;
                           const imgHeight = 20;
                           
-                          // Add the image directly without waiting for onload
+                          // Add the image directly
                           doc.addImage(
                             getImageUrl(branding.logoPath), 
                             'JPEG', 
@@ -1299,10 +1298,6 @@ export default function ReportPage({
                       doc.setFont('helvetica', 'bold');
                       doc.text(`District-wise Classification Report - Continued`, centerX, contPageContactY + 12, { align: 'center' });
                       
-                      // Add a visible marker to ensure headers are displaying
-                      doc.setFillColor(255, 0, 0);  // Red color
-                      doc.rect(centerX - 5, contPageContactY + 13, 10, 2, 'F');  // Small red rectangle under text
-                      
                       doc.setDrawColor(0);
                       doc.setLineWidth(0.5);
                       doc.line(20, contPageContactY + 15, pageWidth - 20, contPageContactY + 15);
@@ -1310,15 +1305,13 @@ export default function ReportPage({
                     
                     // Move page numbers to bottom left corner
                     doc.setFontSize(8);
-                    doc.text(`Page ${doc.getNumberOfPages()}`, 20, doc.internal.pageSize.getHeight() - 10);
+                    doc.text(`Page ${globalPageNumber}`, 20, doc.internal.pageSize.getHeight() - 10);
                     
-                    // Create a debugging element to show page numbers and report type
-                    if (pageData.pageNumber > 1) {
-                      doc.setFontSize(8);
-                      doc.setTextColor(220, 0, 0);
-                      doc.text(`DEBUG: District Report Page ${pageData.pageNumber}`, pageWidth - 60, doc.internal.pageSize.getHeight() - 10);
-                      doc.setTextColor(0, 0, 0);
-                    }
+                    // Add small indicator to verify headers are being drawn properly
+                    doc.setFontSize(6);
+                    doc.setTextColor(180, 180, 180); // Light gray color
+                    doc.text(`Page ${globalPageNumber} - Auto header`, pageWidth - 30, doc.internal.pageSize.getHeight() - 5);
+                    doc.setTextColor(0, 0, 0); // Reset to black
                   },
                   didDrawCell: function(data: any) {
                     // Track the last cell drawn using the data object's properties
@@ -2084,6 +2077,8 @@ export default function ReportPage({
                           a.startsWith('cultural:') || 
                           a.includes('Museums') || 
                           a.includes('Cultural') ||
+                          a.includes('Festivals') || 
+                          a.includes('Traditional') || 
                           a.includes('Festivals') ||
                           a.includes('Traditional') ||
                           a.includes('Community Lifestyle')
