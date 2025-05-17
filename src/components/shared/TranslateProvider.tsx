@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 export function TranslateProvider({ children }: { children: React.ReactNode }) {
   const [initialized, setInitialized] = useState(false);
   const [scriptLoaded, setScriptLoaded] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   
   // First, add the Google Translate script to the page
   useEffect(() => {
@@ -17,14 +18,66 @@ export function TranslateProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     
+    // Create a meta tag for content language to ensure proper translation
+    const metaContent = document.querySelector('meta[http-equiv="Content-Language"]');
+    if (!metaContent) {
+      const meta = document.createElement('meta');
+      meta.setAttribute('http-equiv', 'Content-Language');
+      meta.setAttribute('content', 'en');
+      document.head.appendChild(meta);
+    }
+    
+    // Create a function to detect if an ad blocker might be preventing script load
+    const checkForBlockers = () => {
+      // If the script load takes too long, it might be blocked
+      if (retryCount === 0) {
+        setTimeout(() => {
+          if (!scriptLoaded) {
+            console.warn('Google Translate script may be blocked. Using alternative loading method...');
+            // Try an alternative loading method with a different URL format
+            const altScript = document.createElement('script');
+            altScript.src = 'https://translate.googleapis.com/translate_a/element.js?cb=googleTranslateElementInit';
+            altScript.async = true;
+            altScript.onload = () => setScriptLoaded(true);
+            document.body.appendChild(altScript);
+          }
+        }, 5000);
+      }
+    };
+    
+    // Attempt to load the script
     const script = document.createElement('script');
     script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
     script.async = true;
     script.onload = () => {
       setScriptLoaded(true);
     };
+    script.onerror = (error) => {
+      console.error('Failed to load Google Translate script:', error);
+      // Attempt to reload after a delay if under retry limit
+      if (retryCount < 3) {
+        setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+          // Remove failed script
+          if (script.parentNode) {
+            script.parentNode.removeChild(script);
+          }
+          setScriptLoaded(false);
+        }, 2000);
+      }
+    };
     document.body.appendChild(script);
-  }, [scriptLoaded]);
+    
+    // Check for potential blockers
+    checkForBlockers();
+    
+    // Cleanup
+    return () => {
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
+  }, [scriptLoaded, retryCount]);
   
   // Then, initialize Google Translate when script is loaded
   useEffect(() => {
@@ -48,34 +101,107 @@ export function TranslateProvider({ children }: { children: React.ReactNode }) {
         document.body.appendChild(div);
       }
       
-      if (window.google && window.google.translate) {
+      // Simple initialization to avoid CSP issues
+      const simpleInit = () => {
         try {
-          new window.google.translate.TranslateElement({
-            pageLanguage: 'en',
-            includedLanguages: 'en,ne,hi,zh-CN,ko,de,es,ja',
-            layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
-            autoDisplay: false,
-            gaTrack: false
-          }, 'google_translate_element');
-          setInitialized(true);
-          console.log('Google Translate initialized');
-          
-          // Add class to prevent Google from translating its own UI
-          document.querySelectorAll('.goog-te-menu-value span').forEach(el => {
-            el.classList.add('notranslate');
-          });
-          
-          // Fix: reset translation on next tick to ensure full page gets the proper translation
-          setTimeout(() => {
-            restoreTranslation();
-          }, 500);
+          // Create a new element without using TranslateElement.InlineLayout
+          if (window.google && window.google.translate && window.google.translate.TranslateElement) {
+            new window.google.translate.TranslateElement({
+              pageLanguage: 'en',
+              includedLanguages: 'en,ne,hi,zh-CN,ko,de,es,ja',
+              layout: 0, // Use direct value instead of InlineLayout.SIMPLE
+              autoDisplay: false,
+              gaTrack: false
+            }, 'google_translate_element');
+            
+            setInitialized(true);
+            console.log('Google Translate initialized with simple layout');
+            
+            setTimeout(() => {
+              restoreTranslation();
+            }, 500);
+            
+            return true;
+          }
+          return false;
         } catch (error) {
-          console.error('Failed to initialize Google Translate:', error);
+          console.warn('Simple init failed:', error);
+          return false;
         }
-      } else {
-        // If window.google.translate is not available yet, wait a bit
-        console.log('Waiting for Google Translate API to load...');
-        setTimeout(initGoogleTranslate, 500);
+      };
+      
+      // Try to initialize with full settings
+      try {
+        // Check if Google Translate is available and properly loaded
+        if (window.google && window.google.translate && window.google.translate.TranslateElement) {
+          try {
+            // Try to access InlineLayout safely
+            let inlineLayout = 0; // Default fallback
+            
+            try {
+              // Access InlineLayout safely
+              if (window.google.translate.TranslateElement.InlineLayout) {
+                inlineLayout = window.google.translate.TranslateElement.InlineLayout.SIMPLE;
+              }
+            } catch (layoutError) {
+              console.warn('Could not access InlineLayout, using fallback:', layoutError);
+            }
+              
+            new window.google.translate.TranslateElement({
+              pageLanguage: 'en',
+              includedLanguages: 'en,ne,hi,zh-CN,ko,de,es,ja',
+              layout: inlineLayout,
+              autoDisplay: false,
+              gaTrack: false
+            }, 'google_translate_element');
+            
+            setInitialized(true);
+            console.log('Google Translate initialized');
+            
+            // Add class to prevent Google from translating its own UI
+            document.querySelectorAll('.goog-te-menu-value span').forEach(el => {
+              el.classList.add('notranslate');
+            });
+            
+            // Add notranslate class to React fragment containers
+            // This helps prevent crashes when Google Translate modifies DOM nodes
+            document.querySelectorAll('[data-reactroot]').forEach(el => {
+              el.classList.add('notranslate');
+            });
+            
+            // Fix: reset translation on next tick to ensure full page gets the proper translation
+            setTimeout(() => {
+              restoreTranslation();
+            }, 500);
+          } catch (error) {
+            console.error('Failed to initialize Google Translate with InlineLayout:', error);
+            
+            // Fall back to simple initialization
+            if (!simpleInit()) {
+              // Retry after delay if API is not fully loaded yet
+              if (retryCount < 5) {
+                setTimeout(() => {
+                  setRetryCount(prev => prev + 1);
+                }, 1000);
+              }
+            }
+          }
+        } else {
+          // If window.google.translate is not available yet, wait a bit
+          console.log('Waiting for Google Translate API to load...');
+          if (retryCount < 10) {
+            setTimeout(() => {
+              setRetryCount(prev => prev + 1);
+            }, 1000);
+          } else {
+            console.error('Failed to load Google Translate API after multiple attempts');
+          }
+        }
+      } catch (error) {
+        console.error('Error during Google Translate initialization:', error);
+        
+        // Try simple init as a last resort
+        simpleInit();
       }
     };
     
@@ -89,17 +215,22 @@ export function TranslateProvider({ children }: { children: React.ReactNode }) {
       // Set the global callback
       window.googleTranslateElementInit = initGoogleTranslate;
       // Try to call it directly after a small delay
-      setTimeout(initGoogleTranslate, 500);
+      setTimeout(initGoogleTranslate, 1000);
     }
     
     return () => {
       // Clean up
-      delete window.googleTranslateElementInit;
+      if (window.googleTranslateElementInit) {
+        // Use assignment to undefined instead of delete
+        window.googleTranslateElementInit = undefined;
+      }
     };
-  }, [scriptLoaded, initialized]);
+  }, [scriptLoaded, initialized, retryCount]);
   
   // Function to restore translation state after route changes
   const restoreTranslation = () => {
+    if (typeof window === 'undefined') return;
+    
     // Get the current language from cookie
     const getCookie = (name: string) => {
       const value = '; ' + document.cookie;
@@ -116,7 +247,8 @@ export function TranslateProvider({ children }: { children: React.ReactNode }) {
           const selectField = document.querySelector('.goog-te-combo') as HTMLSelectElement;
           if (selectField && selectField.value !== lang) {
             selectField.value = lang;
-            selectField.dispatchEvent(new Event('change'));
+            // Use bubbling to ensure the event propagates
+            selectField.dispatchEvent(new Event('change', { bubbles: true }));
           }
         }, 500);
       }
@@ -125,10 +257,38 @@ export function TranslateProvider({ children }: { children: React.ReactNode }) {
   
   // Add listener to fix translation issues on route changes
   useEffect(() => {
-    if (!initialized) return;
+    if (!initialized || typeof window === 'undefined') return;
     
     // Listen for route changes in Next.js
     document.addEventListener('nextjs:afterPageTransition', restoreTranslation);
+    
+    // Fix for issues with React nodes being manipulated by Google Translate
+    // This reduces the chance of crashes from text node replacement
+    const addNoTranslateToTextNodes = () => {
+      // Find React fragments and direct text nodes
+      const walkDOM = (node: Node) => {
+        if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
+          // If parent is a React fragment or doesn't have a tag name, wrap it
+          const parent = node.parentElement;
+          if (parent && (!parent.tagName || parent.tagName === 'REACT-FRAGMENT')) {
+            // Create a span to replace the text node
+            const span = document.createElement('span');
+            span.className = 'notranslate';
+            span.textContent = node.textContent;
+            node.parentNode?.replaceChild(span, node);
+          }
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          // Process children
+          node.childNodes.forEach(walkDOM);
+        }
+      };
+      
+      // Start from the body
+      walkDOM(document.body);
+    };
+    
+    // Run once on initialization
+    addNoTranslateToTextNodes();
     
     // Add MutationObserver to detect page changes (which may not trigger route change events)
     const observer = new MutationObserver((mutations) => {
@@ -140,6 +300,7 @@ export function TranslateProvider({ children }: { children: React.ReactNode }) {
       );
       
       if (significantChanges) {
+        addNoTranslateToTextNodes();
         restoreTranslation();
       }
     });
@@ -164,12 +325,12 @@ export function TranslateProvider({ children }: { children: React.ReactNode }) {
 // Add TypeScript type declaration for Google Translate 
 declare global {
   interface Window {
-    googleTranslateElementInit: () => void;
+    googleTranslateElementInit?: () => void; // Optional to fix linter error
     google: {
       translate: {
         TranslateElement: {
           new (options: any, element: string): any;
-          InlineLayout: {
+          InlineLayout?: {
             SIMPLE: number;
           };
         };

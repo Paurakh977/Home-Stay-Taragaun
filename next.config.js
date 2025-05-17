@@ -44,6 +44,64 @@ const nextConfig = {
   
   // Disable using trailing slash
   trailingSlash: false,
+  
+  // Add necessary headers for Google Translate to work properly
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://*.google.com https://*.google.com http://translate.google.com https://translate.google.com http://*.googleapis.com https://*.googleapis.com http://*.gstatic.com https://*.gstatic.com; style-src 'self' 'unsafe-inline' http://*.googleapis.com https://*.googleapis.com http://*.translate.goog https://*.translate.goog http://*.gstatic.com https://*.gstatic.com; img-src 'self' data: blob: http://*.google.com https://*.google.com http://translate.google.com https://translate.google.com http://*.googleapis.com https://*.googleapis.com http://*.gstatic.com https://*.gstatic.com; connect-src 'self' http://*.google.com https://*.google.com http://*.googleapis.com https://*.googleapis.com; frame-src 'self' http://translate.google.com https://translate.google.com http://*.google.com https://*.google.com; font-src 'self' data: http://fonts.gstatic.com https://fonts.gstatic.com http://*.gstatic.com https://*.gstatic.com;"
+          },
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*'
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff'
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN'
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block'
+          }
+        ]
+      }
+    ];
+  },
+
+  // Ensure the browser doesn't cache translation cookies incorrectly
+  async rewrites() {
+    return [
+      // Special handling for Google Translate resources
+      {
+        source: '/translate_a/:path*',
+        destination: 'https://translate.googleapis.com/translate_a/:path*'
+      },
+      {
+        source: '/translate_static/:path*',
+        destination: 'https://translate.googleapis.com/translate_static/:path*'
+      },
+      {
+        source: '/translate-pa/:path*',
+        destination: 'https://translate-pa.googleapis.com/:path*'
+      },
+      {
+        source: '/gen204',
+        destination: 'https://translate.google.com/gen204'
+      },
+      {
+        source: '/element/log',
+        destination: 'https://translate.googleapis.com/element/log'
+      }
+    ];
+  }
 };
 
 module.exports = nextConfig; 
