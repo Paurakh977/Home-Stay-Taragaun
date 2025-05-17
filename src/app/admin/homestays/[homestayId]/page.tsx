@@ -135,6 +135,10 @@ export interface HomestayData {
   description?: string;
   adminUsername?: string; // The admin user who owns this homestay
   
+  // Add business registration fields
+  registrationAuthority?: string;
+  businessRegistrationNumber?: string;
+  
   villageName?: string; // Top-level village name
   ownerName?: string;   // Top-level owner name (fallback)
   ownerContact?: string;// Top-level owner contact (fallback)
@@ -495,6 +499,21 @@ export default function AdminHomestayDetailPage() {
   const [districtMunicipalitiesMap, setDistrictMunicipalitiesMap] = useState<Record<string, string[]>>({});
   const [locationDataLoaded, setLocationDataLoaded] = useState(false);
   
+  // Address translations data
+  const [addressData, setAddressData] = useState<{
+    allProvinces: string[];
+    provinceDistrictsMap: Record<string, string[]>;
+    districtMunicipalitiesMap: Record<string, string[]>;
+    districtTranslations: Record<string, string>;
+    municipalityTranslations: Record<string, string>;
+  }>({
+    allProvinces: [],
+    provinceDistrictsMap: {},
+    districtMunicipalitiesMap: {},
+    districtTranslations: {},
+    municipalityTranslations: {}
+  });
+  
   // Document upload state
   const [documentItems, setDocumentItems] = useState<Array<{id: string; title: string; description: string; files: File[]}>>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -633,12 +652,27 @@ export default function AdminHomestayDetailPage() {
         const responses = await Promise.all([
           fetch('/address/all-provinces.json').then(res => res.json()),
           fetch('/address/map-province-districts.json').then(res => res.json()),
-          fetch('/address/map-districts-municipalities.json').then(res => res.json())
+          fetch('/address/map-districts-municipalities.json').then(res => res.json()),
+          fetch('/address/all-districts.json').then(res => res.json()),
+          fetch('/address/all-municipalities.json').then(res => res.json())
         ]);
 
         setProvinces(responses[0] as string[]);
         setProvinceDistrictsMap(responses[1] as Record<string, string[]>);
         setDistrictMunicipalitiesMap(responses[2] as Record<string, string[]>);
+        setAddressData({
+          allProvinces: responses[0],
+          provinceDistrictsMap: responses[1],
+          districtMunicipalitiesMap: responses[2],
+          districtTranslations: responses[3],
+          municipalityTranslations: responses[4]
+        });
+        
+        console.log("Loaded translations:", {
+          districts: Object.keys(responses[3]).length,
+          municipalities: Object.keys(responses[4]).length
+        });
+        
         setLocationDataLoaded(true);
       } catch (error) {
         console.error("Error loading location data:", error);
@@ -778,15 +812,80 @@ export default function AdminHomestayDetailPage() {
     return filePath;
   };
   
-  // Handle nested field changes for address object
+  // Handle address field changes with proper bilingual support
   const handleAddressChange = (field: string, value: any) => {
-    setEditedData(prev => ({
-      ...prev,
-      address: {
-        ...(prev.address || {}),
-        [field]: value
+    setEditedData(prev => {
+      // Create a deep copy of the current address to avoid reference issues
+      const currentAddress = JSON.parse(JSON.stringify(prev.address || {}));
+      
+      // For bilingual fields, we need special handling
+      if (['province', 'district', 'municipality', 'ward'].includes(field)) {
+        // If value is already in bilingual format (has en/ne properties)
+        if (value && typeof value === 'object' && 'en' in value && 'ne' in value) {
+          if (field === 'province') currentAddress.province = value;
+          else if (field === 'district') currentAddress.district = value;
+          else if (field === 'municipality') currentAddress.municipality = value;
+          else if (field === 'ward') currentAddress.ward = value;
+        } 
+        // If it's just a string value (assuming Nepali input)
+        else if (typeof value === 'string') {
+          let englishValue = '';
+          
+          // Generate English translation based on field type
+          if (field === 'province') {
+            // For province use direct mapping
+            const provinceTranslations: Record<string, string> = {
+              "कोशी": "Koshi",
+              "मधेश": "Madhesh",
+              "वागमती": "Bagmati",
+              "गण्डकी": "Gandaki",
+              "लुम्बिनी": "Lumbini",
+              "कर्णाली": "Karnali",
+              "सुदुर पश्चिम": "Sudurpashchim"
+            };
+            englishValue = provinceTranslations[value] || value;
+            currentAddress.province = { ne: value, en: englishValue };
+          } else if (field === 'district') {
+            englishValue = findBestTranslation(value, 'district');
+            currentAddress.district = { ne: value, en: englishValue };
+          } else if (field === 'municipality') {
+            englishValue = findBestTranslation(value, 'municipality');
+            currentAddress.municipality = { ne: value, en: englishValue };
+          } else if (field === 'ward') {
+            englishValue = translateWard(value);
+            currentAddress.ward = { ne: value, en: englishValue };
+          }
+        }
+      } else if (field === 'city') {
+        currentAddress.city = value;
+      } else if (field === 'tole') {
+        currentAddress.tole = value;
       }
-    }));
+      
+      // Generate formatted address
+      // Only update if we have enough address components
+      if (currentAddress.province?.ne && currentAddress.district?.ne && currentAddress.municipality?.ne) {
+        const tole = currentAddress.tole || '';
+        const city = currentAddress.city || '';
+        
+        // Nepali formatted address
+        const formattedAddressNe = `${tole ? tole + ', ' : ''}${city ? city + ', ' : ''}${currentAddress.municipality?.ne || ''}, ${currentAddress.district?.ne || ''}, ${currentAddress.province?.ne || ''}`.replace(/^,\s*|,\s*$/, '').replace(/,\s*,\s*/g, ', ');
+        
+        // English formatted address
+        const formattedAddressEn = `${tole ? tole + ', ' : ''}${city ? city + ', ' : ''}${currentAddress.municipality?.en || ''}, ${currentAddress.district?.en || ''}, ${currentAddress.province?.en || ''}`.replace(/^,\s*|,\s*$/, '').replace(/,\s*,\s*/g, ', ');
+        
+        // Update formatted address in bilingual format
+        currentAddress.formattedAddress = {
+          ne: formattedAddressNe,
+          en: formattedAddressEn
+        };
+      }
+      
+      return {
+        ...prev,
+        address: currentAddress
+      };
+    });
   };
 
   // Handle basic field changes
@@ -1744,6 +1843,88 @@ export default function AdminHomestayDetailPage() {
     }
   };
 
+  // Helper function to find the best English translation for location fields
+  const findBestTranslation = (nepaliValue: string, type: 'district' | 'municipality' | 'province'): string => {
+    if (!nepaliValue) return '';
+    
+    // Province translations - we have these hardcoded
+    const provinceTranslations: Record<string, string> = {
+      "कोशी": "Koshi",
+      "मधेश": "Madhesh",
+      "वागमती": "Bagmati",
+      "गण्डकी": "Gandaki",
+      "लुम्बिनी": "Lumbini",
+      "कर्णाली": "Karnali",
+      "सुदुर पश्चिम": "Sudurpashchim"
+    };
+    
+    // Direct lookup for provinces
+    if (type === 'province' && provinceTranslations[nepaliValue]) {
+      return provinceTranslations[nepaliValue];
+    }
+    
+    // For districts and municipalities, we need to fetch translations
+    // Try to find them in addressData if it was loaded earlier
+    if (type === 'district' && addressData?.districtTranslations) {
+      const translation = addressData.districtTranslations[nepaliValue.trim()];
+      if (translation) return translation;
+      
+      // Try with normalized spaces
+      const normalizedValue = nepaliValue.trim().replace(/\s+/g, ' ');
+      if (addressData.districtTranslations[normalizedValue]) {
+        return addressData.districtTranslations[normalizedValue];
+      }
+      
+      // Look for partial matches
+      const possibleKey = Object.keys(addressData.districtTranslations)
+        .find(key => key.includes(nepaliValue) || nepaliValue.includes(key));
+        
+      if (possibleKey) {
+        return addressData.districtTranslations[possibleKey];
+      }
+    }
+    
+    if (type === 'municipality' && addressData?.municipalityTranslations) {
+      const translation = addressData.municipalityTranslations[nepaliValue.trim()];
+      if (translation) return translation;
+      
+      // Try with normalized spaces
+      const normalizedValue = nepaliValue.trim().replace(/\s+/g, ' ');
+      if (addressData.municipalityTranslations[normalizedValue]) {
+        return addressData.municipalityTranslations[normalizedValue];
+      }
+      
+      // Look for partial matches
+      const possibleKey = Object.keys(addressData.municipalityTranslations)
+        .find(key => key.includes(nepaliValue) || nepaliValue.includes(key));
+        
+      if (possibleKey) {
+        return addressData.municipalityTranslations[possibleKey];
+      }
+    }
+    
+    // If no translation found, use capitalized version of Nepali value as fallback
+    return nepaliValue.split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
+  // Convert Nepali numeric ward to English
+  const translateWard = (ward: string): string => {
+    const wardMap: Record<string, string> = {
+      '१': '1', '२': '2', '३': '3', '४': '4', '५': '5',
+      '६': '6', '७': '7', '८': '8', '९': '9', '०': '0'
+    };
+    
+    let englishWard = '';
+    for (let i = 0; i < ward.length; i++) {
+      const char = ward[i];
+      englishWard += wardMap[char] || char;
+    }
+    
+    return englishWard;
+  };
+
   return (
     <div className="max-w-6xl mx-auto py-8 px-4 bg-gray-50 min-h-screen">
       {/* Header: Back Button, Title, Status Badge */}
@@ -1806,6 +1987,9 @@ export default function AdminHomestayDetailPage() {
                  <InfoItem label="Capacity">
                    {homestay.homeCount || 0} Homes / {homestay.roomCount || 0} Rooms / {homestay.bedCount || 0} Beds
                  </InfoItem>
+                 {/* Add business registration fields */}
+                 <InfoItem label="Registration Authority" value={homestay.registrationAuthority} />
+                 <InfoItem label="Business Registration Number" value={homestay.businessRegistrationNumber} />
                </>
              ) : (
                <>
@@ -1870,6 +2054,20 @@ export default function AdminHomestayDetailPage() {
                      </div>
                    </div>
                  </div>
+                 
+                 {/* Add business registration fields */}
+                 <EditableInfoItem 
+                   label="Registration Authority" 
+                   value={getCurrentValue('registrationAuthority')} 
+                   field="registrationAuthority"
+                   onChange={handleInputChange}
+                 />
+                 <EditableInfoItem 
+                   label="Business Registration Number" 
+                   value={getCurrentValue('businessRegistrationNumber')} 
+                   field="businessRegistrationNumber"
+                   onChange={handleInputChange}
+                 />
                </>
              )}
           </InfoSection>
@@ -1927,19 +2125,44 @@ export default function AdminHomestayDetailPage() {
                        value={(editedData.address?.province?.ne || homestay.address?.province?.ne) || ''}
                        onChange={(e) => {
                          const selectedProvince = e.target.value;
+                         // Use the provinceTranslations map directly for reliable English names
+                         const provinceTranslations: Record<string, string> = {
+                           "कोशी": "Koshi",
+                           "मधेश": "Madhesh",
+                           "वागमती": "Bagmati",
+                           "गण्डकी": "Gandaki",
+                           "लुम्बिनी": "Lumbini",
+                           "कर्णाली": "Karnali",
+                           "सुदुर पश्चिम": "Sudurpashchim"
+                         };
+                         const provinceEn = provinceTranslations[selectedProvince] || selectedProvince;
+                         
                          handleAddressChange('province', {
                            ne: selectedProvince,
-                           en: selectedProvince // Also set English value
+                           en: provinceEn
                          });
                        }}
                        className="w-full p-2 border border-gray-300 rounded-md text-sm"
                      >
                        <option value="">Select Province</option>
-                       {provinces.map(province => (
-                         <option key={province} value={province}>
-                           {province}
-                         </option>
-                       ))}
+                       {provinces.map(province => {
+                         // Define province translations here in the mapping function
+                         const translations = {
+                           "कोशी": "Koshi",
+                           "मधेश": "Madhesh",
+                           "वागमती": "Bagmati",
+                           "गण्डकी": "Gandaki",
+                           "लुम्बिनी": "Lumbini",
+                           "कर्णाली": "Karnali",
+                           "सुदुर पश्चिम": "Sudurpashchim"
+                         };
+                         return (
+                           <option key={province} value={province}>
+                             {/* Display both English and Nepali names in dropdown */}
+                             {translations[province] || province} / {province}
+                           </option>
+                         );
+                       })}
                      </select>
                    </div>
                  </div>
@@ -1952,20 +2175,41 @@ export default function AdminHomestayDetailPage() {
                        value={(editedData.address?.district?.ne || homestay.address?.district?.ne) || ''}
                        onChange={(e) => {
                          const selectedDistrict = e.target.value;
+                         // Use findBestTranslation, but with additional fallback to existing translation if available
+                         let districtEn = '';
+                         
+                         // Try to get English value from existing district data first, if available
+                         if (homestay.address?.district?.ne === selectedDistrict && homestay.address?.district?.en) {
+                           districtEn = homestay.address.district.en;
+                         } else {
+                           districtEn = findBestTranslation(selectedDistrict, 'district');
+                         }
+                         
                          handleAddressChange('district', {
                            ne: selectedDistrict,
-                           en: selectedDistrict // Also set English value
+                           en: districtEn
                          });
                        }}
                        className="w-full p-2 border border-gray-300 rounded-md text-sm"
                        disabled={!(editedData.address?.province?.ne || homestay.address?.province?.ne)}
                      >
                        <option value="">Select District</option>
-                       {districts.map(district => (
-                         <option key={district} value={district}>
-                           {district}
-                         </option>
-                       ))}
+                       {districts.map(district => {
+                         // Try to find existing English translation from addressData or existing homestay data
+                         let districtEn = '';
+                         if (homestay.address?.district?.ne === district && homestay.address?.district?.en) {
+                           districtEn = homestay.address.district.en;
+                         } else {
+                           districtEn = findBestTranslation(district, 'district');
+                         }
+                         
+                         return (
+                           <option key={district} value={district}>
+                             {/* Display both English and Nepali names in dropdown */}
+                             {districtEn} / {district}
+                           </option>
+                         );
+                       })}
                      </select>
                    </div>
                  </div>
@@ -1978,20 +2222,41 @@ export default function AdminHomestayDetailPage() {
                        value={(editedData.address?.municipality?.ne || homestay.address?.municipality?.ne) || ''}
                        onChange={(e) => {
                          const selectedMunicipality = e.target.value;
+                         // Use findBestTranslation, but with additional fallback to existing translation if available
+                         let municipalityEn = '';
+                         
+                         // Try to get English value from existing municipality data first, if available
+                         if (homestay.address?.municipality?.ne === selectedMunicipality && homestay.address?.municipality?.en) {
+                           municipalityEn = homestay.address.municipality.en;
+                         } else {
+                           municipalityEn = findBestTranslation(selectedMunicipality, 'municipality');
+                         }
+                         
                          handleAddressChange('municipality', {
                            ne: selectedMunicipality,
-                           en: selectedMunicipality // Also set English value
+                           en: municipalityEn
                          });
                        }}
                        className="w-full p-2 border border-gray-300 rounded-md text-sm"
                        disabled={!(editedData.address?.district?.ne || homestay.address?.district?.ne)}
                      >
                        <option value="">Select Municipality</option>
-                       {municipalities.map(municipality => (
-                         <option key={municipality} value={municipality}>
-                           {municipality}
-                         </option>
-                       ))}
+                       {municipalities.map(municipality => {
+                         // Try to find existing English translation from addressData or existing homestay data
+                         let municipalityEn = '';
+                         if (homestay.address?.municipality?.ne === municipality && homestay.address?.municipality?.en) {
+                           municipalityEn = homestay.address.municipality.en;
+                         } else {
+                           municipalityEn = findBestTranslation(municipality, 'municipality');
+                         }
+                         
+                         return (
+                           <option key={municipality} value={municipality}>
+                             {/* Display both English and Nepali names in dropdown */}
+                             {municipalityEn} / {municipality}
+                           </option>
+                         );
+                       })}
                      </select>
                    </div>
                  </div>
@@ -2004,19 +2269,25 @@ export default function AdminHomestayDetailPage() {
                        value={(editedData.address?.ward?.ne || homestay.address?.ward?.ne) || ''}
                        onChange={(e) => {
                          const selectedWard = e.target.value;
+                         const wardEn = translateWard(selectedWard);
+                         
                          handleAddressChange('ward', {
                            ne: selectedWard,
-                           en: selectedWard // Also set English value
+                           en: wardEn
                          });
                        }}
                        className="w-full p-2 border border-gray-300 rounded-md text-sm"
                      >
                        <option value="">Select Ward</option>
-                       {[...Array(33)].map((_, i) => (
-                         <option key={i+1} value={String(i+1)}>
-                           {i+1}
-                         </option>
-                       ))}
+                       {[...Array(33)].map((_, i) => {
+                         const wardNumber = String(i+1);
+                         return (
+                           <option key={i+1} value={wardNumber}>
+                             {/* Display ward number in both formats */}
+                             {wardNumber} / {wardNumber}
+                           </option>
+                         );
+                       })}
                      </select>
                    </div>
                  </div>

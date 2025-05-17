@@ -40,7 +40,7 @@ export async function PUT(request: NextRequest, context: ParamsContext) {
     const basicFields = [
       'homeStayName', 'dhsrNo', 'villageName', 'homeStayType', 'description',
       'homeCount', 'roomCount', 'bedCount', 'profileImage', 'latitude', 'longitude',
-      'directions'
+      'directions', 'registrationAuthority', 'businessRegistrationNumber'
     ];
     
     basicFields.forEach(field => {
@@ -66,8 +66,23 @@ export async function PUT(request: NextRequest, context: ParamsContext) {
       
       addressFields.forEach(field => {
         if (body.address[field] !== undefined) {
-          updatedAddress[field] = body.address[field];
-          addressFieldsChanged = true;
+          // Ensure we're preserving the bilingual structure for province, district, municipality and ward
+          if (['province', 'district', 'municipality', 'ward'].includes(field)) {
+            // Make sure the field has both 'en' and 'ne' properties
+            if (body.address[field] && 
+                typeof body.address[field] === 'object' && 
+                'en' in body.address[field] && 
+                'ne' in body.address[field]) {
+              updatedAddress[field] = body.address[field];
+              addressFieldsChanged = true;
+            } else {
+              console.warn(`Admin API: Address field ${field} is missing bilingual structure`);
+            }
+          } else {
+            // For non-bilingual fields like city and tole
+            updatedAddress[field] = body.address[field];
+            addressFieldsChanged = true;
+          }
         }
       });
       
@@ -84,10 +99,13 @@ export async function PUT(request: NextRequest, context: ParamsContext) {
         const districtNe = updatedAddress.district?.ne || '';
         const provinceNe = updatedAddress.province?.ne || '';
         
+        // Format addresses properly with commas and handle empty fields
         updatedAddress.formattedAddress = {
-          en: `${tole}, ${city}, ${municipalityEn}, ${districtEn}, ${provinceEn}`.replace(/^,\s*|,\s*$/, '').replace(/,\s*,\s*/g, ', '),
-          ne: `${tole}, ${city}, ${municipalityNe}, ${districtNe}, ${provinceNe}`.replace(/^,\s*|,\s*$/, '').replace(/,\s*,\s*/g, ', ')
+          en: `${tole ? tole + ', ' : ''}${city ? city + ', ' : ''}${municipalityEn ? municipalityEn + ', ' : ''}${districtEn ? districtEn + ', ' : ''}${provinceEn}`.replace(/,\s*$/, '').replace(/,\s*,\s*/g, ', '),
+          ne: `${tole ? tole + ', ' : ''}${city ? city + ', ' : ''}${municipalityNe ? municipalityNe + ', ' : ''}${districtNe ? districtNe + ', ' : ''}${provinceNe}`.replace(/,\s*$/, '').replace(/,\s*,\s*/g, ', ')
         };
+        
+        console.log(`Admin API: Updated formattedAddress for ${homestayId}:`, updatedAddress.formattedAddress);
       }
       
       homestayUpdateData.address = updatedAddress;
