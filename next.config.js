@@ -53,7 +53,7 @@ const nextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://*.google.com https://*.google.com http://translate.google.com https://translate.google.com http://*.googleapis.com https://*.googleapis.com http://*.gstatic.com https://*.gstatic.com; style-src 'self' 'unsafe-inline' http://*.googleapis.com https://*.googleapis.com http://*.translate.goog https://*.translate.goog http://*.gstatic.com https://*.gstatic.com; img-src 'self' data: blob: http://*.google.com https://*.google.com http://translate.google.com https://translate.google.com http://*.googleapis.com https://*.googleapis.com http://*.gstatic.com https://*.gstatic.com; connect-src 'self' http://*.google.com https://*.google.com http://*.googleapis.com https://*.googleapis.com; frame-src 'self' http://translate.google.com https://translate.google.com http://*.google.com https://*.google.com; font-src 'self' data: http://fonts.gstatic.com https://fonts.gstatic.com http://*.gstatic.com https://*.gstatic.com;"
+            value: "default-src 'self' * data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' *; style-src 'self' 'unsafe-inline' *; img-src 'self' data: blob: *; connect-src 'self' *; frame-src 'self' *; font-src 'self' data: *;"
           },
           {
             key: 'Access-Control-Allow-Origin',
