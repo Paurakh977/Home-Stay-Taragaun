@@ -69,6 +69,8 @@ const TranslateButton = ({
       for (let i = 0; i < parts.length - 1; i++) {
         domains.push(parts.slice(i).join('.'));
       }
+      // Add domain without the first part
+      domains.push('.' + hostname);
     }
 
     // Common paths in the application
@@ -125,6 +127,11 @@ const TranslateButton = ({
     
     // Clear any translation classes
     document.body.classList.remove('translated-ltr', 'translated-rtl');
+    
+    // Remove translation attributes from document
+    document.documentElement.removeAttribute('style');
+    document.documentElement.removeAttribute('lang');
+    document.documentElement.removeAttribute('translate');
   };
 
   // Function to change the language
@@ -148,9 +155,16 @@ const TranslateButton = ({
     
     // Direct reload approach for ALL languages (most reliable)
     const directReload = () => {
-      // First, clear all translation cookies
       if (langCode === 'en') {
+        // Special case for English - clear cookies first
         clearAllTranslateCookies();
+        
+        // Also try to manually set cookie to English explicitly
+        document.cookie = `googtrans=/auto/en; path=/`;
+        if (!isLocalhost) {
+          document.cookie = `googtrans=/auto/en; path=/; domain=${hostname}${isSecure ? '; secure' : ''}`;
+          document.cookie = `googtrans=/auto/en; path=/; domain=.${hostname}${isSecure ? '; secure' : ''}`;
+        }
       } else {
         // Set cookies for non-English languages
         const domains = [hostname];
@@ -173,6 +187,12 @@ const TranslateButton = ({
       
       // Force reload with a timestamp to prevent caching
       const url = new URL(window.location.href);
+      
+      // Clear any existing lang and t parameters
+      url.searchParams.delete('lang');
+      url.searchParams.delete('t');
+      
+      // Add new parameters
       url.searchParams.set('lang', langCode);
       url.searchParams.set('t', Date.now().toString());
       
@@ -183,70 +203,9 @@ const TranslateButton = ({
       window.location.replace(url.toString());
     };
     
-    // For production environments or when switching to English, 
-    // always use direct reload approach which is more reliable
-    if (!isLocalhost || langCode === 'en') {
-      directReload();
-      return;
-    }
-    
-    // For local development, try to use the UI approach first for non-English languages
-    let translationAttempted = false;
-    
-    // Method 1: Using Google Translate's combo dropdown
-    const selectField = document.querySelector('.goog-te-combo') as HTMLSelectElement;
-    if (selectField) {
-      try {
-        selectField.value = langCode;
-        selectField.dispatchEvent(new Event('change', { bubbles: true }));
-        selectField.dispatchEvent(new MouseEvent('change', { bubbles: true }));
-        translationAttempted = true;
-      } catch (e) {
-        console.warn('Error using select field:', e);
-      }
-    }
-    
-    // Method 2: Using Google Translate's banner frame
-    if (!translationAttempted) {
-      try {
-        const frame = document.querySelector('.goog-te-banner-frame') as HTMLIFrameElement;
-        if (frame) {
-          const frameDocument = frame.contentDocument || frame.contentWindow?.document;
-          if (frameDocument) {
-            const select = frameDocument.querySelector('.goog-te-combo') as HTMLSelectElement;
-            if (select) {
-              select.value = langCode;
-              select.dispatchEvent(new Event('change', { bubbles: true }));
-              translationAttempted = true;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Could not access iframe content', e);
-      }
-    }
-    
-    // If translation wasn't attempted, use direct reload approach
-    if (!translationAttempted) {
-      directReload();
-      return;
-    }
-    
-    // Notify Next.js of the language change
-    document.dispatchEvent(new CustomEvent('nextjs:afterPageTransition'));
-    
-    // Verify if translation was applied in local dev mode
-    setTimeout(() => {
-      const translatedElements = document.querySelectorAll('.translated-ltr, .translated-rtl');
-      const isTranslated = translatedElements.length > 0;
-      
-      if (!isTranslated) {
-        console.log('Translation not applied, trying direct reload method');
-        directReload();
-      } else {
-        setIsSwitching(false);
-      }
-    }, 1500);
+    // Always use direct reload approach which is more reliable in all environments
+    directReload();
+    return;
   };
 
   return (

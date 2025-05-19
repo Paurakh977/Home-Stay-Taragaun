@@ -231,6 +231,10 @@ export function TranslateProvider({ children }: { children: React.ReactNode }) {
   const restoreTranslation = () => {
     if (typeof window === 'undefined') return;
     
+    // Check URL parameters first for language preference
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlLang = urlParams.get('lang');
+    
     // Get the current language from cookie
     const getCookie = (name: string) => {
       const value = '; ' + document.cookie;
@@ -240,20 +244,68 @@ export function TranslateProvider({ children }: { children: React.ReactNode }) {
     };
     
     const savedLang = getCookie('googtrans');
-    if (savedLang) {
-      const lang = savedLang.split('/').pop();
-      if (lang && lang !== 'en') {
-        setTimeout(() => {
-          const selectField = document.querySelector('.goog-te-combo') as HTMLSelectElement;
-          if (selectField && selectField.value !== lang) {
-            selectField.value = lang;
-            // Use bubbling to ensure the event propagates
-            selectField.dispatchEvent(new Event('change', { bubbles: true }));
+    let targetLang = 'en'; // Default to English
+    
+    // URL parameter takes precedence over cookie
+    if (urlLang) {
+      targetLang = urlLang;
+    } else if (savedLang) {
+      const langFromCookie = savedLang.split('/').pop();
+      if (langFromCookie) targetLang = langFromCookie;
+    }
+    
+    // Only attempt to set language if it's not English or if URL explicitly requests English
+    if (targetLang !== 'en' || urlLang === 'en') {
+      setTimeout(() => {
+        const selectField = document.querySelector('.goog-te-combo') as HTMLSelectElement;
+        if (selectField && selectField.value !== targetLang) {
+          selectField.value = targetLang;
+          // Use bubbling to ensure the event propagates
+          selectField.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }, 500);
+    } else if (targetLang === 'en') {
+      // If we need to ensure we're in English mode, reset any translation
+      document.body.classList.remove('translated-ltr', 'translated-rtl');
+      try {
+        // Try to find and click the "Show Original" link if available
+        const iframe = document.querySelector('.goog-te-banner-frame') as HTMLIFrameElement;
+        if (iframe) {
+          const frameDocument = iframe.contentDocument || iframe.contentWindow?.document;
+          if (frameDocument) {
+            const originalLink = frameDocument.querySelector('a.goog-te-menu-value') as HTMLAnchorElement;
+            if (originalLink) {
+              originalLink.click();
+            }
           }
-        }, 500);
+        }
+      } catch (e) {
+        console.warn('Error resetting to English:', e);
       }
     }
   };
+  
+  // Check for language parameter in URL on page load
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlLang = urlParams.get('lang');
+    
+    // If there's a lang parameter, make sure we preserve it
+    if (urlLang) {
+      // Wait for Google Translate to initialize first
+      const langCheckInterval = setInterval(() => {
+        if (initialized) {
+          clearInterval(langCheckInterval);
+          restoreTranslation();
+        }
+      }, 500);
+      
+      // Clear interval after 10 seconds to avoid infinite loops
+      setTimeout(() => clearInterval(langCheckInterval), 10000);
+    }
+  }, [initialized]);
   
   // Add listener to fix translation issues on route changes
   useEffect(() => {
