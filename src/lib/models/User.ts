@@ -48,6 +48,20 @@ export interface IUser extends Document {
         photoPath?: string;
       }>;
     };
+    featuredSection?: {
+      features: Array<{
+        icon: string;
+        title: string;
+        description: string;
+        imagePath: string;
+      }>;
+    };
+    testimonials?: Array<{
+      quote: string;
+      author: string;
+      location: string;
+      avatarPath: string;
+    }>;
   };
   createdAt: Date;
   updatedAt: Date;
@@ -168,6 +182,20 @@ const userSchema = new Schema<IUser>(
             photoPath: String,
           }],
         },
+        featuredSection: {
+          features: [{
+            icon: String,
+            title: String,
+            description: String,
+            imagePath: String,
+          }],
+        },
+        testimonials: [{
+          quote: String,
+          author: String,
+          location: String,
+          avatarPath: String,
+        }],
       },
       required: function(this: any) {
         // Only required for admin role

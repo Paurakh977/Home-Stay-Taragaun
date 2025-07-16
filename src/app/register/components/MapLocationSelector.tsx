@@ -18,6 +18,8 @@ interface MapLocationSelectorProps {
     address?: string;
     district?: string;
   }) => void;
+  initialSearchQuery?: string | null;
+  autoSaveLocation?: boolean;
 }
 
 declare global {
@@ -36,10 +38,16 @@ declare global {
       currentLat: number | null;
       currentLng: number | null;
     };
+    mapSearchControl?: any; // Store search control separately
   }
 }
 
-const MapLocationSelector: React.FC<MapLocationSelectorProps> = ({ value, onChange }) => {
+const MapLocationSelector: React.FC<MapLocationSelectorProps> = ({ 
+  value, 
+  onChange, 
+  initialSearchQuery = null, 
+  autoSaveLocation = false 
+}) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapReady, setMapReady] = useState(false);
   const [mapType, setMapType] = useState<string>('street');
@@ -50,10 +58,12 @@ const MapLocationSelector: React.FC<MapLocationSelectorProps> = ({ value, onChan
   const [currentCoordinates, setCurrentCoordinates] = useState<{lat: number, lng: number} | null>(
     value.latitude && value.longitude ? {lat: value.latitude, lng: value.longitude} : null
   );
+  const [hasPerformedInitialSearch, setHasPerformedInitialSearch] = useState(false);
 
   // Create refs at the component level
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
+  const searchControlRef = useRef<any>(null);
 
   // Load Leaflet scripts when component mounts
   useEffect(() => {
@@ -240,6 +250,7 @@ const MapLocationSelector: React.FC<MapLocationSelectorProps> = ({ value, onChan
     });
     
     map.addControl(searchControl);
+    searchControlRef.current = searchControl;
 
     // Handle map click to add/move marker
     map.on('click', function(e: any) {
@@ -290,9 +301,25 @@ const MapLocationSelector: React.FC<MapLocationSelectorProps> = ({ value, onChan
         });
       }
       
+      // Update location data
       updateLocation(location.y, location.x);
-      // Reset saved state when location changes
-      setLocationSaved(false);
+      
+      console.log('Search result found:', location.y, location.x);
+      console.log('Auto-save setting:', autoSaveLocation, 'Location saved:', locationSaved);
+      
+      // Auto-save the location if requested
+      if (autoSaveLocation && !locationSaved) {
+        console.log('Auto-saving location from search result');
+        // Use a timeout to ensure the location data is updated
+        setTimeout(() => {
+          if (currentCoordinates) {
+            handleSaveLocation();
+          }
+        }, 800);
+      } else {
+        // Reset saved state when location changes if not auto-saving
+        setLocationSaved(false);
+      }
     });
 
     // Function to update location data
@@ -363,6 +390,9 @@ const MapLocationSelector: React.FC<MapLocationSelectorProps> = ({ value, onChan
       currentLat: value.latitude || null,
       currentLng: value.longitude || null
     };
+    
+    // Store search control separately
+    window.mapSearchControl = searchControl;
 
     // Clean up function to run when component unmounts
     return () => {
@@ -373,8 +403,54 @@ const MapLocationSelector: React.FC<MapLocationSelectorProps> = ({ value, onChan
       if (window.mapInstance) {
         delete window.mapInstance;
       }
+      if (window.mapSearchControl) {
+        delete window.mapSearchControl;
+      }
     };
-  }, [leafletLoaded, value.latitude, value.longitude]);
+  }, [leafletLoaded, value.latitude, value.longitude, autoSaveLocation]);
+
+  // Handle programmatic search if initialSearchQuery is provided
+  useEffect(() => {
+    if (
+      leafletLoaded && 
+      initialSearchQuery && 
+      !hasPerformedInitialSearch && 
+      mapInstanceRef.current
+    ) {
+      console.log('Performing initial search with query:', initialSearchQuery);
+      
+      try {
+        // Find the input element within the search control
+        const searchInput = document.querySelector('.leaflet-control-geosearch form input');
+        if (searchInput) {
+          // Set the value and dispatch events to trigger the search
+          (searchInput as HTMLInputElement).value = initialSearchQuery;
+          
+          // Focus the input
+          (searchInput as HTMLInputElement).focus();
+          
+          // Dispatch input event to trigger search suggestions
+          const inputEvent = new Event('input', { bubbles: true });
+          searchInput.dispatchEvent(inputEvent);
+          
+          // Wait a bit then dispatch keydown event for Enter key
+          setTimeout(() => {
+            const keyEvent = new KeyboardEvent('keydown', { 
+              bubbles: true, 
+              key: 'Enter',
+              keyCode: 13,
+              which: 13
+            });
+            searchInput.dispatchEvent(keyEvent);
+            
+            setHasPerformedInitialSearch(true);
+          }, 500);
+        }
+      } catch (error) {
+        console.error('Error during programmatic search:', error);
+      }
+    }
+  }, [leafletLoaded, initialSearchQuery, hasPerformedInitialSearch]);
 
   // Handle map type selection
   const handleMapTypeChange = (newMapType: string) => {

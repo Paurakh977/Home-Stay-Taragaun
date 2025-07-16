@@ -13,6 +13,12 @@ import AddressDetails from "./components/AddressDetails";
 import HomestayFeaturesForm from "./components/HomestayFeaturesForm";
 import ContactInfo from "./components/ContactInfo";
 
+// Define bilingual field structure
+interface BilingualField {
+  en: string;
+  ne: string;
+}
+
 // Form data type
 type FormData = {
   // Page 1
@@ -23,14 +29,22 @@ type FormData = {
   bedCount: number;
   homeStayType: string;
   
-  // Page 2 (WayToHomeStay)
+  // Page 2 (Address details)
+  province: BilingualField;
+  district: BilingualField;
+  municipality: BilingualField;
+  ward: BilingualField;
+  city: string;
+  tole: string;
+  
+  // Page 3 (WayToHomeStay)
   directions?: string; // Optional written directions
   latitude?: number;   // Added for map location
   longitude?: number;  // Added for map location
   locationAddress?: string; // Added for reverse geocoded address
   locationDistrict?: string; // Added for district information
   
-  // Page 3
+  // Page 4
   operatorName: string; // Added for Homestay Operator
   operatorGender: string; // Added for Homestay Operator gender
   operatorContactNo: string; // Added for Homestay Operator contact number
@@ -39,14 +53,6 @@ type FormData = {
     role: string;
     contactNo: string;
   }[];
-
-  // Page 4 - Address
-  province: string;
-  district: string;
-  municipality: string;
-  ward: string;
-  city: string;
-  tole: string;
 
   // Page 5 - Homestay Features
   localAttractions: string[];
@@ -101,10 +107,10 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
     operatorGender: "male", // Initialize operator gender with default
     operatorContactNo: "+977", // Initialize operator contact number
     officials: [{ name: "", role: "", contactNo: "+977" }],
-    province: "",
-    district: "",
-    municipality: "",
-    ward: "",
+    province: { en: "", ne: "" },
+    district: { en: "", ne: "" },
+    municipality: { en: "", ne: "" },
+    ward: { en: "", ne: "" },
     city: "",
     tole: "",
     localAttractions: [],
@@ -219,12 +225,11 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
     }
     
     // Address Details (step 4)
-    if (!formData.province) errors.push("Province is required");
-    if (!formData.district) errors.push("District is required");
-    if (!formData.municipality) errors.push("Municipality is required");
-    if (!formData.ward) errors.push("Ward is required");
+    if (!formData.province.en || !formData.province.ne) errors.push("Province is required");
+    if (!formData.district.en || !formData.district.ne) errors.push("District is required");
+    if (!formData.municipality.en || !formData.municipality.ne) errors.push("Municipality is required");
+    if (!formData.ward.en || !formData.ward.ne) errors.push("Ward is required");
     if (!formData.city) errors.push("City is required");
-    if (!formData.tole) errors.push("Tole is required");
     
     // Homestay Features (step 5)
     if (!formData.localAttractions?.length) errors.push("At least one Local Attraction is required");
@@ -256,14 +261,30 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
       setShowValidationErrors(false);
+      // Scroll to top when navigating to previous step
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   // Handle next step
   const handleNext = () => {
     if (currentStep < 6) {
+      // Debug log for step 2 -> 3 transition (Address details to Way to homestay)
+      if (currentStep === 2) {
+        console.log("DEBUG: Moving from Address Details to Way to Homestay");
+        console.log("Form data being passed:", formData);
+        console.log("Address fields:", {
+          province: formData.province,
+          district: formData.district,
+          municipality: formData.municipality,
+          ward: formData.ward
+        });
+      }
+      
       setCurrentStep(currentStep + 1);
       setShowValidationErrors(false);
+      // Scroll to top when navigating to next step
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       // Validate all form data before submission
       if (validateForm()) {
@@ -331,7 +352,7 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
         latitude: formData.latitude,
         longitude: formData.longitude,
         
-        // Create an official for the operator (This is the important part we're fixing)
+        // Create an official for the operator
         officials: [
           // Add operator as an official with role 'operator'
           {
@@ -344,13 +365,19 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
           ...formData.officials
         ],
         
-        // Address information
-        province: formData.province,
-        district: formData.district,
-        municipality: formData.municipality,
-        ward: formData.ward,
+        // Extract string values from address information
+        province: formData.province.ne,
+        district: formData.district.ne,
+        municipality: formData.municipality.ne,
+        ward: formData.ward.ne,
         city: formData.city,
-        tole: formData.tole,
+        tole: "", // Always set tole to empty string
+        
+        // Also include English translations
+        provinceEn: formData.province.en,
+        districtEn: formData.district.en,
+        municipalityEn: formData.municipality.en,
+        wardEn: formData.ward.en,
         
         // Features
         localAttractions: formData.localAttractions,
@@ -502,11 +529,11 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
       case 1:
         return <HomeStayIntroduction formData={formData} updateFormData={updateFormData} />;
       case 2:
-        return <WayToHomeStay formData={formData} updateFormData={updateFormData} />;
-      case 3:
-        return <CommitteeOfficials formData={formData} updateFormData={updateFormData} />;
-      case 4:
         return <AddressDetails formData={formData} updateFormData={updateFormData} />;
+      case 3:
+        return <WayToHomeStay formData={formData} updateFormData={updateFormData} />;
+      case 4:
+        return <CommitteeOfficials formData={formData} updateFormData={updateFormData} />;
       case 5:
         return <HomestayFeaturesForm formData={formData} updateFormData={updateFormData} />;
       case 6:
@@ -529,11 +556,11 @@ export default function RegisterPage({ adminUsername }: RegisterPageProps) {
       case 1:
         return "Home stay's introduction/होमस्टेको परिचय";
       case 2:
-        return "Way to home stay/होमस्टे गाउँ कसरी पुग्ने (पहुँच)/साधन";
-      case 3:
-        return "Names of the officials of the Homestay Management Committee/होमस्टे व्यवस्थापन समितिका पदाधिकारीहरुको नाम";
-      case 4:
         return "Address Details/ठेगाना विवरण";
+      case 3:
+        return "Way to home stay/होमस्टे गाउँ कसरी पुग्ने (पहुँच)/साधन";
+      case 4:
+        return "Names of the officials of the Homestay Management Committee/होमस्टे व्यवस्थापन समितिका पदाधिकारीहरुको नाम";
       case 5:
         return "Homestay Features and Attractions / होमस्टे सुविधा र आकर्षणहरू";
       case 6:

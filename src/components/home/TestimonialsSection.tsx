@@ -5,36 +5,46 @@ import Image from "next/image";
 import { ChevronLeft, ChevronRight, Quote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useBranding } from "@/context/BrandingContext";
 
-const testimonials = [
+// Default testimonials as fallback if no data from context
+const defaultTestimonials = [
   {
     quote: "Our stay at the Hamro Home Stay was incredible. The hospitality was unmatched, and we felt like part of the family. The views were breathtaking!",
     author: "Sarah Johnson",
     location: "United States",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=100&auto=format&fit=crop"
+    avatarPath: "/images/testimonials/avatar-1.jpg"
   },
   {
     quote: "The authentic food, the warm hospitality, and the cultural experience made our stay unforgettable. Definitely coming back next year!",
     author: "James Wilson",
     location: "United Kingdom",
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=100&auto=format&fit=crop"
+    avatarPath: "/images/testimonials/avatar-2.jpg"
   },
   {
     quote: "If you want to experience the real Nepal, this is the place. Our host family was amazing, and the home-cooked meals were the best we had during our entire trip.",
     author: "Emma Thompson",
     location: "Australia",
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=100&auto=format&fit=crop"
+    avatarPath: "/images/testimonials/avatar-3.jpg"
   },
   {
     quote: "The perfect blend of comfort and authentic cultural experience. Waking up to mountain views every morning was magical!",
     author: "David Chen",
     location: "Canada",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=100&auto=format&fit=crop"
+    avatarPath: "/images/testimonials/avatar-4.jpg"
   }
 ];
 
 const TestimonialsSection = () => {
   const [activeIndex, setActiveIndex] = useState(0);
+  
+  // Get branding data from context
+  const branding = useBranding();
+  
+  // Use testimonials from branding if available, otherwise use defaults
+  const testimonials = branding?.testimonials?.length ? 
+    branding.testimonials : 
+    defaultTestimonials;
 
   const nextTestimonial = () => {
     setActiveIndex((prevIndex) => 
@@ -69,20 +79,20 @@ const TestimonialsSection = () => {
                   <CardContent className="p-8 flex flex-col items-center text-center">
                     <Quote className="h-12 w-12 text-primary/20 mb-6" />
                     <p className="text-lg md:text-xl text-gray-700 italic mb-8">
-                      &ldquo;{testimonial.quote}&rdquo;
+                      &ldquo;{testimonial.quote || 'This homestay provided an amazing experience with authentic local hospitality.'}&rdquo;
                     </p>
                     <div className="flex items-center">
                       <div className="relative h-12 w-12 rounded-full overflow-hidden mr-4">
                         <Image
-                          src={testimonial.avatar}
-                          alt={testimonial.author}
+                          src={testimonial.avatarPath || `/images/testimonials/avatar-${index+1}.jpg`}
+                          alt={testimonial.author || `Guest ${index+1}`}
                           fill
                           className="object-cover"
                         />
                       </div>
                       <div className="text-left">
-                        <h4 className="font-semibold text-gray-900">{testimonial.author}</h4>
-                        <p className="text-gray-500">{testimonial.location}</p>
+                        <h4 className="font-semibold text-gray-900">{testimonial.author || `Happy Guest ${index+1}`}</h4>
+                        <p className="text-gray-500">{testimonial.location || 'Traveler'}</p>
                       </div>
                     </div>
                   </CardContent>

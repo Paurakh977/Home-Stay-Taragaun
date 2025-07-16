@@ -1,6 +1,8 @@
 import { ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { createHash } from 'crypto';
+// Re-export these functions directly from imageUtils
+export { getImageUrl, shouldUseUnoptimizedImage, updateImageCacheBuster } from './imageUtils';
 
 /**
  * Combines class names (className) with Tailwind CSS classes
@@ -70,47 +72,12 @@ export function verifyPassword(password: string, hashedPassword: string): boolea
 }
 
 /**
- * Transforms an upload path to an API image path with cache busting
- * @param imagePath - The original image path from the database (e.g., /uploads/...)
- * @returns A properly formatted image URL for the API with cache busting
- */
-export function getImageUrl(imagePath: string): string {
-  if (!imagePath) return '';
-  
-  // Check if imagePath is already a proper URL or API path
-  if (!imagePath.startsWith('/uploads/')) {
-    return imagePath;
-  }
-  
-  // Transform /uploads/path/to/image.jpg to /api/images/path/to/image.jpg
-  // This handles both admin paths (/uploads/adminUsername/homestayId/...)
-  // and regular paths (/uploads/homestayId/...)
-  const apiPath = imagePath.replace('/uploads/', '/api/images/');
-  
-  // Add cache busting timestamp
-  return `${apiPath}?t=${Date.now()}`;
-}
-
-/**
  * Constructs an image URL without timestamps to prevent hydration mismatch
+ * @deprecated Use getImageUrl from imageUtils instead
  */
 export function getApiImageUrl(imagePath: string | null | undefined): string {
-  if (!imagePath) {
-    return '/images/placeholder-homestay.jpg';
-  }
-  
-  // If it's already a URL or an absolute path to images, return it as is
-  if (imagePath.startsWith('http') || imagePath.startsWith('/images/')) {
-    return imagePath;
-  }
-  
-  // Convert /uploads/ paths to /api/images/ paths
-  // This will handle both regular and admin paths properly
-  if (imagePath.startsWith('/uploads/')) {
-    const apiPath = imagePath.replace('/uploads/', '/api/images/');
-    return apiPath;
-  }
-  
-  // Handle other paths
-  return `/api/images/${imagePath}`;
+  console.warn('getApiImageUrl is deprecated. Please use getImageUrl from @/lib/imageUtils instead');
+  // We need to import inside the function to avoid circular dependency
+  const { getImageUrl } = require('./imageUtils');
+  return getImageUrl(imagePath);
 }

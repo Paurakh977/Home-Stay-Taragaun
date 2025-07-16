@@ -8,6 +8,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useBranding } from "@/context/BrandingContext";
 import { getImageUrl } from "@/lib/utils";
+import TranslateButton from "@/components/ui/translate-button";
 
 interface AdminLoginFormProps {
   adminUsername: string;
@@ -107,6 +108,9 @@ export default function AdminLoginForm({ adminUsername }: AdminLoginFormProps) {
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           {/* Header with brand logo */}
           <div className="p-8 text-center">
+            <div className="absolute top-4 right-4">
+              <TranslateButton variant="ghost" size="sm" />
+            </div>
             <div className="flex justify-center mb-4">
               {branding.logoPath ? (
                 <div className="relative h-24 w-24 rounded-full overflow-hidden border-2 border-white shadow-sm">
@@ -120,19 +124,23 @@ export default function AdminLoginForm({ adminUsername }: AdminLoginFormProps) {
                 </div>
               ) : (
                 <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-primary text-white text-3xl font-bold shadow-sm">
-                  {branding.brandName?.charAt(0) || adminUsername.charAt(0).toUpperCase()}
+                  {branding.brandName?.charAt(0) || adminUsername.charAt(0).toUpperCase()} 
                 </div>
               )}
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">
-              {branding.brandName || 'एडमिन पोर्टल'}
+            <h1 className="text-2x font-bold text-gray-900 mb-1">
+              {branding.brandName || 'एडमिन पोर्टल'} Development Committee
             </h1>
             <p className="text-gray-500 text-sm">
-              {greeting}, <span className="font-semibold">{adminUsername}</span>
+              {branding.contactInfo?.address || 'Kathmandu, Nepal'}
             </p>
             {branding.brandDescription && (
-              <p className="mt-2 text-xs text-gray-500">{branding.brandDescription}</p>
+              <p className="mt-2 text-xs text-gray-800">{branding.brandName}</p>
             )}
+            
+          <p className="mt-1 text-xs text-gray-500">
+            <span className="font-bold">Homestay Digital Marketing Platform  </span>
+          </p>
           </div>
           
           {/* Login Form */}
@@ -182,16 +190,6 @@ export default function AdminLoginForm({ adminUsername }: AdminLoginFormProps) {
               </button>
             </form>
           </div>
-        </div>
-        
-        {/* Back link */}
-        <div className="text-center mt-6">
-          <Link 
-            href="/admin/login"
-            className="text-sm text-gray-600 hover:text-primary transition-colors"
-          >
-            एडमिन लगइन पृष्ठमा फर्कनुहोस्
-          </Link>
         </div>
       </div>
     </div>

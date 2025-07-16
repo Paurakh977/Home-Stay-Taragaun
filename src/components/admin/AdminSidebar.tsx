@@ -74,6 +74,11 @@ const reportItems = [
     title: "Homestay Services",
     href: "/admin/report/homestay-services",
     icon: Users,
+  },
+  {
+    title: "District-wise Classification",
+    href: "/admin/report/district-type",
+    icon: MapPin,
   }
 ];
 
@@ -191,13 +196,8 @@ export default function AdminSidebar({ username }: AdminSidebarProps) {
           )}
           <div>
             <div className="font-medium text-gray-900 text-sm">
-              {branding.brandName || 'Admin Dashboard'}
+              {branding.brandName || 'Admin Dashboard'} Dashboard
             </div>
-            {adminUsername && (
-              <span className="text-xs text-gray-500">
-                {adminUsername}
-              </span>
-            )}
           </div>
         </Link>
       </div>

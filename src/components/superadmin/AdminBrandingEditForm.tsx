@@ -40,9 +40,19 @@ export function AdminBrandingEditForm({ adminData, onSuccess }: BrandingFormProp
   const [teamPhotoPreviews, setTeamPhotoPreviews] = useState<string[]>([]);
   const [teamMembers, setTeamMembers] = useState<{name: string; role: string; photoPath?: string}[]>([]);
   
+  // New state for featured section and testimonials
+  const [features, setFeatures] = useState<{icon: string; title: string; description: string; imagePath: string}[]>([]);
+  const [featureImagePreviews, setFeatureImagePreviews] = useState<string[]>([]);
+  const [testimonials, setTestimonials] = useState<{quote: string; author: string; location: string; avatarPath: string}[]>([]);
+  const [testimonialAvatarPreviews, setTestimonialAvatarPreviews] = useState<string[]>([]);
+  
   const logoRef = useRef<HTMLInputElement>(null);
   const sliderRefs = useRef<HTMLInputElement[]>([]);
   const teamPhotoRefs = useRef<HTMLInputElement[]>([]);
+  
+  // New refs for featured section and testimonial images
+  const featureImageRefs = useRef<HTMLInputElement[]>([]);
+  const testimonialAvatarRefs = useRef<HTMLInputElement[]>([]);
 
   // Initialize form with existing admin data
   const form = useForm({
@@ -87,6 +97,62 @@ export function AdminBrandingEditForm({ adminData, onSuccess }: BrandingFormProp
         setTeamPhotoPreviews(team.map((member: any) => 
           member.photoPath ? getImageUrl(member.photoPath) : ''
         ));
+      }
+      
+      // Set featured section data
+      if (adminData.branding.featuredSection?.features && adminData.branding.featuredSection.features.length > 0) {
+        const featuredItems = adminData.branding.featuredSection.features;
+        setFeatures(featuredItems.map((feature: any) => ({
+          icon: feature.icon || '',
+          title: feature.title || '',
+          description: feature.description || '',
+          imagePath: feature.imagePath || ''
+        })));
+        setFeatureImagePreviews(featuredItems.map((feature: any) => 
+          feature.imagePath ? getImageUrl(feature.imagePath) : ''
+        ));
+      } else {
+        // Set default features if none exist
+        setFeatures([
+          { icon: '🏠', title: 'Authentic Local Experience', description: 'Stay with local families and experience authentic Nepali hospitality and culture.', imagePath: '/images/features/feature-1.jpg' },
+          { icon: '🍽️', title: 'Traditional Cuisine', description: 'Enjoy homemade Nepali dishes prepared with locally sourced organic ingredients.', imagePath: '/images/features/feature-2.jpg' },
+          { icon: '🌿', title: 'Scenic Locations', description: 'Our home stays are situated in beautiful locations with stunning mountain views.', imagePath: '/images/features/feature-3.jpg' },
+          { icon: '🧳', title: 'Personalized Service', description: 'Each home stay offers personalized service to make your stay comfortable and memorable.', imagePath: '/images/features/feature-4.jpg' }
+        ]);
+        setFeatureImagePreviews([
+          '/images/features/feature-1.jpg',
+          '/images/features/feature-2.jpg',
+          '/images/features/feature-3.jpg',
+          '/images/features/feature-4.jpg'
+        ]);
+      }
+      
+      // Set testimonials data
+      if (adminData.branding.testimonials && adminData.branding.testimonials.length > 0) {
+        const testimonialsData = adminData.branding.testimonials;
+        setTestimonials(testimonialsData.map((testimonial: any) => ({
+          quote: testimonial.quote || '',
+          author: testimonial.author || '',
+          location: testimonial.location || '',
+          avatarPath: testimonial.avatarPath || ''
+        })));
+        setTestimonialAvatarPreviews(testimonialsData.map((testimonial: any) => 
+          testimonial.avatarPath ? getImageUrl(testimonial.avatarPath) : ''
+        ));
+      } else {
+        // Set default testimonials if none exist
+        setTestimonials([
+          { quote: 'Our stay at the Hamro Home Stay was incredible. The hospitality was unmatched, and we felt like part of the family. The views were breathtaking!', author: 'Sarah Johnson', location: 'United States', avatarPath: '/images/testimonials/avatar-1.jpg' },
+          { quote: 'The authentic food, the warm hospitality, and the cultural experience made our stay unforgettable. Definitely coming back next year!', author: 'James Wilson', location: 'United Kingdom', avatarPath: '/images/testimonials/avatar-2.jpg' },
+          { quote: 'If you want to experience the real Nepal, this is the place. Our host family was amazing, and the home-cooked meals were the best we had during our entire trip.', author: 'Emma Thompson', location: 'Australia', avatarPath: '/images/testimonials/avatar-3.jpg' },
+          { quote: 'The perfect blend of comfort and authentic cultural experience. Waking up to mountain views every morning was magical!', author: 'David Chen', location: 'Canada', avatarPath: '/images/testimonials/avatar-4.jpg' }
+        ]);
+        setTestimonialAvatarPreviews([
+          '/images/testimonials/avatar-1.jpg',
+          '/images/testimonials/avatar-2.jpg',
+          '/images/testimonials/avatar-3.jpg',
+          '/images/testimonials/avatar-4.jpg'
+        ]);
       }
     }
   }, [adminData]);
@@ -174,6 +240,34 @@ export function AdminBrandingEditForm({ adminData, onSuccess }: BrandingFormProp
         }
       });
       
+      // Add features
+      features.forEach((feature, index) => {
+        formData.append(`feature_${index}_icon`, feature.icon);
+        formData.append(`feature_${index}_title`, feature.title);
+        formData.append(`feature_${index}_description`, feature.description);
+        
+        // Add feature images if changed
+        if (featureImageRefs.current[index]?.files?.[0]) {
+          formData.append(`feature_image_${index}`, featureImageRefs.current[index].files[0]);
+        } else if (feature.imagePath) {
+          formData.append(`feature_${index}_imagePath`, feature.imagePath);
+        }
+      });
+      
+      // Add testimonials
+      testimonials.forEach((testimonial, index) => {
+        formData.append(`testimonial_${index}_quote`, testimonial.quote);
+        formData.append(`testimonial_${index}_author`, testimonial.author);
+        formData.append(`testimonial_${index}_location`, testimonial.location);
+        
+        // Add testimonial avatars if changed
+        if (testimonialAvatarRefs.current[index]?.files?.[0]) {
+          formData.append(`testimonial_avatar_${index}`, testimonialAvatarRefs.current[index].files[0]);
+        } else if (testimonial.avatarPath) {
+          formData.append(`testimonial_${index}_avatarPath`, testimonial.avatarPath);
+        }
+      });
+      
       // Submit form data
       const response = await fetch(`/api/superadmin/users/${adminData._id}/branding`, {
         method: 'PATCH',
@@ -236,6 +330,36 @@ export function AdminBrandingEditForm({ adminData, onSuccess }: BrandingFormProp
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleFeatureImageChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const newPreviews = [...featureImagePreviews];
+      newPreviews[index] = URL.createObjectURL(file);
+      setFeatureImagePreviews(newPreviews);
+    }
+  };
+
+  const handleTestimonialAvatarChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const newPreviews = [...testimonialAvatarPreviews];
+      newPreviews[index] = URL.createObjectURL(file);
+      setTestimonialAvatarPreviews(newPreviews);
+    }
+  };
+
+  const updateFeature = (index: number, field: keyof typeof features[0], value: string) => {
+    const newFeatures = [...features];
+    newFeatures[index] = { ...newFeatures[index], [field]: value };
+    setFeatures(newFeatures);
+  };
+
+  const updateTestimonial = (index: number, field: keyof typeof testimonials[0], value: string) => {
+    const newTestimonials = [...testimonials];
+    newTestimonials[index] = { ...newTestimonials[index], [field]: value };
+    setTestimonials(newTestimonials);
   };
 
   return (
@@ -643,6 +767,174 @@ export function AdminBrandingEditForm({ adminData, onSuccess }: BrandingFormProp
               ))}
             </div>
           )}
+        </div>
+        
+        <Separator />
+        
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-medium">Featured Section</h3>
+          </div>
+          
+          <div className="space-y-6">
+            {features.map((feature, index) => (
+              <div key={`feature-${index}`} className="p-4 border rounded-md bg-gray-50 relative">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="font-medium mb-2">Icon</h4>
+                        <Input 
+                          value={feature.icon} 
+                          onChange={(e) => updateFeature(index, 'icon', e.target.value)}
+                          placeholder="Emoji or icon (e.g. 🏠)" 
+                        />
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-medium mb-2">Title</h4>
+                        <Input 
+                          value={feature.title} 
+                          onChange={(e) => updateFeature(index, 'title', e.target.value)}
+                          placeholder="Feature title" 
+                        />
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-medium mb-2">Description</h4>
+                        <Textarea 
+                          value={feature.description} 
+                          onChange={(e) => updateFeature(index, 'description', e.target.value)}
+                          placeholder="Feature description" 
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium mb-2">Image</h4>
+                    <div className="relative h-48 w-full rounded-md overflow-hidden border bg-gray-50">
+                      {featureImagePreviews[index] ? (
+                        <Image 
+                          src={featureImagePreviews[index]} 
+                          alt={`Feature ${index+1}`} 
+                          fill 
+                          className="object-cover" 
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-gray-400">
+                          No image
+                        </div>
+                      )}
+                    </div>
+                    
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="sm" 
+                      className="mt-2"
+                      onClick={() => featureImageRefs.current[index]?.click()}
+                    >
+                      <CameraIcon className="h-4 w-4 mr-2" />
+                      Change Image
+                    </Button>
+                    
+                    <input 
+                      type="file" 
+                      className="hidden" 
+                      accept="image/*" 
+                      onChange={(e) => handleFeatureImageChange(e, index)}
+                      ref={(el) => {
+                        if (el) featureImageRefs.current[index] = el;
+                      }} 
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        <Separator />
+        
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-medium">Testimonials</h3>
+          </div>
+          
+          <div className="space-y-6">
+            {testimonials.map((testimonial, index) => (
+              <div key={`testimonial-${index}`} className="p-4 border rounded-md bg-gray-50 relative">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <h4 className="font-medium mb-2">Avatar</h4>
+                    <div className="relative h-24 w-24 rounded-full overflow-hidden border bg-gray-50">
+                      {testimonialAvatarPreviews[index] ? (
+                        <Image 
+                          src={testimonialAvatarPreviews[index]} 
+                          alt={`${testimonial.author}'s avatar`} 
+                          fill 
+                          className="object-cover" 
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-gray-400">
+                          No avatar
+                        </div>
+                      )}
+                    </div>
+                    
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="sm" 
+                      className="mt-2"
+                      onClick={() => testimonialAvatarRefs.current[index]?.click()}
+                    >
+                      <CameraIcon className="h-4 w-4 mr-2" />
+                      Change Avatar
+                    </Button>
+                    
+                    <input 
+                      type="file" 
+                      className="hidden" 
+                      accept="image/*" 
+                      onChange={(e) => handleTestimonialAvatarChange(e, index)}
+                      ref={(el) => {
+                        if (el) testimonialAvatarRefs.current[index] = el;
+                      }} 
+                    />
+                    
+                    <div className="mt-4 space-y-2">
+                      <h4 className="font-medium">Author Info</h4>
+                      <Input 
+                        value={testimonial.author} 
+                        onChange={(e) => updateTestimonial(index, 'author', e.target.value)}
+                        placeholder="Author name" 
+                        className="mb-2"
+                      />
+                      <Input 
+                        value={testimonial.location} 
+                        onChange={(e) => updateTestimonial(index, 'location', e.target.value)}
+                        placeholder="Location (e.g., United States)" 
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="md:col-span-2">
+                    <h4 className="font-medium mb-2">Testimonial</h4>
+                    <Textarea 
+                      value={testimonial.quote} 
+                      onChange={(e) => updateTestimonial(index, 'quote', e.target.value)}
+                      placeholder="Testimonial quote" 
+                      rows={8}
+                      className="h-full min-h-[200px]"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
         
         <div className="flex justify-end pt-4">

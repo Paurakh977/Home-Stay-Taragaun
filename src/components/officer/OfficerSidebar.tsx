@@ -59,6 +59,11 @@ const reportItems = [
     title: "Homestay Services",
     href: "/officer/report/homestay-services",
     icon: Users,
+  },
+  {
+    title: "District-wise Classification",
+    href: "/officer/report/district-type",
+    icon: MapPin,
   }
 ];
 
@@ -184,17 +189,12 @@ export default function OfficerSidebar({ adminUsername, officerUsername }: Offic
           )}
           <div>
             <div className="font-medium text-gray-900 text-sm">
-              {branding.brandName || 'Officer Dashboard'}
+              {branding.brandName || 'Officer Dashboard'} Dashboard
             </div>
             <div className="flex flex-col">
               <span className="text-xs text-gray-500">
                 {officerName && `Officer: ${officerName}`}
               </span>
-              {adminUsernameValue && (
-                <span className="text-xs text-gray-400">
-                  Admin: {adminUsernameValue}
-                </span>
-              )}
             </div>
           </div>
         </Link>

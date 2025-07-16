@@ -59,12 +59,18 @@ interface Homestay {
     tourismServices?: string[];
     infrastructure?: string[];
   };
+  contacts?: {
+    name: string;
+    mobile: string;
+  }[];
+  registrationAuthority?: string;
+  businessRegistrationNumber?: string;
 }
 
 interface ReportPageProps {
   title: string;
   description: string;
-  type: 'geographical-classification' | 'service-ratings' | 'tourism-attractions' | 'infrastructure' | 'homestay-services';
+  type: 'geographical-classification' | 'service-ratings' | 'tourism-attractions' | 'infrastructure' | 'homestay-services' | 'district-type';
   userType: 'admin' | 'officer';
   username: string;
 }
@@ -115,7 +121,7 @@ export default function ReportPage({
   // Fetch homestays data
   useEffect(() => {
     const fetchHomestays = async () => {
-      if (type !== 'geographical-classification' && type !== 'tourism-attractions' && type !== 'infrastructure' && type !== 'homestay-services') return;
+      if (type !== 'geographical-classification' && type !== 'tourism-attractions' && type !== 'infrastructure' && type !== 'homestay-services' && type !== 'district-type') return;
       
       try {
         setLoading(true);
@@ -129,6 +135,11 @@ export default function ReportPage({
         if (filters.municipality) queryParams.append('municipality', filters.municipality);
         if (filters.homestayType) queryParams.append('homestayType', filters.homestayType);
         if (filters.status) queryParams.append('status', filters.status);
+        
+        // For district-type report, we need to include contacts
+        if (type === 'district-type') {
+          queryParams.append('includeContacts', 'true');
+        }
         
         // Add attraction filter if applicable
         if (type === 'tourism-attractions' && filters.selectedAttractions && filters.selectedAttractions.length > 0) {
@@ -401,10 +412,18 @@ export default function ReportPage({
         categories.wildlife++;
       } else if (attr.startsWith('adventure:')) {
         categories.adventure++;
-      } else if (attr.includes('Park') || attr.includes('National') || attr.includes('River')) {
+      } else if (attr.includes('National Parks') || attr.includes('Conservation Areas') || attr.includes('Rivers') || attr.includes('Lakes') || attr.includes('Ponds')) {
         categories.natural++;
-      } else if (attr.includes('Museum') || attr.includes('Heritage') || attr.includes('Traditional')) {
+      } else if (attr.includes('Museums') || attr.includes('Cultural') || attr.includes('Festivals') || attr.includes('Traditional') || attr.includes('Community Lifestyle')) {
         categories.cultural++;
+      } else if (attr.includes('Wildlife') || attr.includes('Birdwatching') || attr.includes('Conservation')) {
+        categories.wildlife++;
+      } else if (attr.includes('Forests') || attr.includes('Nature Walks') || attr.includes('Eco Trails')) {
+        categories.forest++;
+      } else if (attr.includes('Trekking') || attr.includes('Climbing') || attr.includes('Hiking') || attr.includes('Safaris') || attr.includes('Village Tours')) {
+        categories.adventure++;
+      } else if (attr.includes('Dishes') || attr.includes('Recipes') || attr.includes('Organic')) {
+        categories.products++;
       } else {
         categories.other++;
       }
@@ -447,161 +466,14 @@ export default function ReportPage({
   };
 
   // For downloading the report data in various formats
-  const handleExport = async (format: 'pdf' | 'excel' | 'csv') => {
+  const handleExport = async (format: 'pdf' | 'csv') => {
     try {
       setLoading(true);
       
       // Make sure we use the fully filtered data for exports
       const dataToExport = sortedHomestays;
       
-      if (format === 'excel') {
-        // For Excel export, we'll use the xlsx library
-        const XLSX = await import('xlsx');
-        
-        // Create a header/branding worksheet - REMOVED FILTER INFO
-        const brandingWorksheet = XLSX.utils.aoa_to_sheet([
-          [`${branding.brandName || 'Department of Tourism'}`],
-          ['Government of Nepal'],
-          ['Homestay Management System'],
-          [''],
-          [`Report: ${title}`],
-          [description],
-          [''],
-          [`Generated on: ${currentDate}`],
-          [''],
-          [`Ref. No: HMS/${new Date().getFullYear()}/${Math.floor(Math.random() * 1000)}`]
-        ]);
-        
-        // Set wider column width for branding
-        brandingWorksheet['!cols'] = [{ wch: 80 }];
-        
-        // Create data worksheet based on report type
-        let worksheet;
-        
-        if (type === 'tourism-attractions') {
-          // For tourism attractions, normalize the data with one attraction per row
-          const normalizedData: Array<{
-            'S.N.': number;
-            'Homestay Name': string;
-            'DHSR No': string;
-            'Type': string;
-            'Formatted Address': string;
-            'Local Attraction': string;
-            'Homes': number;
-            'Rooms': number;
-            'Beds': number;
-            'Remarks': string;
-          }> = [];
-          let rowCounter = 1;
-          
-          dataToExport.forEach((homestay, index) => {
-            // Get all basic homestay information
-            const homestayInfo = {
-              'S.N.': index + 1,
-              'Homestay Name': getValue(homestay, 'homeStayName') || 'N/A',
-              'DHSR No': getValue(homestay, 'dhsrNo') || 'N/A',
-              'Type': getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private',
-              'Formatted Address': getValue(homestay, 'address.formattedAddress.en') || 'N/A',
-              'Homes': parseInt(getValue(homestay, 'homeCount')) || 0,
-              'Rooms': parseInt(getValue(homestay, 'roomCount')) || 0,
-              'Beds': parseInt(getValue(homestay, 'bedCount')) || 0,
-              'Remarks': ''
-            };
-            
-            // If no attractions, add one row with "None" as attraction
-            if (!homestay.features?.localAttractions || homestay.features.localAttractions.length === 0) {
-              normalizedData.push({
-                ...homestayInfo,
-                'Local Attraction': 'None'
-              });
-              rowCounter++;
-              return;
-            }
-            
-            // For each attraction, create a separate row with the same homestay info
-            homestay.features.localAttractions.forEach(attraction => {
-              const { en } = extractBilingualParts(attraction);
-              normalizedData.push({
-                ...homestayInfo,
-                'Local Attraction': en
-              });
-              rowCounter++;
-            });
-          });
-          
-          worksheet = XLSX.utils.json_to_sheet(normalizedData);
-          
-          // Set column widths for tourism attractions
-          worksheet['!cols'] = [
-            { wch: 5 },   // S.N.
-            { wch: 25 },  // Homestay Name
-            { wch: 15 },  // DHSR No
-            { wch: 12 },  // Type
-            { wch: 40 },  // Formatted Address
-            { wch: 60 },  // Local Attraction
-            { wch: 10 },  // Homes
-            { wch: 10 },  // Rooms
-            { wch: 10 },   // Beds
-            { wch: 20 }    // Remarks
-          ];
-        } else {
-          // Original geographical-classification columns
-          worksheet = XLSX.utils.json_to_sheet(
-          dataToExport.map((homestay, index) => ({
-            'S.N.': index + 1,
-            'Homestay Name': getValue(homestay, 'homeStayName') || 'N/A',
-            'DHSR No': getValue(homestay, 'dhsrNo') || 'N/A',
-            'Type': getValue(homestay, 'homeStayType'),
-            'Status': getValue(homestay, 'status'),
-            'Province': getValue(homestay, 'address.province.en') || 'N/A',
-            'District': getValue(homestay, 'address.district.en') || 'N/A',
-            'Municipality': getValue(homestay, 'address.municipality.en') || 'N/A',
-            'Ward': getValue(homestay, 'address.ward') || 'N/A',
-            'City': getValue(homestay, 'address.city') || 'N/A',
-            'Tole': getValue(homestay, 'address.tole') || 'N/A',
-            'Village': getValue(homestay, 'villageName') || 'N/A',
-            'Homes': parseInt(getValue(homestay, 'homeCount')) || 0,
-            'Rooms': parseInt(getValue(homestay, 'roomCount')) || 0,
-            'Beds': parseInt(getValue(homestay, 'bedCount')) || 0,
-            'Remarks': ''
-          }))
-        );
-        
-          // Set column widths for geographical classification
-          worksheet['!cols'] = [
-          { wch: 5 },  // S.N.
-          { wch: 25 }, // Homestay Name
-          { wch: 15 }, // DHSR No
-          { wch: 12 }, // Type
-          { wch: 12 }, // Status
-          { wch: 20 }, // Province
-          { wch: 20 }, // District
-          { wch: 20 }, // Municipality
-          { wch: 10 }, // Ward
-          { wch: 15 }, // City
-          { wch: 15 }, // Tole
-          { wch: 15 }, // Village
-          { wch: 10 }, // Homes
-          { wch: 10 }, // Rooms
-          { wch: 10 },  // Beds
-          { wch: 20 }   // Remarks
-        ];
-        }
-        
-        // Create workbook and add the worksheets
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, brandingWorksheet, 'Report Info');
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Homestays');
-        
-        // Generate filename with date and report type
-        const today = new Date().toISOString().slice(0, 10);
-        const reportType = type.charAt(0).toUpperCase() + type.slice(1).replace(/-/g, '_');
-        const filename = `Homestay_${reportType}_Report_${today}.xlsx`;
-        
-        // Write and download
-        XLSX.writeFile(workbook, filename);
-        
-      } else if (format === 'pdf') {
+      if (format === 'pdf') {
         // Create a new PDF document
         const doc = new jsPDF({
           orientation: 'landscape',
@@ -652,7 +524,7 @@ export default function ReportPage({
           // Add document title
           doc.setFontSize(16);
           doc.setFont('helvetica', 'bold');
-          doc.text(`${branding.brandName || 'Department of Tourism'}`, centerX, 40, { align: 'center' });
+          doc.text(`${branding.brandDescription || 'Development Committee'}`, centerX, 40, { align: 'center' });
           
           // Add contact information immediately after brand name
           doc.setFontSize(8);
@@ -680,11 +552,9 @@ export default function ReportPage({
             contactY += 6; // Add more space after contact info
           }
           
-          // Government and system info after contact info
-          doc.setFontSize(12);
-          doc.text('Government of Nepal', centerX, contactY, { align: 'center' });
-          contactY += 6;
-          doc.text('Homestay Management System', centerX, contactY, { align: 'center' });
+          // system info after contact info
+          doc.setFontSize(12); 
+          doc.text('Homestay Digitization Marketing Platform', centerX, contactY, { align: 'center' });
           contactY += 8;
           
           // Add report title and description
@@ -784,7 +654,7 @@ export default function ReportPage({
               },
               columnStyles: {
                 0: { cellWidth: 10 },   // S.N.
-                1: { cellWidth: 28 },  // Homestay Name
+                1: { cellWidth: 28, overflow: 'linebreak' },  // Homestay Name - Add overflow linebreak
                 2: { cellWidth: 20 },  // DHSR No
                 3: { cellWidth: 22 },  // Type - increased width
                 4: { cellWidth: 70, overflow: 'linebreak' }, // Formatted Address
@@ -810,7 +680,7 @@ export default function ReportPage({
                   // Add branding first
                   doc.setFontSize(12);
                   doc.setFont('helvetica', 'bold');
-                  doc.text(`${branding.brandName || 'Department of Tourism'}`, centerX, 15, { align: 'center' });
+                  doc.text(`${branding.brandDescription || 'Development Committee'}`, centerX, 15, { align: 'center' });
                   
                   // Add logo to continuation pages - use a synchronous approach
                   if (branding.logoPath) {
@@ -863,8 +733,7 @@ export default function ReportPage({
                   }
                   
                   doc.setFontSize(10);
-                  doc.text('Government of Nepal', centerX, contPageContactY + 2, { align: 'center' });
-                  doc.text('Homestay Management System', centerX, contPageContactY + 7, { align: 'center' });
+                  doc.text('Homestay Digitization Marketing Platform', centerX, contPageContactY + 7, { align: 'center' });
                   
                   doc.setFont('helvetica', 'bold');
                   doc.text(`Tourism Attractions Report - Continued`, centerX, contPageContactY + 12, { align: 'center' });
@@ -957,7 +826,7 @@ export default function ReportPage({
               },
               columnStyles: {
                 0: { cellWidth: 10 },   // S.N.
-                1: { cellWidth: 28 },  // Homestay Name
+                1: { cellWidth: 28, overflow: 'linebreak' },  // Homestay Name - Add overflow linebreak
                 2: { cellWidth: 20 },  // DHSR No
                 3: { cellWidth: 22 },  // Type
                 4: { cellWidth: 70, overflow: 'linebreak' }, // Formatted Address
@@ -983,7 +852,7 @@ export default function ReportPage({
                   // Add branding first
                   doc.setFontSize(12);
                   doc.setFont('helvetica', 'bold');
-                  doc.text(`${branding.brandName || 'Department of Tourism'}`, centerX, 15, { align: 'center' });
+                  doc.text(`${branding.brandDescription || 'Development Committee'}`, centerX, 15, { align: 'center' });
                   
                   // Add logo to continuation pages - use a synchronous approach
                   if (branding.logoPath) {
@@ -1036,8 +905,7 @@ export default function ReportPage({
                   }
                   
                   doc.setFontSize(10);
-                  doc.text('Government of Nepal', centerX, contPageContactY + 2, { align: 'center' });
-                  doc.text('Homestay Management System', centerX, contPageContactY + 7, { align: 'center' });
+                  doc.text('Homestay Digitization Marketing Platform', centerX, contPageContactY + 7, { align: 'center' });
                   
                   doc.setFont('helvetica', 'bold');
                   doc.text(`Infrastructure Report - Continued`, centerX, contPageContactY + 12, { align: 'center' });
@@ -1129,7 +997,7 @@ export default function ReportPage({
               },
               columnStyles: {
                 0: { cellWidth: 10 },   // S.N.
-                1: { cellWidth: 28 },  // Homestay Name
+                1: { cellWidth: 28, overflow: 'linebreak' },  // Homestay Name - Add overflow linebreak
                 2: { cellWidth: 20 },  // DHSR No
                 3: { cellWidth: 22 },  // Type
                 4: { cellWidth: 70, overflow: 'linebreak' }, // Formatted Address
@@ -1155,7 +1023,7 @@ export default function ReportPage({
                   // Add branding first
                   doc.setFontSize(12);
                   doc.setFont('helvetica', 'bold');
-                  doc.text(`${branding.brandName || 'Department of Tourism'}`, centerX, 15, { align: 'center' });
+                  doc.text(`${branding.brandDescription || 'Development Committee'}`, centerX, 15, { align: 'center' });
                   
                   // Add logo to continuation pages - use a synchronous approach
                   if (branding.logoPath) {
@@ -1208,8 +1076,7 @@ export default function ReportPage({
                   }
                   
                   doc.setFontSize(10);
-                  doc.text('Government of Nepal', centerX, contPageContactY + 2, { align: 'center' });
-                  doc.text('Homestay Management System', centerX, contPageContactY + 7, { align: 'center' });
+                  doc.text('Homestay Digitization Marketing Platform', centerX, contPageContactY + 7, { align: 'center' });
                   
                   doc.setFont('helvetica', 'bold');
                   doc.text(`Homestay Services Report - Continued`, centerX, contPageContactY + 12, { align: 'center' });
@@ -1222,6 +1089,242 @@ export default function ReportPage({
                 doc.setFontSize(8);
                 doc.text(`Page ${doc.getNumberOfPages()}`, 20, doc.internal.pageSize.getHeight() - 10);
               }
+            });
+          } else if (type === 'district-type') {
+            // First, group homestays by province, then by district
+            const provinceDistrictMap = dataToExport.reduce((provinceAcc: {
+              [province: string]: {
+                [district: string]: Homestay[]
+              }
+            }, homestay) => {
+              const province = getValue(homestay, 'address.province.en') || 'Unknown Province';
+              const district = getValue(homestay, 'address.district.en');
+              if (!district) return provinceAcc;
+              
+              // Initialize province if not exists
+              if (!provinceAcc[province]) {
+                provinceAcc[province] = {};
+              }
+              
+              // Initialize district if not exists
+              if (!provinceAcc[province][district]) {
+                provinceAcc[province][district] = [];
+              }
+              
+              // Add homestay to the district
+              provinceAcc[province][district].push(homestay);
+              return provinceAcc;
+            }, {});
+            
+            // Set up initial PDF properties
+            let currentY = tableStartY;
+            let isFirstDistrict = true;
+            
+            // If province filter is applied, only show that province's districts
+            const provincesToShow = filters.province 
+              ? { [filters.province]: provinceDistrictMap[filters.province] || {} } 
+              : provinceDistrictMap;
+            
+            // Process each province
+            Object.entries(provincesToShow).forEach(([province, districts], provinceIndex) => {
+              // For each province, add a province header
+              if (!isFirstDistrict) {
+                doc.addPage();
+                currentY = 60; // Reset Y position for new page
+              }
+              
+              // Add province header
+              doc.setFontSize(14);
+              doc.setFont('helvetica', 'bold');
+              doc.text(`${province} Province`, centerX, currentY, { align: 'center' });
+              currentY += 15; // Add space after province header
+              
+              // Force a page break after the first district to test continuation headers
+              if (provinceIndex === 0 && Object.keys(districts).length > 1) {
+                console.log("Forcing a test page break to verify headers");
+              }
+              
+              // Process each district in this province
+              Object.entries(districts).forEach(([district, homestays], districtIndex) => {
+                // If not the first district of this province, check if we need a new page
+                if (districtIndex > 0) {
+                  // Check if there's enough space for the next district
+                  if (currentY > doc.internal.pageSize.getHeight() - 100) {
+                    doc.addPage();
+                    currentY = 60; // Reset Y position for new page
+                  } else {
+                    // Just add some space between districts
+                    currentY += 20;
+                  }
+                }
+                
+                // Add district header
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                // Always include province name in district header for better readability in all-provinces export
+                doc.text(`${province} Province - ${district} District`, 20, currentY);
+                currentY += 8;
+                
+                // District table data
+                const normalizedData: Array<(string | number)[]> = [];
+                
+                homestays.forEach((homestay, index) => {
+                  // Find the first contact (manager/operator) for this homestay
+                  const contacts = homestay.contacts || [];
+                  const primaryContact = contacts.length > 0 ? contacts[0] : null;
+                  
+                  normalizedData.push([
+                    index + 1,
+                    getValue(homestay, 'homeStayName') || 'N/A',
+                    getValue(homestay, 'address.formattedAddress.en') || 'N/A',
+                    getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private',
+                    getValue(homestay, 'registrationAuthority') || 'N/A',
+                    getValue(homestay, 'businessRegistrationNumber') || 'N/A',
+                    primaryContact?.name || 'N/A',
+                    primaryContact?.mobile || 'N/A'
+                  ]);
+                });
+                
+                // Calculate counts for footer
+                const communityCount = homestays.filter(h => h.homeStayType === 'community').length;
+                const privateCount = homestays.filter(h => h.homeStayType === 'private').length;
+                
+                // Add district table with merged cells in footer
+                autoTable(doc, {
+                  startY: currentY,
+                  head: [['S.N.', 'Homestay Name', 'Address', 'Type', 'Registration Authority', 'Business Reg. No.', 'Manager/Operator', 'Contact Number']],
+                  body: normalizedData,
+                  foot: [[
+                    { content: `Total Homestays: ${homestays.length}`, colSpan: 2 },
+                    { content: `Community: ${communityCount}`, colSpan: 1 },
+                    { content: `Private: ${privateCount}`, colSpan: 5 }
+                  ]],
+                  styles: {
+                    fontSize: 8,
+                    cellPadding: 2,
+                    lineColor: [0, 0, 0],
+                    lineWidth: 0.1,
+                    halign: 'left',
+                    valign: 'middle',
+                    overflow: 'ellipsize',
+                    cellWidth: 'auto',
+                    font: 'helvetica'
+                  },
+                  columnStyles: {
+                    0: { cellWidth: 12 },   // S.N.
+                    1: { cellWidth: 40, overflow: 'linebreak' },  // Homestay Name
+                    2: { cellWidth: 40, overflow: 'linebreak' },  // Address
+                    3: { cellWidth: 25 },  // Type
+                    4: { cellWidth: 35, overflow: 'linebreak' },  // Registration Authority 
+                    5: { cellWidth: 30, overflow: 'linebreak' },  // Business Registration Number 
+                    6: { cellWidth: 30, overflow: 'linebreak' },  // Manager/Operator 
+                    7: { cellWidth: 35 }   // Contact Number
+                  },
+                  headStyles: {
+                    fillColor: [220, 220, 220],
+                    textColor: [0, 0, 0],
+                    fontStyle: 'bold',
+                    halign: 'center'
+                  },
+                  footStyles: {
+                    fillColor: [245, 245, 245],
+                    fontStyle: 'bold',
+                    textColor: [0, 0, 0]  // Make footer text black
+                  },
+                  alternateRowStyles: {
+                    fillColor: [245, 245, 245]
+                  },
+                  margin: { top: 60 },
+                  didDrawPage: function(pageData) {
+                    // Check global PDF page number instead of table page number
+                    const globalPageNumber = doc.getNumberOfPages();
+                    
+                    // Only add header to pages after the first page
+                    if (globalPageNumber > 1) {
+                      // Add branding first
+                      doc.setFontSize(12);
+                      doc.setFont('helvetica', 'bold');
+                      doc.text(`${branding.brandDescription || 'Development Committee'}`, centerX, 15, { align: 'center' });
+                      
+                      // Add logo to continuation pages
+                      if (branding.logoPath) {
+                        try {
+                          // Default dimensions for logo
+                          const imgWidth = 20;
+                          const imgHeight = 20;
+                          
+                          // Add the image directly
+                          doc.addImage(
+                            getImageUrl(branding.logoPath), 
+                            'JPEG', 
+                            centerX - 55, 
+                            5, 
+                            imgWidth, 
+                            imgHeight
+                          );
+                        } catch (error) {
+                          console.error('Error adding logo to page:', error);
+                        }
+                      }
+                      
+                      // Add contact information on continuation pages
+                      doc.setFontSize(8);
+                      doc.setFont('helvetica', 'normal');
+                      let contPageContactY = 20;
+                      
+                      if (branding.contactInfo?.address) {
+                        doc.text(`${branding.contactInfo.address}`, centerX, contPageContactY, { align: 'center' });
+                        contPageContactY += 4;
+                      }
+                      
+                      if (branding.contactInfo?.email || branding.contactInfo?.phone) {
+                        let contactText = '';
+                        if (branding.contactInfo?.email) {
+                          contactText += branding.contactInfo.email;
+                        }
+                        if (branding.contactInfo?.email && branding.contactInfo?.phone) {
+                          contactText += ' | ';
+                        }
+                        if (branding.contactInfo?.phone) {
+                          contactText += branding.contactInfo.phone;
+                        }
+                        doc.text(contactText, centerX, contPageContactY, { align: 'center' });
+                        contPageContactY += 4;
+                      }
+                      
+                      doc.setFontSize(10);
+                      doc.text('Homestay Digitization Marketing Platform', centerX, contPageContactY + 7, { align: 'center' });
+                      
+                      doc.setFont('helvetica', 'bold');
+                      doc.text(`District-wise Classification Report - Continued`, centerX, contPageContactY + 12, { align: 'center' });
+                      
+                      doc.setDrawColor(0);
+                      doc.setLineWidth(0.5);
+                      doc.line(20, contPageContactY + 15, pageWidth - 20, contPageContactY + 15);
+                    }
+                    
+                    // Move page numbers to bottom left corner
+                    doc.setFontSize(8);
+                    doc.text(`Page ${globalPageNumber}`, 20, doc.internal.pageSize.getHeight() - 10);
+                    
+                    // Add small indicator to verify headers are being drawn properly
+                    doc.setFontSize(6);
+                    doc.setTextColor(180, 180, 180); // Light gray color
+                    doc.text(`Page ${globalPageNumber} - Auto header`, pageWidth - 30, doc.internal.pageSize.getHeight() - 5);
+                    doc.setTextColor(0, 0, 0); // Reset to black
+                  },
+                  didDrawCell: function(data: any) {
+                    // Track the last cell drawn using the data object's properties
+                    if (data.section === 'foot') {
+                      // This is the footer section
+                      currentY = data.cell.y + data.cell.height + 20; // Add padding after table
+                    }
+                  }
+                });
+                
+                // Set flag to indicate we've processed the first district
+                isFirstDistrict = false;
+              });
             });
           } else {
             // Original geographical-classification table
@@ -1275,7 +1378,7 @@ export default function ReportPage({
               if (pageData.pageNumber > 1) {
                 doc.setFontSize(12);
                 doc.setFont('helvetica', 'bold');
-                doc.text(`${branding.brandName || 'Department of Tourism'}`, centerX, 15, { align: 'center' });
+                doc.text(`${branding.brandDescription || 'Development Committee'}`, centerX, 15, { align: 'center' });
                 
                 // Add logo to continuation pages - use a synchronous approach
                 if (branding.logoPath) {
@@ -1328,8 +1431,7 @@ export default function ReportPage({
                 }
                 
                 doc.setFontSize(10);
-                doc.text('Government of Nepal', centerX, contPageContactY + 2, { align: 'center' });
-                doc.text('Homestay Management System', centerX, contPageContactY + 7, { align: 'center' });
+                doc.text('Homestay Digitization Marketing Platform', centerX, contPageContactY + 7, { align: 'center' });
                 
                 doc.setFont('helvetica', 'bold');
                 doc.text(`Geographical Classification Report - Continued`, centerX, contPageContactY + 12, { align: 'center' });
@@ -1345,20 +1447,10 @@ export default function ReportPage({
           });
           }
           
-          // Add footer with signature
+          // Just set to the last page and save the PDF, no signature
           const lastPage = doc.getNumberOfPages();
           doc.setPage(lastPage);
-          
-          const pageHeight = doc.internal.pageSize.getHeight();
-          // Increase vertical space for signature area - moved up higher on the page
-          const footerY = pageHeight - 50;  
-          doc.setFontSize(10);
-          
-          // Center align the signature properly with more space
-          doc.text('Authorized Signature', pageWidth - 50, footerY, { align: 'center' });
-          doc.line(pageWidth - 90, footerY + 15, pageWidth - 10, footerY + 15);
-          doc.text('Tourism Officer', pageWidth - 50, footerY + 25, { align: 'center' });
-          
+            
           // Save the PDF with appropriate name based on report type
           const reportTypeName = type.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('_');
           doc.save(`Homestay_${reportTypeName}_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -1503,14 +1595,7 @@ export default function ReportPage({
             <FileText className="h-4 w-4 mr-2" />
             <span>PDF</span>
           </button>
-          <button 
-            onClick={() => handleExport('excel')}
-            className="flex items-center px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-            disabled={loading || homestays.length === 0}
-          >
-            <FileSpreadsheet className="h-4 w-4 mr-2" />
-            <span>Excel</span>
-          </button>
+
         </div>
       </div>
       
@@ -1534,9 +1619,8 @@ export default function ReportPage({
               </div>
             )}
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900">{branding.brandName || 'Department of Tourism'}</h2>
-              <p className="text-md text-gray-700">Government of Nepal</p>
-              <p className="text-sm text-gray-600">Homestay Management System</p>
+              <h2 className="text-2xl font-bold text-gray-900">{branding.brandDescription || 'Department of Tourism'}</h2>
+              <p className="text-sm text-gray-600">Homestay Digital Marketing Platform</p>
             </div>
           </div>
           
@@ -1713,7 +1797,7 @@ export default function ReportPage({
                             className="text-xs hover:bg-gray-50 transition-colors"
                           >
                             <td className="px-4 py-3 text-gray-900">{index + 1}</td>
-                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'dhsrNo') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">
                               {getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private'}
@@ -1948,12 +2032,12 @@ export default function ReportPage({
                             className="text-xs hover:bg-gray-50 transition-colors"
                           >
                             <td className="px-4 py-3 text-gray-900">{index + 1}</td>
-                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'dhsrNo') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">
                               {getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private'}
                             </td>
-                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'address.formattedAddress.en') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'address.formattedAddress.en') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">
                               {formatAttractions(homestay.features?.localAttractions)}
                             </td>
@@ -1989,7 +2073,16 @@ export default function ReportPage({
                     <p className="font-medium">Cultural Sites</p>
                     <p className="text-sm text-gray-500 mt-2">
                       {homestays.reduce((count, h) => {
-                        return count + (h.features?.localAttractions?.filter(a => a.startsWith('cultural:') || a.includes('Museum') || a.includes('संग्रहालय')).length || 0);
+                        return count + (h.features?.localAttractions?.filter(a => 
+                          a.startsWith('cultural:') || 
+                          a.includes('Museums') || 
+                          a.includes('Cultural') ||
+                          a.includes('Festivals') || 
+                          a.includes('Traditional') || 
+                          a.includes('Festivals') ||
+                          a.includes('Traditional') ||
+                          a.includes('Community Lifestyle')
+                        ).length || 0);
                       }, 0)} cultural sites listed
                     </p>
                   </div>
@@ -1997,7 +2090,14 @@ export default function ReportPage({
                     <p className="font-medium">Natural Attractions</p>
                     <p className="text-sm text-gray-500 mt-2">
                       {homestays.reduce((count, h) => {
-                        return count + (h.features?.localAttractions?.filter(a => a.startsWith('natural:') || a.includes('Park') || a.includes('River') || a.includes('नदी')).length || 0);
+                        return count + (h.features?.localAttractions?.filter(a => 
+                          a.startsWith('natural:') || 
+                          a.includes('National Parks') || 
+                          a.includes('Conservation Areas') || 
+                          a.includes('Rivers') || 
+                          a.includes('Lakes') || 
+                          a.includes('Ponds')
+                        ).length || 0);
                       }, 0)} natural attractions
                     </p>
                   </div>
@@ -2152,12 +2252,12 @@ export default function ReportPage({
                             className="text-xs hover:bg-gray-50 transition-colors"
                           >
                             <td className="px-4 py-3 text-gray-900">{index + 1}</td>
-                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'dhsrNo') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">
                               {getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private'}
                             </td>
-                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'address.formattedAddress.en') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'address.formattedAddress.en') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">
                               {formatInfrastructure(homestay.features?.infrastructure)}
                             </td>
@@ -2349,12 +2449,12 @@ export default function ReportPage({
                             className="text-xs hover:bg-gray-50 transition-colors"
                           >
                             <td className="px-4 py-3 text-gray-900">{index + 1}</td>
-                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'dhsrNo') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">
                               {getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private'}
                             </td>
-                            <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'address.formattedAddress.en') || 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'address.formattedAddress.en') || 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-900">
                               {formatServices(homestay.features?.tourismServices)}
                             </td>
@@ -2398,6 +2498,233 @@ export default function ReportPage({
                 </div>
               </>
             )}
+
+            {type === 'district-type' && (
+              <>
+                {/* Filters Section */}
+                <div className="mb-8 border p-4 rounded-lg print:hidden">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-medium">Filter Homestays</h2>
+                    <button 
+                      onClick={resetFilters}
+                      className="text-sm text-primary hover:underline flex items-center"
+                    >
+                      <Filter className="h-4 w-4 mr-1" />
+                      Reset Filters
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-4 mb-6">
+                    {/* Province Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Province</label>
+                      <select
+                        value={filters.province || ''}
+                        onChange={(e) => handleFilterChange('province', e.target.value)}
+                        className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary/20 transition-colors"
+                      >
+                        <option value="">All Provinces</option>
+                        {provinces.map(province => (
+                          <option key={province} value={province}>{province}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                
+                {loading ? (
+                  <div className="flex items-center justify-center p-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {homestays.length > 0 ? (
+                      !filters.province ? (
+                        // Show all provinces and districts when no province is selected
+                        Object.entries(
+                          sortedHomestays.reduce((acc: {[key: string]: {[key: string]: Homestay[]}}, homestay) => {
+                            const province = getValue(homestay, 'address.province.en');
+                            const district = getValue(homestay, 'address.district.en');
+                            if (!province || !district) return acc;
+                            
+                            if (!acc[province]) {
+                              acc[province] = {};
+                            }
+                            
+                            if (!acc[province][district]) {
+                              acc[province][district] = [];
+                            }
+                            
+                            acc[province][district].push(homestay);
+                            return acc;
+                          }, {})
+                        ).map(([province, districts], provinceIndex) => (
+                          <div key={province} className="mb-12">
+                            <h2 className="text-2xl font-bold mb-4 border-b pb-2">{province} Province</h2>
+                            
+                            {Object.entries(districts).map(([district, districtHomestays], districtIndex) => (
+                              <div key={district} className="mb-10">
+                                <h3 className="text-xl font-semibold mb-3 border-b pb-2">{district} District</h3>
+                                
+                                <div className="overflow-x-auto border rounded-lg">
+                                  <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-100 text-gray-700 text-xs font-medium border-b">
+                                      <tr>
+                                        <th className="px-4 py-3 text-left w-12">S.N.</th>
+                                        <th className="px-4 py-3 text-left">Homestay Name</th>
+                                        <th className="px-4 py-3 text-left">Address</th>
+                                        <th className="px-4 py-3 text-left">Private or Community</th>
+                                        <th className="px-4 py-3 text-left">Registration Authority</th>
+                                        <th className="px-4 py-3 text-left">Business Reg. No.</th>
+                                        <th className="px-4 py-3 text-left">Manager/Operator</th>
+                                        <th className="px-4 py-3 text-left">Contact Number</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                      {districtHomestays.length > 0 ? (
+                                        districtHomestays.map((homestay, index) => {
+                                          // Find the first contact (manager/operator) for this homestay
+                                          const contacts = homestay.contacts || [];
+                                          const primaryContact = contacts.length > 0 ? contacts[0] : null;
+                                          
+                                          return (
+                                            <tr 
+                                              key={homestay._id} 
+                                              className="text-xs hover:bg-gray-50 transition-colors"
+                                            >
+                                              <td className="px-4 py-3 text-gray-900">{index + 1}</td>
+                                              <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
+                                              <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'address.formattedAddress.en') || 'N/A'}</td>
+                                              <td className="px-4 py-3 text-gray-900">
+                                                {getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private'}
+                                              </td>
+                                              <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'registrationAuthority') || 'N/A'}</td>
+                                              <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'businessRegistrationNumber') || 'N/A'}</td>
+                                              <td className="px-4 py-3 text-gray-900 whitespace-normal">{primaryContact?.name || 'N/A'}</td>
+                                              <td className="px-4 py-3 text-gray-900">{primaryContact?.mobile || 'N/A'}</td>
+                                            </tr>
+                                          );
+                                        })
+                                      ) : (
+                                        <tr>
+                                          <td colSpan={8} className="px-4 py-6 text-center text-gray-500">
+                                            <div className="flex flex-col items-center justify-center py-8">
+                                              <BarChart2 className="h-10 w-10 text-gray-300 mb-3" />
+                                              <h3 className="text-sm font-semibold text-gray-600 mb-1">No homestays found</h3>
+                                              <p className="text-xs text-gray-500">No homestays available in this district</p>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      )}
+                                    </tbody>
+                                    <tfoot className="bg-gray-50 font-medium text-xs">
+                                      <tr>
+                                        <td colSpan={3} className="px-4 py-3 text-right border-t text-black">Total Homestays:</td>
+                                        <td colSpan={5} className="px-4 py-3 text-left border-t text-black">
+                                          {districtHomestays.length} 
+                                          ({districtHomestays.filter(h => h.homeStayType === 'community').length} Community, {districtHomestays.filter(h => h.homeStayType === 'private').length} Private)
+                                        </td>
+                                      </tr>
+                                    </tfoot>
+                                  </table>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ))
+                      ) : (
+                        // Group homestays by district when a specific province is selected
+                        Object.entries(
+                          sortedHomestays.reduce((acc: {[key: string]: Homestay[]}, homestay) => {
+                            const district = getValue(homestay, 'address.district.en');
+                            if (!district) return acc;
+                            
+                            if (!acc[district]) {
+                              acc[district] = [];
+                            }
+                            acc[district].push(homestay);
+                            return acc;
+                          }, {})
+                        ).map(([district, districtHomestays], districtIndex) => (
+                          <div key={district} className="mb-10">
+                            <h3 className="text-xl font-semibold mb-3 border-b pb-2">{district} District</h3>
+                            
+                            <div className="overflow-x-auto border rounded-lg">
+                              <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-100 text-gray-700 text-xs font-medium border-b">
+                                  <tr>
+                                    <th className="px-4 py-3 text-left w-12">S.N.</th>
+                                    <th className="px-4 py-3 text-left">Homestay Name</th>
+                                    <th className="px-4 py-3 text-left">Address</th>
+                                    <th className="px-4 py-3 text-left">Private or Community</th>
+                                    <th className="px-4 py-3 text-left">Registration Authority</th>
+                                    <th className="px-4 py-3 text-left">Business Reg. No.</th>
+                                    <th className="px-4 py-3 text-left">Manager/Operator</th>
+                                    <th className="px-4 py-3 text-left">Contact Number</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                  {districtHomestays.length > 0 ? (
+                                    districtHomestays.map((homestay, index) => {
+                                      // Find the first contact (manager/operator) for this homestay
+                                      const contacts = homestay.contacts || [];
+                                      const primaryContact = contacts.length > 0 ? contacts[0] : null;
+                                      
+                                      return (
+                                        <tr 
+                                          key={homestay._id} 
+                                          className="text-xs hover:bg-gray-50 transition-colors"
+                                        >
+                                          <td className="px-4 py-3 text-gray-900">{index + 1}</td>
+                                          <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'homeStayName') || 'N/A'}</td>
+                                          <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'address.formattedAddress.en') || 'N/A'}</td>
+                                          <td className="px-4 py-3 text-gray-900">
+                                            {getValue(homestay, 'homeStayType') === 'community' ? 'Community' : 'Private'}
+                                          </td>
+                                          <td className="px-4 py-3 text-gray-900 whitespace-normal">{getValue(homestay, 'registrationAuthority') || 'N/A'}</td>
+                                          <td className="px-4 py-3 text-gray-900">{getValue(homestay, 'businessRegistrationNumber') || 'N/A'}</td>
+                                          <td className="px-4 py-3 text-gray-900 whitespace-normal">{primaryContact?.name || 'N/A'}</td>
+                                          <td className="px-4 py-3 text-gray-900">{primaryContact?.mobile || 'N/A'}</td>
+                                        </tr>
+                                      );
+                                    })
+                                  ) : (
+                                    <tr>
+                                      <td colSpan={8} className="px-4 py-6 text-center text-gray-500">
+                                        <div className="flex flex-col items-center justify-center py-8">
+                                          <BarChart2 className="h-10 w-10 text-gray-300 mb-3" />
+                                          <h3 className="text-sm font-semibold text-gray-600 mb-1">No homestays found</h3>
+                                          <p className="text-xs text-gray-500">No homestays available in this district</p>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                                <tfoot className="bg-gray-50 font-medium text-xs">
+                                  <tr>
+                                    <td colSpan={3} className="px-4 py-3 text-right border-t text-black">Total Homestays:</td>
+                                    <td colSpan={5} className="px-4 py-3 text-left border-t text-black">
+                                      {districtHomestays.length} 
+                                      ({districtHomestays.filter(h => h.homeStayType === 'community').length} Community, {districtHomestays.filter(h => h.homeStayType === 'private').length} Private)
+                                    </td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            </div>
+                          </div>
+                        ))
+                      )
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 border rounded-lg">
+                        <BarChart2 className="h-16 w-16 text-gray-300 mb-4" />
+                        <h3 className="text-lg font-semibold text-gray-600 mb-2">No Homestays Found</h3>
+                        <p className="text-sm text-gray-500">No homestay data available for the selected filters</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -2407,12 +2734,6 @@ export default function ReportPage({
             <div className="text-sm text-gray-500">
               <p>© {new Date().getFullYear()} {branding.brandName || 'Department of Tourism'}</p>
               <p className="mt-1">Generated on {currentDate}</p>
-            </div>
-            
-            <div className="mt-4 md:mt-0 text-right">
-              <p className="text-sm">Authorized Signature</p>
-              <div className="h-12 mt-2"></div>
-              <p className="text-sm border-t pt-1 border-gray-400">Tourism Officer</p>
             </div>
           </div>
         </div>

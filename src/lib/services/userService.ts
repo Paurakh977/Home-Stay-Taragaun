@@ -180,7 +180,63 @@ export async function createUser(userData: UserData) {
             role: member.position || "",
             photoPath: userData.teamPhotoPaths?.[index] || "",
           })) : []
-        }
+        },
+        // Add default featured section data
+        featuredSection: {
+          features: [
+            {
+              icon: "🏠",
+              title: "Authentic Local Experience",
+              description: "Stay with local families and experience authentic Nepali hospitality and culture.",
+              imagePath: "/images/features/feature-1.jpg"
+            },
+            {
+              icon: "🍽️",
+              title: "Traditional Cuisine",
+              description: "Enjoy homemade Nepali dishes prepared with locally sourced organic ingredients.",
+              imagePath: "/images/features/feature-2.jpg"
+            },
+            {
+              icon: "🌿",
+              title: "Scenic Locations",
+              description: "Our home stays are situated in beautiful locations with stunning mountain views.",
+              imagePath: "/images/features/feature-3.jpg"
+            },
+            {
+              icon: "🧳",
+              title: "Personalized Service",
+              description: "Each home stay offers personalized service to make your stay comfortable and memorable.",
+              imagePath: "/images/features/feature-4.jpg"
+            }
+          ]
+        },
+        // Add default testimonials data
+        testimonials: [
+          {
+            quote: "Our stay at the Hamro Home Stay was incredible. The hospitality was unmatched, and we felt like part of the family. The views were breathtaking!",
+            author: "Sarah Johnson",
+            location: "United States",
+            avatarPath: "/images/testimonials/avatar-1.jpg"
+          },
+          {
+            quote: "The authentic food, the warm hospitality, and the cultural experience made our stay unforgettable. Definitely coming back next year!",
+            author: "James Wilson",
+            location: "United Kingdom",
+            avatarPath: "/images/testimonials/avatar-2.jpg"
+          },
+          {
+            quote: "If you want to experience the real Nepal, this is the place. Our host family was amazing, and the home-cooked meals were the best we had during our entire trip.",
+            author: "Emma Thompson",
+            location: "Australia",
+            avatarPath: "/images/testimonials/avatar-3.jpg"
+          },
+          {
+            quote: "The perfect blend of comfort and authentic cultural experience. Waking up to mountain views every morning was magical!",
+            author: "David Chen",
+            location: "Canada",
+            avatarPath: "/images/testimonials/avatar-4.jpg"
+          }
+        ]
       };
 
       // Add branding to user data

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Search, MapPin, Star, Bed, Home, Filter, X, ChevronDown, ArrowRight, Utensils, Wifi, Users, Mountain } from "lucide-react";
+import TranslateButton from "@/components/ui/translate-button";
 
 // Types
 interface HomestayListing {
@@ -72,6 +73,7 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
   
   // Address data state
   const [addressData, setAddressData] = useState<{
@@ -115,6 +117,29 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
     tourismServices: [],
     infrastructure: []
   });
+
+  // Add a check for superadmin role on component mount
+  useEffect(() => {
+    const checkSuperadminStatus = async () => {
+      try {
+        const response = await fetch('/api/superadmin/auth/me', {
+          credentials: 'include' // Important to send the cookies
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.user && data.user.role === 'superadmin') {
+            setIsSuperadmin(true);
+          }
+        }
+      } catch (err) {
+        console.error('Error checking superadmin status:', err);
+        // Don't update state - default is false
+      }
+    };
+
+    checkSuperadminStatus();
+  }, []);
 
   // Load address data
   useEffect(() => {
@@ -410,8 +435,15 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-primary/90 to-primary text-white py-16">
         <div className="container mx-auto px-4">
-          <h1 className="text-3xl md:text-4xl font-bold mb-4">Discover Authentic Homestays</h1>
-          <p className="text-lg md:text-xl max-w-2xl opacity-90">Experience the true essence of Nepalese hospitality and culture with our curated homestays.</p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold mb-4">Discover Authentic Homestays</h1>
+              <p className="text-lg md:text-xl max-w-2xl opacity-90">Experience the true essence of Nepalese hospitality and culture with our curated homestays.</p>
+            </div>
+            <div className="hidden md:block">
+              <TranslateButton variant="outline" size="default" className="bg-white/20 hover:bg-white/30 border-white/40" />
+            </div>
+          </div>
         </div>
       </div>
       
@@ -441,15 +473,20 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
               )}
             </div>
             
-            {/* Filter button */}
-            <button 
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <Filter size={20} className="text-primary" />
-              <span className="font-medium">Filters</span>
-              <ChevronDown size={16} className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />
-            </button>
+            <div className="flex gap-2">
+              {/* Filter button */}
+              <button 
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center gap-2 px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <Filter size={20} className="text-primary" />
+                <span className="font-medium">Filters</span>
+                <ChevronDown size={16} className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {/* Translate Button */}
+              <TranslateButton variant="ghost" />
+            </div>
           </div>
           
           {/* Filter options */}
@@ -667,8 +704,9 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
             {filteredHomestays.map((homestay) => (
               <div 
                 key={homestay._id} 
-                onClick={() => router.push(`/homestays/${homestay.homestayId}`)}
-                className="bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow group"
+                // TEMPORARILY DISABLED: Remove this comment to re-enable navigation
+                // onClick={() => router.push(`/homestays/${homestay.homestayId}`)}
+                className="bg-white rounded-xl shadow-sm overflow-hidden cursor-default hover:shadow-md transition-shadow group"
               >
                 {/* Image */}
                 <div className="h-48 bg-gray-200 relative overflow-hidden">
@@ -733,7 +771,7 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
                     <h3 className="text-lg font-semibold text-gray-900 mb-1 group-hover:text-primary transition-colors">
                       {homestay.homeStayName}
                     </h3>
-                    {renderRating(homestay.averageRating)}
+                    {/* {renderRating(homestay.averageRating)} */}
                   </div>
                   
                   <div className="flex items-start gap-1 text-gray-500 mb-2">
@@ -742,9 +780,9 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
                   </div>
                   
                   {/* Description */}
-                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                  {/* <p className="text-sm text-gray-600 mb-3 line-clamp-2">
                     {formatDescription(homestay.description)}
-                  </p>
+                  </p> */}
                   
                   {/* DHSR Number */}
                   {homestay.dhsrNo && (
@@ -790,12 +828,14 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
                   </div>
                 </div>
                 
-                {/* View button */}
+                {/* View button - TEMPORARILY DISABLED */}
                 <div className="px-4 pb-4 flex">
-                  <div className="w-full group-hover:bg-primary/5 rounded-lg p-2 text-center text-sm font-medium text-primary flex justify-center items-center transition-colors">
-                    <span>View Details</span>
-                    <ArrowRight size={16} className="ml-1 transform transition-transform group-hover:translate-x-1" />
-                  </div>
+                  <Link
+                    href={isSuperadmin ? `/homestays/${homestay.homestayId}` : `/homestays/${homestay.homestayId}/temporary`}
+                    className="w-full rounded-lg p-2 text-center text-sm bg-primary text-white hover:bg-primary/90 transition-colors flex justify-center items-center"
+                  >
+                    <span>View Details</span> <ArrowRight className="ml-1 w-4 h-4" />
+                  </Link>
                 </div>
               </div>
             ))}

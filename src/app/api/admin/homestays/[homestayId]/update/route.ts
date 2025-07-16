@@ -39,7 +39,8 @@ export async function PUT(request: NextRequest, context: ParamsContext) {
     // Process basic fields
     const basicFields = [
       'homeStayName', 'dhsrNo', 'villageName', 'homeStayType', 'description',
-      'homeCount', 'roomCount', 'bedCount', 'profileImage'
+      'homeCount', 'roomCount', 'bedCount', 'profileImage', 'latitude', 'longitude',
+      'directions', 'registrationAuthority', 'businessRegistrationNumber'
     ];
     
     basicFields.forEach(field => {
@@ -65,8 +66,23 @@ export async function PUT(request: NextRequest, context: ParamsContext) {
       
       addressFields.forEach(field => {
         if (body.address[field] !== undefined) {
-          updatedAddress[field] = body.address[field];
-          addressFieldsChanged = true;
+          // Ensure we're preserving the bilingual structure for province, district, municipality and ward
+          if (['province', 'district', 'municipality', 'ward'].includes(field)) {
+            // Make sure the field has both 'en' and 'ne' properties
+            if (body.address[field] && 
+                typeof body.address[field] === 'object' && 
+                'en' in body.address[field] && 
+                'ne' in body.address[field]) {
+              updatedAddress[field] = body.address[field];
+              addressFieldsChanged = true;
+            } else {
+              console.warn(`Admin API: Address field ${field} is missing bilingual structure`);
+            }
+          } else {
+            // For non-bilingual fields like city and tole
+            updatedAddress[field] = body.address[field];
+            addressFieldsChanged = true;
+          }
         }
       });
       
@@ -83,24 +99,31 @@ export async function PUT(request: NextRequest, context: ParamsContext) {
         const districtNe = updatedAddress.district?.ne || '';
         const provinceNe = updatedAddress.province?.ne || '';
         
+        // Format addresses properly with commas and handle empty fields
         updatedAddress.formattedAddress = {
-          en: `${tole}, ${city}, ${municipalityEn}, ${districtEn}, ${provinceEn}`.replace(/^,\s*|,\s*$/, '').replace(/,\s*,\s*/g, ', '),
-          ne: `${tole}, ${city}, ${municipalityNe}, ${districtNe}, ${provinceNe}`.replace(/^,\s*|,\s*$/, '').replace(/,\s*,\s*/g, ', ')
+          en: `${tole ? tole + ', ' : ''}${city ? city + ', ' : ''}${municipalityEn ? municipalityEn + ', ' : ''}${districtEn ? districtEn + ', ' : ''}${provinceEn}`.replace(/,\s*$/, '').replace(/,\s*,\s*/g, ', '),
+          ne: `${tole ? tole + ', ' : ''}${city ? city + ', ' : ''}${municipalityNe ? municipalityNe + ', ' : ''}${districtNe ? districtNe + ', ' : ''}${provinceNe}`.replace(/,\s*$/, '').replace(/,\s*,\s*/g, ', ')
         };
+        
+        console.log(`Admin API: Updated formattedAddress for ${homestayId}:`, updatedAddress.formattedAddress);
       }
       
       homestayUpdateData.address = updatedAddress;
       
-      // Also update Location collection if address was changed
-      if (addressFieldsChanged) {
+      // Also update Location collection if address was changed or coordinates were updated
+      if (addressFieldsChanged || body.latitude !== undefined || body.longitude !== undefined) {
         const locationUpdateData: any = {};
         
-        if (body.address.province) locationUpdateData.province = body.address.province;
-        if (body.address.district) locationUpdateData.district = body.address.district;
-        if (body.address.municipality) locationUpdateData.municipality = body.address.municipality;
-        if (body.address.ward) locationUpdateData.ward = body.address.ward;
-        if (body.address.city) locationUpdateData.city = body.address.city;
-        if (body.address.tole) locationUpdateData.tole = body.address.tole;
+        if (body.address?.province) locationUpdateData.province = body.address.province;
+        if (body.address?.district) locationUpdateData.district = body.address.district;
+        if (body.address?.municipality) locationUpdateData.municipality = body.address.municipality;
+        if (body.address?.ward) locationUpdateData.ward = body.address.ward;
+        if (body.address?.city) locationUpdateData.city = body.address.city;
+        if (body.address?.tole) locationUpdateData.tole = body.address.tole;
+        
+        // Update coordinates if provided
+        if (body.latitude !== undefined) locationUpdateData.latitude = body.latitude;
+        if (body.longitude !== undefined) locationUpdateData.longitude = body.longitude;
         
         // Find and update location record
         await Location.findOneAndUpdate(

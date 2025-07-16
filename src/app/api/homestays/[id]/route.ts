@@ -221,6 +221,10 @@ export async function PUT(
     if (body.directions !== undefined) homestayUpdateData.directions = body.directions || "";
     if (body.profileImage !== undefined) homestayUpdateData.profileImage = body.profileImage;
     
+    // Handle latitude and longitude updates explicitly
+    if (body.latitude !== undefined) homestayUpdateData.latitude = body.latitude;
+    if (body.longitude !== undefined) homestayUpdateData.longitude = body.longitude;
+    
     // Handle address updates
     // Check if address is provided as a complete object (new format)
     if (body.address) {
@@ -436,10 +440,31 @@ export async function PUT(
           if (body.tole) locationUpdateData.tole = body.tole;
         }
         
+        // Also update coordinates in the Location collection if provided
+        if (body.latitude !== undefined) locationUpdateData.latitude = body.latitude;
+        if (body.longitude !== undefined) locationUpdateData.longitude = body.longitude;
+        
         // Update formattedAddress if it was regenerated
         if (homestayUpdateData.address?.formattedAddress) {
           locationUpdateData.formattedAddress = homestayUpdateData.address.formattedAddress;
         }
+        
+        // Update the location document
+        await Location.updateOne(
+          { homestayId: homestayId },
+          { $set: locationUpdateData }
+        );
+      }
+    }
+    // Check if we need to update just coordinates without address changes
+    else if (body.latitude !== undefined || body.longitude !== undefined) {
+      const existingLocation = await Location.findOne({ homestayId: homestayId });
+      
+      if (existingLocation) {
+        const locationUpdateData: any = {};
+        
+        if (body.latitude !== undefined) locationUpdateData.latitude = body.latitude;
+        if (body.longitude !== undefined) locationUpdateData.longitude = body.longitude;
         
         // Update the location document
         await Location.updateOne(

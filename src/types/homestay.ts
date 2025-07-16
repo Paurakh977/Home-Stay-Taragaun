@@ -124,6 +124,11 @@ export interface HomestayData {
   homestayId: string;
   password?: string; // Usually excluded from API responses
   dhsrNo?: string;
+  
+  // Business registration details
+  registrationAuthority?: string;
+  businessRegistrationNumber?: string;
+  
   homeStayName: string;
   villageName: string;
   homeCount: number;

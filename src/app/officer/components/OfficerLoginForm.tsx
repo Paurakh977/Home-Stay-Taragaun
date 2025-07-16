@@ -8,6 +8,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useBranding } from "@/context/BrandingContext";
 import { getImageUrl } from "@/lib/utils";
+import TranslateButton from "@/components/ui/translate-button";
 
 interface OfficerLoginFormProps {
   adminUsername: string;
@@ -111,9 +112,12 @@ export default function OfficerLoginForm({ adminUsername }: OfficerLoginFormProp
     <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-md">
         {/* Card container with minimal shadow */}
-        <div className="bg-white rounded-xl shadow-md overflow-hidden">
+        <div className="bg-white rounded-xl shadow-md overflow-hidden relative">
           {/* Header with brand logo */}
           <div className="p-8 text-center">
+            <div className="absolute top-4 right-4">
+              <TranslateButton variant="ghost" size="sm" />
+            </div>
             <div className="flex justify-center mb-4">
               {branding.logoPath ? (
                 <div className="relative h-24 w-24 rounded-full overflow-hidden border-2 border-white shadow-sm">
@@ -131,17 +135,17 @@ export default function OfficerLoginForm({ adminUsername }: OfficerLoginFormProp
                 </div>
               )}
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">
-              {branding.brandName || 'Officer Portal'}
+            <h1 className="text-2x font-bold text-gray-900 mb-1">
+              {branding.brandName || 'Officer Portal'} Development Committee
             </h1>
             <p className="text-gray-500 text-sm">
-              {greeting}, <span className="font-semibold">Officer</span>
+              {branding.contactInfo?.address || 'Kathmandu, Nepal'}
             </p>
-            <p className="text-xs text-gray-400 mt-1">
-              Admin: {adminUsername}
+            <p className="text-xs text-gray-800 mt-1">
+              {adminUsername}
             </p>
             {branding.brandDescription && (
-              <p className="mt-2 text-xs text-gray-500">{branding.brandDescription}</p>
+              <p className="mt-2 text-xs text-gray-500">Homestay Digital Marketing Platform</p>
             )}
           </div>
           
@@ -209,16 +213,6 @@ export default function OfficerLoginForm({ adminUsername }: OfficerLoginFormProp
               </button>
             </form>
           </div>
-        </div>
-        
-        {/* Back link */}
-        <div className="text-center mt-6">
-          <Link 
-            href="/officer/login"
-            className="text-sm text-gray-600 hover:text-primary transition-colors"
-          >
-            Return to Officer Login
-          </Link>
         </div>
       </div>
     </div>

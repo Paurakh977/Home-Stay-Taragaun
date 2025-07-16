@@ -137,6 +137,18 @@ async function generateDHSRNumber(province: string, homeStayType: string): Promi
   }
 }
 
+// Helper function to format the homestay name properly
+function formatHomeStayName(originalName: string, homeStayType: string): string {
+  // Capitalize first letter of each word
+  const capitalized = originalName.trim().replace(/\b\w/g, c => c.toUpperCase());
+  
+  // Add the type in parentheses - Samudaik for community, Niji for private
+  const typeText = homeStayType === 'community' ? 'Community' : 'Private';
+  
+  // Return the formatted name: [Original Name] ([Type]) Homestay
+  return `${capitalized} ${typeText} Homestay`;
+}
+
 export async function GET(req: NextRequest) {
   try {
     await dbConnect();
@@ -493,15 +505,19 @@ export async function POST(req: NextRequest) {
     
     console.log(`Processing registration for: ${body.homeStayName}, ID: ${homestayId}`);
     
-    // Get English translations for the address fields
-    const provinceEn = provinceTranslations[body.province] || body.province;
-    const districtEn = findBestTranslation(body.district, 'district');
-    const municipalityEn = findBestTranslation(body.municipality, 'municipality');
-    const wardEn = translateWard(body.ward);
+    // Format the homestay name: capitalize first letters, add type and "Homestay" suffix
+    const formattedHomeStayName = formatHomeStayName(body.homeStayName, body.homeStayType);
     
-    // Create formatted addresses in both languages
-    const formattedAddressNe = `${body.tole}, ${body.city}, ${body.municipality}, ${body.district}, ${body.province}`;
-    const formattedAddressEn = `${body.tole}, ${body.city}, ${municipalityEn}, ${districtEn}, ${provinceEn}`;
+    // Get English translations for the address fields
+    const provinceEn = body.provinceEn || provinceTranslations[body.province] || body.province;
+    const districtEn = body.districtEn || findBestTranslation(body.district, 'district');
+    const municipalityEn = body.municipalityEn || findBestTranslation(body.municipality, 'municipality');
+    const wardEn = body.wardEn || translateWard(body.ward);
+    
+    // Create formatted addresses in both languages - exclude tole if it's empty
+    const tolePrefix = body.tole ? `${body.tole}, ` : '';
+    const formattedAddressNe = `${tolePrefix}${body.city}, ${body.municipality}, ${body.district}, ${body.province}`;
+    const formattedAddressEn = `${tolePrefix}${body.city}, ${municipalityEn}, ${districtEn}, ${provinceEn}`;
     
     // Generate DHSR number
     const dhsrNo = await generateDHSRNumber(body.province, body.homeStayType);
@@ -513,7 +529,7 @@ export async function POST(req: NextRequest) {
       password: hashedPassword,
       dhsrNo, // Add DHSR number
       adminUsername: body.adminUsername, // Store the admin username
-      homeStayName: body.homeStayName,
+      homeStayName: formattedHomeStayName,
       villageName: body.villageName,
       homeCount: body.homeCount,
       roomCount: body.roomCount,
@@ -571,7 +587,7 @@ export async function POST(req: NextRequest) {
     };
     
     // Add the default content
-    const defaultContent = getDefaultHomestayContent(homestayData.homeStayName, homestayData.villageName);
+    const defaultContent = getDefaultHomestayContent(formattedHomeStayName, homestayData.villageName);
     
     // Check if galleryImages are explicitly provided in the request body
     const galleryImages = body.galleryImages !== undefined ? 
@@ -613,8 +629,8 @@ export async function POST(req: NextRequest) {
         city: body.city || '',
         tole: body.tole || '',
         formattedAddress: {
-          ne: `${body.tole || ''}, ${body.city || ''}, ${body.ward}, ${body.municipality}, ${body.district}, ${body.province}`,
-          en: `${body.tole || ''}, ${body.city || ''}, ${wardEn}, ${municipalityEn}, ${districtEn}, ${provinceEn}`
+          ne: formattedAddressNe,
+          en: formattedAddressEn
         },
         isVerified: false
       };

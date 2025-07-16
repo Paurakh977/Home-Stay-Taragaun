@@ -44,6 +44,64 @@ const nextConfig = {
   
   // Disable using trailing slash
   trailingSlash: false,
+  
+  // Add necessary headers for Google Translate to work properly
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: "default-src 'self' * data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' *; style-src 'self' 'unsafe-inline' *; img-src 'self' data: blob: *; connect-src 'self' *; frame-src 'self' *; font-src 'self' data: *;"
+          },
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*'
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff'
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN'
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block'
+          }
+        ]
+      }
+    ];
+  },
+
+  // Ensure the browser doesn't cache translation cookies incorrectly
+  async rewrites() {
+    return [
+      // Special handling for Google Translate resources
+      {
+        source: '/translate_a/:path*',
+        destination: 'https://translate.googleapis.com/translate_a/:path*'
+      },
+      {
+        source: '/translate_static/:path*',
+        destination: 'https://translate.googleapis.com/translate_static/:path*'
+      },
+      {
+        source: '/translate-pa/:path*',
+        destination: 'https://translate-pa.googleapis.com/:path*'
+      },
+      {
+        source: '/gen204',
+        destination: 'https://translate.google.com/gen204'
+      },
+      {
+        source: '/element/log',
+        destination: 'https://translate.googleapis.com/element/log'
+      }
+    ];
+  }
 };
 
 module.exports = nextConfig; 

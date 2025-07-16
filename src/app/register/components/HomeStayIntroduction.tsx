@@ -133,28 +133,6 @@ const HomeStayIntroduction: React.FC<HomeStayIntroductionProps> = ({ formData, u
           }
         </div>
 
-        {/* Village Name */}
-        <div>
-          <label htmlFor="villageName" className="block text-sm font-medium text-gray-700 mb-1">
-            Home stays&apos; Village Name/होमस्टे गाउँको नाम
-            <span className="text-red-500 ml-1">*</span>
-          </label>
-          <input
-            type="text"
-            id="villageName"
-            name="villageName"
-            value={formData.villageName || ''}
-            onChange={handleChange}
-            className={`mt-1 block w-full px-3 py-2 bg-white border ${
-              !formData.villageName ? 'border-red-300' : 'border-gray-300'
-            } rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary`}
-            required
-          />
-          {!formData.villageName && 
-            <p className="mt-1 text-xs text-red-500">This field is required</p>
-          }
-        </div>
-
         {/* Number dropdowns */}
         <div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -172,7 +150,7 @@ const HomeStayIntroduction: React.FC<HomeStayIntroductionProps> = ({ formData, u
                   className="appearance-none block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
                   required
                 >
-                  {createRange(1, 50).map((num) => (
+                  {createRange(1, 500).map((num) => (
                     <option key={`home-${num}`} value={num}>
                       {num}
                     </option>
@@ -200,7 +178,7 @@ const HomeStayIntroduction: React.FC<HomeStayIntroductionProps> = ({ formData, u
                   className="appearance-none block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
                   required
                 >
-                  {createRange(1, 100).map((num) => (
+                  {createRange(1, 1000).map((num) => (
                     <option key={`room-${num}`} value={num}>
                       {num}
                     </option>
@@ -228,7 +206,7 @@ const HomeStayIntroduction: React.FC<HomeStayIntroductionProps> = ({ formData, u
                   className="appearance-none block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
                   required
                 >
-                  {createRange(1, 200).map((num) => (
+                  {createRange(1, 1000).map((num) => (
                     <option key={`bed-${num}`} value={num}>
                       {num}
                     </option>

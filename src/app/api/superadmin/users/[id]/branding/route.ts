@@ -224,7 +224,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         mission,
         vision,
         team: [...(user.branding?.aboutUs?.team || [])]
-      }
+      },
+      featuredSection: {
+        features: [...(user.branding?.featuredSection?.features || [])]
+      },
+      testimonials: [...(user.branding?.testimonials || [])]
     };
     
     // Process logo if uploaded
@@ -321,6 +325,105 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // If we got team members, update the team array
     if (teamMembers.length > 0) {
       updatedBranding.aboutUs.team = teamMembers;
+    }
+    
+    // Process featured section items
+    const features: any[] = [];
+    let featureIndex = 0;
+    
+    // Get existing features to compare
+    const existingFeatures = user.branding?.featuredSection?.features || [];
+    
+    while (formData.has(`feature_${featureIndex}_title`) || formData.has(`feature_${featureIndex}_icon`)) {
+      const icon = formData.get(`feature_${featureIndex}_icon`) as string;
+      const title = formData.get(`feature_${featureIndex}_title`) as string;
+      const description = formData.get(`feature_${featureIndex}_description`) as string;
+      
+      if (title || icon || description) {
+        // Get existing image path if available
+        const existingImagePath = existingFeatures[featureIndex]?.imagePath || '';
+        
+        // Process feature image if uploaded
+        const featureImage = formData.get(`feature_image_${featureIndex}`) as File | null;
+        let imagePath = formData.get(`feature_${featureIndex}_imagePath`) as string || existingImagePath;
+        
+        if (featureImage && featureImage instanceof File) {
+          imagePath = await saveFile(
+            featureImage, 
+            username, 
+            `feature_${featureIndex}`, 
+            'features',
+            existingImagePath
+          );
+          console.log(`Feature image ${featureIndex} updated:`, imagePath);
+        }
+        
+        features.push({
+          icon: icon || '',
+          title: title || '',
+          description: description || '',
+          imagePath
+        });
+      }
+      
+      featureIndex++;
+    }
+    
+    // Process testimonials
+    const testimonialItems: any[] = [];
+    let testimonialIndex = 0;
+    
+    // Get existing testimonials to compare
+    const existingTestimonials = user.branding?.testimonials || [];
+    
+    while (formData.has(`testimonial_${testimonialIndex}_quote`) || formData.has(`testimonial_${testimonialIndex}_author`)) {
+      const quote = formData.get(`testimonial_${testimonialIndex}_quote`) as string;
+      const author = formData.get(`testimonial_${testimonialIndex}_author`) as string;
+      const location = formData.get(`testimonial_${testimonialIndex}_location`) as string;
+      
+      if (quote || author || location) {
+        // Get existing avatar path if available
+        const existingAvatarPath = existingTestimonials[testimonialIndex]?.avatarPath || '';
+        
+        // Process testimonial avatar if uploaded
+        const avatarImage = formData.get(`testimonial_avatar_${testimonialIndex}`) as File | null;
+        let avatarPath = formData.get(`testimonial_${testimonialIndex}_avatarPath`) as string || existingAvatarPath;
+        
+        if (avatarImage && avatarImage instanceof File) {
+          avatarPath = await saveFile(
+            avatarImage, 
+            username, 
+            `testimonial_${testimonialIndex}`, 
+            'testimonials',
+            existingAvatarPath
+          );
+          console.log(`Testimonial avatar ${testimonialIndex} updated:`, avatarPath);
+        }
+        
+        testimonialItems.push({
+          quote: quote || '',
+          author: author || '',
+          location: location || '',
+          avatarPath
+        });
+      }
+      
+      testimonialIndex++;
+    }
+    
+    // If we got team members, update the team array
+    if (teamMembers.length > 0) {
+      updatedBranding.aboutUs.team = teamMembers;
+    }
+    
+    // If we got features, update the features array
+    if (features.length > 0) {
+      updatedBranding.featuredSection.features = features;
+    }
+    
+    // If we got testimonials, update the testimonials array
+    if (testimonialItems.length > 0) {
+      updatedBranding.testimonials = testimonialItems;
     }
     
     // Update the user's branding in the database

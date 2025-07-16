@@ -7,12 +7,14 @@ import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWebContent } from "@/context/WebContentContext";
+import { getImageUrl, shouldUseUnoptimizedImage } from "@/lib/imageUtils";
+import TranslateButton from "@/components/ui/translate-button";
 
 const PlatformNavbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const pathname = usePathname();
-  const { content, loading } = useWebContent();
+  const { content, loading, refreshContent } = useWebContent();
 
   // Handle scroll effect
   useEffect(() => {
@@ -53,6 +55,22 @@ const PlatformNavbar = () => {
         logoPath: "/Logo.png"
       }
     : content.siteInfo;
+  
+  // Force refresh of content after load to ensure we have the latest data
+  useEffect(() => {
+    if (!loading && content) {
+      // If content is loaded but we want to make sure we have fresh data
+      const refreshTimer = setTimeout(() => {
+        refreshContent();
+      }, 1000);
+      
+      return () => clearTimeout(refreshTimer);
+    }
+  }, [loading, content, refreshContent]);
+
+  // Get the logo URL with cache busting
+  const logoUrl = getImageUrl(siteInfo.logoPath);
+  const useUnoptimized = shouldUseUnoptimizedImage(siteInfo.logoPath);
 
   return (
     <nav className={`sticky top-0 z-50 w-full transition-all duration-300 ${
@@ -64,11 +82,12 @@ const PlatformNavbar = () => {
           <Link href="/" className="flex-shrink-0 flex items-center">
             <div className="relative h-12 w-12 mr-3 overflow-hidden rounded-full bg-white shadow-sm">
               <Image 
-                src={siteInfo.logoPath} 
+                src={logoUrl}
                 alt={siteInfo.siteName} 
                 width={48}
                 height={48}
                 className="object-contain"
+                unoptimized={useUnoptimized}
               />
             </div>
             <div className="flex flex-col">
@@ -97,10 +116,16 @@ const PlatformNavbar = () => {
                 </div>
               </Link>
             ))}
+            
+            {/* Translate Button */}
+            <TranslateButton variant="ghost" />
           </div>
           
           {/* Mobile menu button */}
           <div className="md:hidden flex items-center">
+            {/* Translate Button (Mobile) */}
+            <TranslateButton variant="ghost" size="sm" className="mr-2" />
+            
             <Button
               variant="ghost"
               size="icon"

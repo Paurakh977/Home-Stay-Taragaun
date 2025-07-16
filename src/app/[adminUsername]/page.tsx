@@ -6,7 +6,10 @@ import CtaSection from "@/components/home/CtaSection";
 import ScrollPopup from "@/components/ui/ScrollPopup";
 import { User } from "@/lib/models";
 import dbConnect from "@/lib/mongodb";
+import Link from "next/link";
+import SuperadminWrapper from "@/components/shared/SuperadminWrapper";
 
+// Configure the page to use dynamic rendering
 export const dynamic = 'force-dynamic';
 
 // This function generates the metadata for the page
@@ -61,14 +64,18 @@ export default async function AdminHomePage({ params }: { params: { adminUsernam
       notFound();
     }
 
+    // Use SuperadminWrapper to conditionally show content
+    // If superadmin, it will show original content, otherwise "Explore Homestays" button
     return (
-      <div className="flex flex-col w-full">
-        <ImageSlider />
-        <FeaturedSection adminUsername={adminUsername} />
-        <TestimonialsSection />
-        <CtaSection adminUsername={adminUsername} />
-        <ScrollPopup />
-      </div>
+      <SuperadminWrapper>
+        <div className="flex flex-col w-full">
+          <ImageSlider />
+          <FeaturedSection adminUsername={adminUsername} />
+          <TestimonialsSection />
+          <CtaSection adminUsername={adminUsername} />
+          <ScrollPopup />
+        </div>
+      </SuperadminWrapper>
     );
   } catch (error) {
     console.error(`Error in admin home page for ${adminUsername}:`, error);
