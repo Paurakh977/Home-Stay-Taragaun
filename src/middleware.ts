@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { jwtVerify, type JWTPayload } from 'jose';
+import { auth } from "@clerk/nextjs/server";
 
 // Extended JWT payload interface with our custom properties
 interface ExtendedJWTPayload extends JWTPayload {
@@ -13,17 +14,18 @@ interface ExtendedJWTPayload extends JWTPayload {
 
 // --- Configuration --- 
 const JWT_SECRET = process.env.JWT_SECRET;
+// Edge-compatible approach - no process.exit()
 if (!JWT_SECRET) {
-  // In production, rely on environment variable; fail hard if missing.
   if (process.env.NODE_ENV === 'production') {
     console.error('FATAL ERROR: JWT_SECRET environment variable is not set.');
-    process.exit(1);
+    // Don't use process.exit in Edge Runtime
   } else {
     console.warn('Warning: JWT_SECRET not set, using default fallback for development.');
-    process.env.JWT_SECRET = 'fallback_secret_key_for_development'; // Assign to process.env for consistency
+    // Don't modify process.env directly in Edge Runtime
   }
 }
-const ENCODED_JWT_SECRET = new TextEncoder().encode(JWT_SECRET);
+// Use the JWT_SECRET or a fallback for development
+const ENCODED_JWT_SECRET = new TextEncoder().encode(JWT_SECRET || 'fallback_secret_key_for_development');
 
 // Regular User/Admin Paths
 const DASHBOARD_PATHS = ['/dashboard'];
@@ -41,6 +43,10 @@ const SUPERADMIN_AUTH_PATHS = ['/superadmin/login', '/api/superadmin/auth', '/ap
 const PUBLIC_API_PATHS = ['/api/homestays', '/api/location']; // Publicly accessible API routes
 const ASSET_REGEX = /^\/(_next\/static\/|_next\/image\/|static\/|images\/|favicon\.ico|.*\.(?:png|jpg|jpeg|gif|svg|webp))/;
 const SEED_API_PATH = '/api/seed-superadmin'; // Allow access for seeding
+
+// Clerk authentication paths
+const CLERK_AUTH_PATHS = ['/sign-in', '/sign-up', '/sso-callback', '/api/auth/clerk'];
+const PUBLIC_CLERK_PATHS = ['/', '/about', '/contact', '/homestays', '/news', '/sign-in', '/sign-up', '/sso-callback'];
 
 // Regex to match admin username routes that should be public
 // Match root paths like /admin1 but not /admin1/dashboard (which requires auth)
@@ -125,13 +131,45 @@ function createRedirectResponse(request: NextRequest, redirectTo: string, cookie
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Debug for seed-superadmin path
+  // 1. Skip Middleware for Assets and specific public paths
+  if (
+    ASSET_REGEX.test(pathname) || 
+    pathname === SEED_API_PATH || 
+    pathname.startsWith('/_next/') || 
+    pathname.includes('.js') || 
+    pathname.includes('.css') || 
+    pathname.includes('.png') || 
+    pathname.includes('.ico')
+  ) {
+    return NextResponse.next();
+  }
+
+  // 2. Handle Clerk auth paths
+  if (CLERK_AUTH_PATHS.some(path => pathname.startsWith(path))) {
+    return NextResponse.next();
+  }
+
+  // 3. Check if path is a public Clerk path
+  if (PUBLIC_CLERK_PATHS.some(path => pathname === path || pathname.startsWith(path + '/'))) {
+    return NextResponse.next();
+  }
+
+  // 4. Handle Dashboard with Clerk authentication
+  if (pathname === '/dashboard') {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.redirect(new URL('/sign-in', request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // 5. Debug for seed-superadmin path
   if (pathname === '/api/seed-superadmin') {
     console.log('Seed superadmin path detected, skipping middleware');
     return NextResponse.next();
   }
 
-  // Special handler for direct uploads paths - redirect to API route
+  // 6. Special handler for direct uploads paths - redirect to API route
   // This is critical to ensure direct image access works
   const uploadsMatch = pathname.match(UPLOADS_PATH_REGEX);
   if (uploadsMatch) {
@@ -146,27 +184,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Direct image file access - add cache control headers
+  // 7. Direct image file access - add cache control headers
   if (pathname.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) {
     const response = NextResponse.next();
     response.headers.set('Cache-Control', 'no-store, max-age=0');
     return response;
   }
 
-  // 1. Skip Middleware for Assets and specific public paths
-  if (
-    ASSET_REGEX.test(pathname) || 
-    pathname === SEED_API_PATH || 
-    pathname.startsWith('/_next/') || 
-    pathname.includes('.js') || 
-    pathname.includes('.css') || 
-    pathname.includes('.png') || 
-    pathname.includes('.ico')
-  ) {
-    return NextResponse.next();
-  }
-  
-  // Check for admin username routes early (before other checks)
+  // 8. Check for admin username routes early (before other checks)
   const isAdminUsernamePath = ADMIN_USERNAME_REGEX.test(pathname);
   const isAdminUsernameNestedPath = ADMIN_USERNAME_NESTED_REGEX.test(pathname);
   
@@ -176,13 +201,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for admin-specific login pages
+  // 9. Check for admin-specific login pages
   const isAdminUsernameLoginPath = ADMIN_USERNAME_LOGIN_REGEX.test(pathname);
   if (isAdminUsernameLoginPath) {
     return NextResponse.next(); // Allow access to admin login pages
   }
 
-  // 2. Handle base /superadmin path redirection
+  // 10. Handle base /superadmin path redirection
   if (pathname === '/superadmin') {
       const token = request.cookies.get('superadmin_token')?.value;
       const payload = await verifyToken(token);
@@ -194,7 +219,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/superadmin/login', request.url));
   }
 
-  // 3. Handle base /admin path redirection and admin username paths
+  // 11. Handle base /admin path redirection and admin username paths
   if (pathname === '/admin') {
     const token = request.cookies.get('auth_token')?.value;
     const payload = await verifyToken(token);
@@ -206,15 +231,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/admin/login', request.url));
   }
 
-  // Check for admin username dashboard paths
+  // 12. Check for admin username dashboard paths
   const adminUsernameDashboardRegex = /^\/[^\/]+\/dashboard/;
   const isAdminUsernameDashboardPath = adminUsernameDashboardRegex.test(pathname);
   
-  // Check for admin-specific dashboard
+  // 13. Check for admin-specific dashboard
   const adminSpecificDashboardRegex = /^\/admin\/[^\/]+$/;
   const isAdminSpecificDashboardPath = adminSpecificDashboardRegex.test(pathname) && !pathname.includes('/login');
   
-  // 4. Identify Path Type
+  // 14. Identify Path Type
   const isSuperAdminDashboardPath = SUPERADMIN_DASHBOARD_PATHS.some(p => pathname.startsWith(p));
   const isSuperAdminAPIPath = SUPERADMIN_API_PATHS.some(p => pathname.startsWith(p)) && !SUPERADMIN_AUTH_PATHS.some(p => pathname.startsWith(p)); // Exclude auth APIs
   
@@ -227,9 +252,9 @@ export async function middleware(request: NextRequest) {
 
   const requiresSuperAdminAuth = isSuperAdminDashboardPath || isSuperAdminAPIPath;
   const requiresAdminAuth = isAdminUIPath || isAdminAPIPath || isAdminSpecificDashboardPath;
-  const requiresUserAuth = isDashboardPath; // Only dashboard requires generic login for now
+  const requiresUserAuth = isDashboardPath && !pathname.startsWith('/dashboard'); // Only legacy dashboard paths require JWT auth
 
-  // 5. Handle Superadmin Authentication & Authorization
+  // 15. Handle Superadmin Authentication & Authorization
   if (requiresSuperAdminAuth) {
     const token = request.cookies.get('superadmin_token')?.value;
     const payload = await verifyToken(token);
@@ -247,7 +272,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 6. Handle Regular Admin Authentication & Authorization
+  // 16. Handle Regular Admin Authentication & Authorization
   if (requiresAdminAuth) {
     const token = request.cookies.get('auth_token')?.value;
     const payload = await verifyToken(token);
@@ -288,8 +313,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 7. Handle Regular User Authentication (Dashboard)
-  if (requiresUserAuth) {
+  // 17. Handle Regular User Authentication (Dashboard) - Legacy JWT auth for admin username dashboard paths
+  if (requiresUserAuth && isAdminUsernameDashboardPath) {
     const token = request.cookies.get('auth_token')?.value;
     const payload = await verifyToken(token);
 
@@ -302,8 +327,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 8. Allow Public and Auth Paths
-  // If the code reaches here, it's not a protected asset or a path requiring auth check.
+  // 18. Allow Public and Auth Paths
   // Check if it's an explicitly public path or an auth-related path.
   const isPublicPath = PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'));
   const isAuthPath = AUTH_PATHS.some(p => pathname.startsWith(p));
@@ -314,7 +338,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.next();
   }
 
-  // Check for admin action paths
+  // 19. Check for admin action paths
   const isAdminEditPath = ADMIN_EDIT_PATH.test(pathname);
   const isAdminDeletePath = ADMIN_DELETE_PATH.test(pathname);
   const isAdminDocumentPath = ADMIN_DOCUMENT_PATH.test(pathname);
@@ -378,7 +402,7 @@ export async function middleware(request: NextRequest) {
 // --- Matcher Configuration --- 
 export const config = {
   matcher: [
-    // Exclude API routes, especially seed-superadmin
-    '/((?!api|_next|static|images|favicon.ico).*)',
+    // Include all routes except specific ones we want to exclude
+    '/((?!_next/static|_next/image|static|images|favicon.ico).*)',
   ],
 }; 

@@ -3,8 +3,6 @@ import dbConnect from '@/lib/mongodb';
 import HomestaySingle from '@/lib/models/HomestaySingle';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  await dbConnect();
-  
   // Base URLs that are static
   const baseEntries: MetadataRoute.Sitemap = [
     {
@@ -34,6 +32,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   try {
+    // Check if we're in build/static generation phase
+    const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build' || 
+                       process.env.NEXT_PHASE === 'phase-export';
+    
+    // During build time, return only static routes
+    if (isBuildTime) {
+      console.log('Build time detected, returning only static sitemap routes');
+      return baseEntries;
+    }
+    
+    // Connect to MongoDB only during runtime
+    await dbConnect();
+
     // Get all published homestays for dynamic routes
     const homestays = await HomestaySingle.find({ status: 'approved' })
       .select('_id homestayId homeStayName adminUsername updatedAt')

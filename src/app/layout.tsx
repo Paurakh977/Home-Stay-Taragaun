@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "sonner";
 import Script from 'next/script';
 import { TranslateProvider } from "@/components/shared/TranslateProvider";
+import { ClerkProvider } from "@clerk/nextjs";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -235,10 +236,12 @@ export default function RootLayout({
           `}
         </Script>
         
-        <TranslateProvider>
-          {children}
-        </TranslateProvider>
-        <Toaster position="top-right" richColors />
+        <ClerkProvider>
+          <TranslateProvider>
+            {children}
+          </TranslateProvider>
+          <Toaster position="top-right" richColors />
+        </ClerkProvider>
       </body>
     </html>
   );
