@@ -73,6 +73,7 @@ export default function RefinedMinimalistLogin() {
     }
   };
 
+  // Update the handleSocialLogin function to preserve the redirect_url
   const handleSocialLogin = async (provider: 'oauth_google' | 'oauth_facebook' | 'oauth_apple') => {
     if (!isLoaded) {
       return;
@@ -80,10 +81,13 @@ export default function RefinedMinimalistLogin() {
 
     try {
       setIsLoading(true);
+      // Get the redirect URL from search params or default to '/'
+      const redirectUrl = searchParams.get('redirect_url') || '/';
+      
       await signIn.authenticateWithRedirect({
         strategy: provider,
         redirectUrl: '/sso-callback',
-        redirectUrlComplete: '/',
+        redirectUrlComplete: redirectUrl, // Use the redirect URL from searchParams
       });
     } catch (err) {
       console.error('Social login error:', err);

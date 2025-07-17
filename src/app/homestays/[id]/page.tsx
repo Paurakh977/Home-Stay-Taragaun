@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useParams } from "next/navigation";
@@ -350,18 +350,41 @@ export default function HomestayDetailPage() {
   const params = useParams();
   const homestayId = params.id as string;
 
+  // Add global styles here to avoid nested style tags
+  // This replaces both style tags that were causing conflicts
+  const globalStyles = `
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+    }
+    
+    /* Hide scrollbar for IE, Edge and Firefox */
+    .scrollbar-hide {
+      -ms-overflow-style: none;  /* IE and Edge */
+      scrollbar-width: none;  /* Firefox */
+    }
+    
+    @keyframes jiggle {
+      0% { transform: rotate(0); }
+      25% { transform: rotate(-5deg); }
+      50% { transform: rotate(5deg); }
+      75% { transform: rotate(-3deg); }
+      100% { transform: rotate(0); }
+    }
+    
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  `;
+
   const { isSignedIn } = useAuth();
   const [showChatModal, setShowChatModal] = useState(false);
-
-  // Update the handleChatClick function to include the redirect_url parameter
-  const handleChatClick = () => {
-    if (isSignedIn) {
-      setShowChatModal(true);
-    } else {
-      // Add the current URL as redirect_url parameter
-      router.push(`/sign-in?redirect_url=/homestays/${homestayId}`);
-    }
-  };
+  
+  // Add these new hooks right here, after existing hooks and before other code
+  const chatButtonRef = useRef<HTMLButtonElement>(null);
+  // Remove the emoji picker state since we don't need it anymore
+  const [messageInput, setMessageInput] = useState('');
 
   // State for the homestay data
   const [homestay, setHomestay] = useState<HomestayData | null>(null);
@@ -579,6 +602,31 @@ export default function HomestayDetailPage() {
       fetchHomestayData();
     }
   }, [homestayId]);
+
+
+  const handleChatClick = () => {
+    if (isSignedIn) {
+      setShowChatModal(true);
+    } else {
+      // Add the current URL as redirect_url parameter
+      router.push(`/sign-in?redirect_url=/homestays/${homestayId}`);
+    }
+  };
+
+  // Add the jiggle animation effect at the appropriate place with other useEffects
+  useEffect(() => {
+    const chatButton = chatButtonRef.current;
+    if (!chatButton) return;
+    
+    const jiggleInterval = setInterval(() => {
+      chatButton.style.animation = 'jiggle 0.7s ease';
+      setTimeout(() => {
+        chatButton.style.animation = 'none';
+      }, 700);
+    }, 5000);
+    
+    return () => clearInterval(jiggleInterval);
+  }, []);
 
   if (loading) {
     return (
@@ -899,8 +947,8 @@ export default function HomestayDetailPage() {
 
             {/* Tabs Section - Modern Design with colorful icons */}
             <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
-              <div className="border-b">
-                <div className="flex">
+              <div className="border-b overflow-x-auto scrollbar-hide">
+                <div className="flex whitespace-nowrap min-w-full">
                   <button
                     onClick={() => setActiveTab('amenities')}
                     className={`px-6 py-4 font-medium text-sm transition-colors flex items-center ${
@@ -1288,10 +1336,10 @@ export default function HomestayDetailPage() {
 
       {/* Floating Chat Button */}
       <button
+        ref={chatButtonRef}
         onClick={handleChatClick}
-        className="fixed bottom-6 right-6 z-40 p-4 bg-primary text-white rounded-full shadow-lg hover:bg-primary-dark transition-colors md:bottom-8 md:right-8"
+        className="fixed bottom-6 right-6 z-40 p-4 bg-primary text-white rounded-full shadow-lg hover:bg-primary-dark transition-colors md:bottom-8 md:right-8 cursor-pointer"
         aria-label="Chat with homestay"
-        id="chat-button"
       >
         <MessageCircle className="h-6 w-6" />
       </button>
@@ -1481,69 +1529,38 @@ export default function HomestayDetailPage() {
             <div className="flex items-center gap-2 bg-gray-50 rounded-full pl-4 pr-2 py-1.5">
               <input
                 type="text"
+                value={messageInput}
+                onChange={(e) => setMessageInput(e.target.value)}
                 placeholder="Type a message..."
                 className="bg-transparent border-none text-sm flex-1 focus:outline-none"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    // TODO: Handle send message
-                    console.log('Message sent:', e.currentTarget.value);
-                    e.currentTarget.value = '';
+                    if (messageInput.trim()) {
+                      console.log('Message sent:', messageInput);
+                      setMessageInput('');
+                    }
                   }
                 }}
               />
-              <div className="flex items-center gap-1">
-                <button className="p-1.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-200 transition-colors">
-                  <Image src="/images/emoji.svg" alt="Emoji" width={18} height={18} />
-                </button>
-                <button 
-                  className="p-2 bg-primary text-white rounded-full hover:bg-primary-dark transition-colors"
-                  onClick={() => {
-                    // TODO: Handle send
-                  }}
-                >
-                  <ArrowRight className="h-4 w-4" />
-                </button>
-              </div>
+              <button 
+                className="p-2 bg-primary text-white rounded-full hover:bg-primary-dark transition-colors cursor-pointer"
+                onClick={() => {
+                  if (messageInput.trim()) {
+                    console.log('Message sent:', messageInput);
+                    setMessageInput('');
+                  }
+                }}
+              >
+                <ArrowRight className="h-4 w-4" />
+              </button>
             </div>
           </div>
         </div>
       )}
       
-      {/* Add the jiggle animation to the global CSS */}
-      <style jsx global>{`
-        @keyframes jiggle {
-          0% { transform: rotate(0); }
-          25% { transform: rotate(-5deg); }
-          50% { transform: rotate(5deg); }
-          75% { transform: rotate(-3deg); }
-          100% { transform: rotate(0); }
-        }
-        
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
-
-      {/* Script to add jiggle animation */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-            document.addEventListener('DOMContentLoaded', function() {
-              const chatButton = document.getElementById('chat-button');
-              if (chatButton) {
-                setInterval(() => {
-                  chatButton.style.animation = 'jiggle 0.7s ease';
-                  setTimeout(() => {
-                    chatButton.style.animation = 'none';
-                  }, 700);
-                }, 5000);
-              }
-            });
-          `
-        }}
-      />
+      {/* Single global style tag */}
+      <style jsx global>{globalStyles}</style>
     </div>
   );
 } 

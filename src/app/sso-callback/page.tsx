@@ -34,11 +34,12 @@ function SSOCallbackContent() {
     // Don't do anything until Clerk is loaded
     if (!isSignInLoaded || !isSignUpLoaded) return;
 
+    // Update the processOAuthCallback function to handle redirect_url properly
     const processOAuthCallback = async () => {
       try {
         // Extract the query parameters
         const createdSessionId = searchParams?.get("createdSessionId");
-        const redirectUrl = searchParams?.get("redirect_url") || "/";
+        const redirectUrl = searchParams?.get("redirect_url") || '/';
         
         if (!createdSessionId) {
           console.error("No createdSessionId found in URL");
