@@ -112,11 +112,11 @@ const PlatformNavbar = () => {
     <nav className={`sticky top-0 z-50 w-full transition-all duration-300 ${
       isScrolled ? "bg-white/95 backdrop-blur-sm shadow-md" : "bg-transparent"
     }`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
         <div className="flex justify-between h-20 items-center">
           {/* Logo */}
           <Link href="/" className="flex-shrink-0 flex items-center">
-            <div className="relative h-12 w-12 mr-3 overflow-hidden rounded-full bg-white shadow-sm">
+            <div className="relative h-10 w-10 sm:h-12 sm:w-12 mr-2 sm:mr-3 overflow-hidden rounded-full bg-white shadow-sm">
               <Image 
                 src={logoUrl}
                 alt={siteInfo.siteName} 
@@ -127,8 +127,8 @@ const PlatformNavbar = () => {
               />
             </div>
             <div className="flex flex-col">
-              <span className="text-xl font-bold text-gray-800">{siteInfo.siteName}</span>
-              <span className="text-xs text-gray-500">{siteInfo.tagline}</span>
+              <span className="text-lg sm:text-xl font-bold text-gray-800">{siteInfo.siteName}</span>
+              <span className="text-xs text-gray-500 hidden xs:block">{siteInfo.tagline}</span>
             </div>
           </Link>
           
@@ -206,19 +206,29 @@ const PlatformNavbar = () => {
             )}
           </div>
           
-          {/* Mobile menu button */}
+          {/* Mobile menu button - IMPROVED SPACING */}
           <div className="md:hidden flex items-center">
-            {/* Translate Button (Mobile) */}
-            <TranslateButton variant="ghost" size="sm" className="mr-2" />
+            {/* Translate Button (Mobile) - Better spacing */}
+            <div className="mr-2">
+              <TranslateButton 
+                variant="ghost" 
+                size="sm" 
+                className="h-9 w-9 p-2 rounded-full hover:bg-gray-100"
+              />
+            </div>
             
-            {/* User Profile for Mobile */}
+            {/* User Profile for Mobile - Better spacing */}
             {isLoaded && isSignedIn && user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="mr-2">
-                    <Avatar className="h-8 w-8">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="mr-2 h-9 w-9 p-1.5 rounded-full hover:bg-gray-100"
+                  >
+                    <Avatar className="h-full w-full">
                       <AvatarImage src={user.imageUrl} alt={user.fullName || "User"} />
-                      <AvatarFallback className="bg-[#183636] text-white">
+                      <AvatarFallback className="bg-[#183636] text-white text-xs">
                         {getUserInitials()}
                       </AvatarFallback>
                     </Avatar>
@@ -246,19 +256,25 @@ const PlatformNavbar = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button variant="ghost" size="sm" asChild className="mr-2">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                asChild 
+                className="mr-2 px-3 py-1.5 hover:bg-gray-100"
+              >
                 <Link href="/sign-in">Sign in</Link>
               </Button>
             )}
             
+            {/* Hamburger menu button - Better spacing */}
             <Button
               variant="ghost"
-              size="icon"
+              size="sm"
               aria-label="Toggle menu"
               onClick={toggleMenu}
-              className="text-gray-700"
+              className="text-gray-700 h-9 w-9 p-1.5 rounded-full hover:bg-gray-100"
             >
-              {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
           </div>
         </div>
