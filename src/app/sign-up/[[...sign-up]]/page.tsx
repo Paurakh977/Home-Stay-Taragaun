@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useSignUp } from '@clerk/nextjs';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useSignUp, useUser } from '@clerk/nextjs';
 import EmailVerificationForm from '@/components/auth/EmailVerificationForm';
 
 export default function MinimalistSignUp() {
@@ -19,7 +19,17 @@ export default function MinimalistSignUp() {
   const [pendingVerification, setPendingVerification] = useState(false);
   
   const { isLoaded, signUp, setActive } = useSignUp();
+  const { isSignedIn } = useUser();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Redirect if user is already signed in
+  useEffect(() => {
+    if (isSignedIn) {
+      const redirectUrl = searchParams?.get('redirect_url') || '/';
+      router.replace(redirectUrl);
+    }
+  }, [isSignedIn, router, searchParams]);
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -79,10 +89,13 @@ export default function MinimalistSignUp() {
 
     try {
       setIsLoading(true);
+      // Get the redirect URL from search params or default to '/'
+      const redirectUrl = searchParams?.get('redirect_url') || '/';
+      
       await signUp.authenticateWithRedirect({
         strategy: provider,
         redirectUrl: '/sso-callback',
-        redirectUrlComplete: '/',
+        redirectUrlComplete: redirectUrl,
       });
     } catch (err) {
       console.error('Social sign up error:', err);
@@ -98,6 +111,18 @@ export default function MinimalistSignUp() {
     // Redirect to the home page after successful verification
     router.push('/');
   };
+  
+  // If user is already signed in and we're in the process of redirecting, show a loading state
+  if (isLoaded && isSignedIn) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-gray-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Already signed in. Redirecting...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">

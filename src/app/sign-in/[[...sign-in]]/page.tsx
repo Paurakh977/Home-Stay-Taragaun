@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useSignIn } from '@clerk/nextjs';
+import { useSignIn, useUser } from '@clerk/nextjs';
 
 export default function RefinedMinimalistLogin() {
   const [showPassword, setShowPassword] = useState(false);
@@ -16,8 +16,17 @@ export default function RefinedMinimalistLogin() {
   const [errors, setErrors] = useState<{email?: string; password?: string; general?: string}>({});
   
   const { isLoaded, signIn, setActive } = useSignIn();
+  const { isSignedIn, user } = useUser();
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Redirect if user is already signed in
+  useEffect(() => {
+    if (isSignedIn) {
+      const redirectUrl = searchParams.get('redirect_url') || '/';
+      router.replace(redirectUrl);
+    }
+  }, [isSignedIn, router, searchParams]);
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -95,6 +104,18 @@ export default function RefinedMinimalistLogin() {
       setIsLoading(false);
     }
   };
+  
+  // If user is already signed in and we're in the process of redirecting, show a loading state
+  if (isLoaded && isSignedIn) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-gray-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Already signed in. Redirecting...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
