@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import { Send, Paperclip, Smile } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 
 interface MessageInputProps {
   onSendMessage: (message: string) => void;
@@ -12,51 +10,62 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim()) return;
-    
-    onSendMessage(message);
-    setMessage('');
+    if (message.trim()) {
+      onSendMessage(message.trim());
+      setMessage('');
+    }
   };
 
   return (
-    <div className="flex-none p-4 border-t border-gray-200 bg-white">
-      <form onSubmit={handleSubmit} className="flex items-center space-x-2">
-        <Button 
-          type="button" 
-          variant="ghost" 
-          size="icon"
-          className="text-gray-500 flex-shrink-0"
+    <form 
+      onSubmit={handleSubmit} 
+      className="px-4 py-3 bg-white flex items-end gap-2 w-full"
+    >
+      <button
+        type="button"
+        className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100 focus:outline-none flex-shrink-0"
+        title="Attach file"
+      >
+        <Paperclip className="h-5 w-5" />
+      </button>
+      
+      <div className="flex-1 relative">
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Type a message..."
+          className="w-full p-3 pr-10 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent resize-none leading-5 text-gray-700"
+          style={{ maxHeight: '120px', minHeight: '40px' }}
+          rows={1}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleSubmit(e);
+            }
+          }}
+        />
+        <button
+          type="button"
+          className="absolute right-3 bottom-3 text-gray-500 hover:text-gray-700"
+          title="Add emoji"
         >
-          <Paperclip className="h-5 w-5" />
-        </Button>
-        
-        <div className="relative flex-1">
-          <Input 
-            type="text" 
-            placeholder="Type a message..."
-            className="pr-10 py-5"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-          />
-          <Button 
-            type="button" 
-            variant="ghost" 
-            size="icon" 
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500"
-          >
-            <Smile className="h-5 w-5" />
-          </Button>
-        </div>
-        
-        <Button 
-          type="submit" 
-          disabled={!message.trim()}
-          className="bg-[#183636] hover:bg-[#1c4141] text-white rounded-full h-10 w-10 flex-shrink-0 p-0"
-        >
-          <Send className="h-5 w-5" />
-        </Button>
-      </form>
-    </div>
+          <Smile className="h-5 w-5" />
+        </button>
+      </div>
+      
+      <button
+        type="submit"
+        disabled={!message.trim()}
+        className={`p-3 rounded-full flex-shrink-0 focus:outline-none ${
+          message.trim() 
+            ? 'bg-primary text-white hover:bg-primary-dark' 
+            : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+        }`}
+        title="Send message"
+      >
+        <Send className="h-5 w-5" />
+      </button>
+    </form>
   );
 };
 
