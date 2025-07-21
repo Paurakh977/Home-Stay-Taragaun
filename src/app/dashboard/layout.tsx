@@ -373,12 +373,12 @@ export default function DashboardLayout({
             {!isCollapsed && <span className="ml-3">Profile</span>}
           </Link>
           <Link
-            href={`${basePath}/chats`}
-            className={`flex items-center ${isCollapsed ? "justify-center" : ""} px-4 py-3 rounded-md transition-colors ${isActive("/chats")}`}
-            title={isCollapsed ? "Chats" : ""}
+            href={`${basePath}/chat`}
+            className={`flex items-center ${isCollapsed ? "justify-center" : ""} px-4 py-3 rounded-md transition-colors ${isActive("/chat")}`}
+            title={isCollapsed ? "Chat" : ""}
           >
             <MessageSquare className="h-5 w-5 min-w-5" />
-            {!isCollapsed && <span className="ml-3">Chats</span>}
+            {!isCollapsed && <span className="ml-3">Chat</span>}
           </Link>
           <Link
             href={`${basePath}/portal`}
@@ -472,12 +472,12 @@ export default function DashboardLayout({
                 Profile
               </Link>
               <Link
-                href={`${basePath}/chats`}
-                className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("/chats")}`}
+                href={`${basePath}/chat`}
+                className={`flex items-center px-4 py-3 rounded-md transition-colors ${isActive("/chat")}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 <MessageSquare className="h-5 w-5 mr-3" />
-                Chats
+                Chat
               </Link>
               <Link
                 href={`${basePath}/portal`}
@@ -525,8 +525,8 @@ export default function DashboardLayout({
       )}
 
       {/* Main content */}
-      <div className={isCollapsed ? "lg:ml-20" : "lg:ml-64"} style={{ paddingTop: "9rem", paddingBottom: "2rem" }}>
-        <div className="p-6 lg:pt-6">{children}</div>
+      <div className={isCollapsed ? "lg:ml-20" : "lg:ml-64"} style={{ paddingTop: "2rem", paddingBottom: "2rem" }}>
+        <div className="p-12 lg:pt-6">{children}</div>
       </div>
     </div>
   );

@@ -1,39 +1,38 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import PlatformNavbar from '@/components/platform/PlatformNavbar';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
 import { ChatContainer } from '@/components/chat';
 
-const ChatPage = () => {
-  const [navbarHeight, setNavbarHeight] = useState(80); // Default height
+// Loading component for Suspense fallback
+function ChatLoader() {
+  return (
+    <div className="flex items-center justify-center h-[80vh]">
+      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+    </div>
+  );
+}
 
-  // Measure navbar height for proper spacing
+export default function ChatPage() {
+  // Prevent page scrolling when in chat page
   useEffect(() => {
-    const measureNavbar = () => {
-      const navbarElement = document.querySelector('nav');
-      if (navbarElement) {
-        setNavbarHeight(navbarElement.offsetHeight);
-      }
+    // Save original body style
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    
+    // Disable scrolling on the body
+    document.body.style.overflow = 'hidden';
+    
+    // Restore original style when component unmounts
+    return () => {
+      document.body.style.overflow = originalStyle;
     };
-    
-    // Measure on load and on resize
-    measureNavbar();
-    window.addEventListener('resize', measureNavbar);
-    
-    return () => window.removeEventListener('resize', measureNavbar);
   }, []);
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden">
-      {/* Fixed navbar at the very top */}
-      <div className="fixed top-0 left-0 right-0 z-50">
-        <PlatformNavbar />
-      </div>
-      
-      {/* Chat container */}
-      <ChatContainer navbarHeight={navbarHeight} />
+    <div className="min-h-screen max-h-screen overflow-hidden">
+      <Suspense fallback={<ChatLoader />}>
+        <ChatContainer navbarHeight={80} />
+      </Suspense>
     </div>
   );
-};
-
-export default ChatPage;
+}
