@@ -3,6 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChatContainer } from '@/components/chat';
+import PlatformNavbar from '@/components/platform/PlatformNavbar';
 
 // Loading component for Suspense fallback
 function ChatLoader() {
@@ -29,10 +30,13 @@ export default function ChatPage() {
   }, []);
 
   return (
-    <div className="min-h-screen max-h-screen overflow-hidden">
-      <Suspense fallback={<ChatLoader />}>
-        <ChatContainer navbarHeight={80} />
-      </Suspense>
+    <div className="flex flex-col h-screen min-h-screen w-full">
+      <PlatformNavbar />
+      <div className="flex-1 flex flex-col min-h-0">
+        <Suspense fallback={<ChatLoader />}>
+          <ChatContainer navbarHeight={80} />
+        </Suspense>
+      </div>
     </div>
   );
 }

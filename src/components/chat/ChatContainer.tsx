@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import ChatSidebar from './ChatSidebar';
 import ChatHeader from './ChatHeader';
@@ -19,6 +19,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ navbarHeight }) => {
   const [currentChatId, setCurrentChatId] = useState<string | null>(chatId);
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Find the current chat from the dummy data
   const currentChat = dummyChats.find(chat => chat.id === currentChatId);
@@ -48,6 +49,13 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ navbarHeight }) => {
       setCurrentChatId(chatId);
     }
   }, [pathname, chatId, currentChatId]);
+
+  // Scroll to bottom when chat changes or on mount
+  useEffect(() => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  }, [currentChatId]);
 
   // Handle chat selection
   const handleChatSelect = (chatId: string) => {
@@ -81,7 +89,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ navbarHeight }) => {
   };
 
   return (
-    <div className="flex flex-1 overflow-hidden" style={{ paddingTop: `${navbarHeight}px` }}>
+    <div className="flex flex-1 h-full min-h-0 overflow-hidden">
       {/* Chat Sidebar */}
       <ChatSidebar 
         chats={dummyChats}
@@ -106,12 +114,15 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ navbarHeight }) => {
         
         {/* Chat Content Area */}
         {currentChatId && currentChat ? (
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col flex-1 min-h-0">
             {/* Messages */}
-            <ChatMessages messages={dummyMessages} />
-            
+            <div className="flex-1 overflow-y-auto min-h-0" ref={messagesContainerRef}>
+              <ChatMessages messages={dummyMessages} />
+            </div>
             {/* Message Input */}
-            <MessageInput onSendMessage={handleSendMessage} />
+            <div className="flex-none">
+              <MessageInput onSendMessage={handleSendMessage} />
+            </div>
           </div>
         ) : (
           // Empty state when no chat is selected (mobile only)
