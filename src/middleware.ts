@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { jwtVerify, type JWTPayload } from 'jose';
-import { auth } from "@clerk/nextjs/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 
 // Extended JWT payload interface with our custom properties
 interface ExtendedJWTPayload extends JWTPayload {
@@ -128,7 +128,7 @@ function createRedirectResponse(request: NextRequest, redirectTo: string, cookie
 
 // --- Middleware Logic --- 
 
-export async function middleware(request: NextRequest) {
+async function middlewareHandler(auth: any, request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 1. Skip Middleware for Assets and specific public paths
@@ -399,10 +399,13 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
+// Export the middleware wrapped with clerkMiddleware
+export default clerkMiddleware(middlewareHandler);
+
 // --- Matcher Configuration --- 
 export const config = {
   matcher: [
     // Include all routes except specific ones we want to exclude
     '/((?!_next/static|_next/image|static|images|favicon.ico).*)',
   ],
-}; 
+};
