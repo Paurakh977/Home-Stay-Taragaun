@@ -7,6 +7,9 @@ import User from './User';
 import CustomField from './CustomField';
 import WebContent from './WebContent';
 import Navigation from './Navigation';
+ import Chat from './Chat';
+import Message from './Message';
+import UserStatus from './UserStatus';
 
 export {
   HomestaySingle,
@@ -16,9 +19,15 @@ export {
   User,
   CustomField,
   WebContent,
-  Navigation
+  Navigation,
+  Chat,
+  Message,
+  UserStatus
 };
 
 // Export types
 export type { IWebContent } from './WebContent';
 export type { INavigation } from './Navigation';
+export type { IChat } from './Chat';
+export type { IMessage } from './Message';
+export type { IUserStatus } from './UserStatus';
