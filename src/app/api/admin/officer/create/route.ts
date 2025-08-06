@@ -43,8 +43,7 @@ interface PermissionsSchema {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('================ OFFICER CREATION START ================');
-    console.log('Starting officer creation process');
+
     await dbConnect();
     
     // Get request data
@@ -59,7 +58,6 @@ export async function POST(request: NextRequest) {
       adminUsername
     } = data;
     
-    console.log(`Received request to create officer for admin username: "${adminUsername}"`);
     
     // Validate required fields
     if (!username || !password || !email || !contactNumber || !adminUsername) {
@@ -72,7 +70,6 @@ export async function POST(request: NextRequest) {
     
     try {
       // Verify the admin creating this officer
-      console.log('Checking authentication token...');
       const tokenPayload = await verifyAdminToken(request);
       
       // Add detailed logging
@@ -240,9 +237,6 @@ async function createOfficerWithAdmin(admin: AdminUser, officerData: OfficerData
   console.log('Final permissions:', JSON.stringify(allowedPermissions));
   
   // FIXED: Don't hash the password here, let the User model handle it
-  console.log('OFFICER CREATE: Setting up password');
-  console.log(`OFFICER CREATE: Password length: ${password.length}`);
-  console.log(`OFFICER CREATE: Password starts with: ${password.substring(0, 2)}`);
   
   // Create officer data - passing the raw password to be hashed in Model's pre-save hook
   const officerDataForDB = {

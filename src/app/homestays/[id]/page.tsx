@@ -1,12 +1,22 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, MapPin, Star, Home, Users, Bed, Calendar, Phone, Mail, Globe, Navigation, ArrowLeft, Heart, Map, Check, ExternalLink } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Star, Home, Users, Bed, Calendar, Phone, Mail, Globe, Navigation, ArrowLeft, Heart, Map, Check, ExternalLink, MessageCircle, X, ArrowRight } from "lucide-react";
 import { getImageUrl } from "@/lib/imageUtils";
 import { getApiImageUrl } from "./layout";
+import { useAuth } from '@clerk/nextjs';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
 // Define interfaces for typing
 interface GalleryImage {
@@ -340,6 +350,42 @@ export default function HomestayDetailPage() {
   const params = useParams();
   const homestayId = params.id as string;
 
+  // Add global styles here to avoid nested style tags
+  // This replaces both style tags that were causing conflicts
+  const globalStyles = `
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+    }
+    
+    /* Hide scrollbar for IE, Edge and Firefox */
+    .scrollbar-hide {
+      -ms-overflow-style: none;  /* IE and Edge */
+      scrollbar-width: none;  /* Firefox */
+    }
+    
+    @keyframes jiggle {
+      0% { transform: rotate(0); }
+      25% { transform: rotate(-5deg); }
+      50% { transform: rotate(5deg); }
+      75% { transform: rotate(-3deg); }
+      100% { transform: rotate(0); }
+    }
+    
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  `;
+
+  const { isSignedIn } = useAuth();
+  const [showChatModal, setShowChatModal] = useState(false);
+  
+  // Add these new hooks right here, after existing hooks and before other code
+  const chatButtonRef = useRef<HTMLButtonElement>(null);
+  // Remove the emoji picker state since we don't need it anymore
+  const [messageInput, setMessageInput] = useState('');
+
   // State for the homestay data
   const [homestay, setHomestay] = useState<HomestayData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -556,6 +602,31 @@ export default function HomestayDetailPage() {
       fetchHomestayData();
     }
   }, [homestayId]);
+
+
+  const handleChatClick = () => {
+    if (isSignedIn) {
+      setShowChatModal(true);
+    } else {
+      // Add the current URL as redirect_url parameter
+      router.push(`/sign-in?redirect_url=/homestays/${homestayId}`);
+    }
+  };
+
+  // Add the jiggle animation effect at the appropriate place with other useEffects
+  useEffect(() => {
+    const chatButton = chatButtonRef.current;
+    if (!chatButton) return;
+    
+    const jiggleInterval = setInterval(() => {
+      chatButton.style.animation = 'jiggle 0.7s ease';
+      setTimeout(() => {
+        chatButton.style.animation = 'none';
+      }, 700);
+    }, 5000);
+    
+    return () => clearInterval(jiggleInterval);
+  }, []);
 
   if (loading) {
     return (
@@ -876,8 +947,8 @@ export default function HomestayDetailPage() {
 
             {/* Tabs Section - Modern Design with colorful icons */}
             <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
-              <div className="border-b">
-                <div className="flex">
+              <div className="border-b overflow-x-auto scrollbar-hide">
+                <div className="flex whitespace-nowrap min-w-full">
                   <button
                     onClick={() => setActiveTab('amenities')}
                     className={`px-6 py-4 font-medium text-sm transition-colors flex items-center ${
@@ -1262,6 +1333,234 @@ export default function HomestayDetailPage() {
       
       {/* Mobile bottom action bar */}
       {/* ... existing code ... */}
+
+      {/* Floating Chat Button */}
+      <button
+        ref={chatButtonRef}
+        onClick={handleChatClick}
+        className="fixed bottom-6 right-6 z-40 p-4 bg-primary text-white rounded-full shadow-lg hover:bg-primary-dark transition-colors md:bottom-8 md:right-8 cursor-pointer"
+        aria-label="Chat with homestay"
+      >
+        <MessageCircle className="h-6 w-6" />
+      </button>
+
+      {/* Chat Modal */}
+      {showChatModal && (
+        <div 
+          className="fixed bottom-20 right-6 md:right-8 z-40 w-[calc(100%-24px)] md:w-[340px] bg-white rounded-lg shadow-xl border border-gray-200 flex flex-col"
+          style={{ 
+            height: 'calc(80vh - 100px)',
+            maxHeight: '550px',
+            animation: 'slideUp 0.2s ease-out forwards'
+          }}
+        >
+          {/* Header */}
+          <div className="p-3 border-b flex items-center justify-between bg-white rounded-t-lg sticky top-0 z-10">
+            <div className="flex items-center gap-2">
+              {homestay.profileImage && (
+                <div className="relative h-10 w-10 rounded-full overflow-hidden">
+                  <Image
+                    src={formatImageUrl(homestay.profileImage)}
+                    alt={homestay.homeStayName}
+                    fill
+                    className="object-cover"
+                    unoptimized={true}
+                  />
+                </div>
+              )}
+              <div>
+                <h4 className="text-sm font-medium text-gray-800">{homestay.homeStayName}</h4>
+                <div className="flex items-center">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-1.5"></div>
+                  <p className="text-xs text-gray-500">Active now</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <button className="text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 transition-colors">
+                <Phone className="h-4 w-4" />
+              </button>
+              <button 
+                onClick={() => setShowChatModal(false)}
+                className="text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          
+          {/* Chat Messages Area */}
+          <div className="flex-1 p-3 overflow-y-auto space-y-3 bg-gray-50" id="chat-messages">
+            {/* Date separator */}
+            <div className="flex justify-center my-2">
+              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Today</span>
+            </div>
+
+            {/* Homestay message */}
+            <div className="flex items-end gap-2">
+              {homestay.profileImage && (
+                <div className="relative h-8 w-8 rounded-full overflow-hidden flex-shrink-0">
+                  <Image
+                    src={formatImageUrl(homestay.profileImage)}
+                    alt={homestay.homeStayName}
+                    fill
+                    className="object-cover"
+                    unoptimized={true}
+                  />
+                </div>
+              )}
+              <div className="bg-white rounded-lg rounded-bl-none p-3 max-w-[80%] text-sm shadow-sm">
+                <p>Hello! Welcome to {homestay.homeStayName}. How can I assist you today?</p>
+              </div>
+              <span className="text-xs text-gray-400">10:30 AM</span>
+            </div>
+            
+            {/* User message example */}
+            <div className="flex justify-end items-end gap-2">
+              <span className="text-xs text-gray-400">10:32 AM</span>
+              <div className="bg-primary text-white rounded-lg rounded-br-none p-3 max-w-[80%] text-sm shadow-sm">
+                <p>Hi! I'm interested in booking a stay next month. Do you have availability?</p>
+              </div>
+            </div>
+
+            {/* Homestay message */}
+            <div className="flex items-end gap-2">
+              {homestay.profileImage && (
+                <div className="relative h-8 w-8 rounded-full overflow-hidden flex-shrink-0">
+                  <Image
+                    src={formatImageUrl(homestay.profileImage)}
+                    alt={homestay.homeStayName}
+                    fill
+                    className="object-cover"
+                    unoptimized={true}
+                  />
+                </div>
+              )}
+              <div className="bg-white rounded-lg rounded-bl-none p-3 max-w-[80%] text-sm shadow-sm">
+                <p>Yes, we do have some availability next month! Could you please let me know your specific dates and how many guests will be staying?</p>
+              </div>
+              <span className="text-xs text-gray-400">10:34 AM</span>
+            </div>
+
+            {/* User message example */}
+            <div className="flex justify-end items-end gap-2">
+              <span className="text-xs text-gray-400">10:36 AM</span>
+              <div className="bg-primary text-white rounded-lg rounded-br-none p-3 max-w-[80%] text-sm shadow-sm">
+                <p>I'm looking at around the 15th-20th, for 2 adults and 1 child.</p>
+              </div>
+            </div>
+
+            {/* Homestay message */}
+            <div className="flex items-end gap-2">
+              {homestay.profileImage && (
+                <div className="relative h-8 w-8 rounded-full overflow-hidden flex-shrink-0">
+                  <Image
+                    src={formatImageUrl(homestay.profileImage)}
+                    alt={homestay.homeStayName}
+                    fill
+                    className="object-cover"
+                    unoptimized={true}
+                  />
+                </div>
+              )}
+              <div className="bg-white rounded-lg rounded-bl-none p-3 max-w-[80%] text-sm shadow-sm">
+                <p>Perfect! We do have a family room available for those dates. The room has a double bed and a single bed, with a private bathroom. Would that work for you?</p>
+              </div>
+              <span className="text-xs text-gray-400">10:38 AM</span>
+            </div>
+
+            {/* User message example */}
+            <div className="flex justify-end items-end gap-2">
+              <span className="text-xs text-gray-400">10:40 AM</span>
+              <div className="bg-primary text-white rounded-lg rounded-br-none p-3 max-w-[80%] text-sm shadow-sm">
+                <p>That sounds perfect! What's included in the stay? Do you provide meals?</p>
+              </div>
+            </div>
+
+            {/* Homestay message */}
+            <div className="flex items-end gap-2">
+              {homestay.profileImage && (
+                <div className="relative h-8 w-8 rounded-full overflow-hidden flex-shrink-0">
+                  <Image
+                    src={formatImageUrl(homestay.profileImage)}
+                    alt={homestay.homeStayName}
+                    fill
+                    className="object-cover"
+                    unoptimized={true}
+                  />
+                </div>
+              )}
+              <div className="bg-white rounded-lg rounded-bl-none p-3 max-w-[80%] text-sm shadow-sm">
+                <p>Yes, we provide breakfast and dinner with authentic local cuisine. We can also arrange cultural activities and local tours if you're interested!</p>
+              </div>
+              <span className="text-xs text-gray-400">10:42 AM</span>
+            </div>
+
+            {/* User message example */}
+            <div className="flex justify-end items-end gap-2">
+              <span className="text-xs text-gray-400">10:44 AM</span>
+              <div className="bg-primary text-white rounded-lg rounded-br-none p-3 max-w-[80%] text-sm shadow-sm">
+                <p>That sounds amazing! What's the price for the 5 nights?</p>
+              </div>
+            </div>
+
+            {/* Homestay message - last message */}
+            <div className="flex items-end gap-2">
+              {homestay.profileImage && (
+                <div className="relative h-8 w-8 rounded-full overflow-hidden flex-shrink-0">
+                  <Image
+                    src={formatImageUrl(homestay.profileImage)}
+                    alt={homestay.homeStayName}
+                    fill
+                    className="object-cover"
+                    unoptimized={true}
+                  />
+                </div>
+              )}
+              <div className="bg-white rounded-lg rounded-bl-none p-3 max-w-[80%] text-sm shadow-sm">
+                <p>For 5 nights, including meals and basic activities, the total would be $450 USD. We also offer airport pickup for an additional $20 if needed.</p>
+              </div>
+              <span className="text-xs text-gray-400">10:45 AM</span>
+            </div>
+          </div>
+          
+          {/* Message Input */}
+          <div className="border-t p-2 bg-white rounded-b-lg sticky bottom-0 z-10">
+            <div className="flex items-center gap-2 bg-gray-50 rounded-full pl-4 pr-2 py-1.5">
+              <input
+                type="text"
+                value={messageInput}
+                onChange={(e) => setMessageInput(e.target.value)}
+                placeholder="Type a message..."
+                className="bg-transparent border-none text-sm flex-1 focus:outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (messageInput.trim()) {
+                      console.log('Message sent:', messageInput);
+                      setMessageInput('');
+                    }
+                  }
+                }}
+              />
+              <button 
+                className="p-2 bg-primary text-white rounded-full hover:bg-primary-dark transition-colors cursor-pointer"
+                onClick={() => {
+                  if (messageInput.trim()) {
+                    console.log('Message sent:', messageInput);
+                    setMessageInput('');
+                  }
+                }}
+              >
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Single global style tag */}
+      <style jsx global>{globalStyles}</style>
     </div>
   );
 } 

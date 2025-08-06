@@ -1,16 +1,32 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useSignIn, useUser } from '@clerk/nextjs';
 
 export default function RefinedMinimalistLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{email?: string; password?: string}>({});
+  const [errors, setErrors] = useState<{email?: string; password?: string; general?: string}>({});
+  
+  const { isLoaded, signIn, setActive } = useSignIn();
+  const { isSignedIn, user } = useUser();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Redirect if user is already signed in
+  useEffect(() => {
+    if (isSignedIn) {
+      const redirectUrl = searchParams.get('redirect_url') || '/';
+      router.replace(redirectUrl);
+    }
+  }, [isSignedIn, router, searchParams]);
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -22,11 +38,10 @@ export default function RefinedMinimalistLogin() {
     setIsLoading(true);
     setErrors({});
 
-    const newErrors: {email?: string; password?: string} = {};
+    const newErrors: {email?: string; password?: string; general?: string} = {};
     if (!email) newErrors.email = 'Email is required';
     else if (!validateEmail(email)) newErrors.email = 'Please enter a valid email';
     if (!password) newErrors.password = 'Password is required';
-    else if (password.length < 6) newErrors.password = 'Password must be at least 6 characters';
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -34,15 +49,73 @@ export default function RefinedMinimalistLogin() {
       return;
     }
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsLoading(false);
-    alert('Login successful!');
+    if (!isLoaded) {
+      setErrors({ general: 'Authentication system is loading. Please try again.' });
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // Start the sign-in process with Clerk
+      const result = await signIn.create({
+        identifier: email,
+        password: password,
+      });
+      
+      // Check the status of the sign-in
+      if (result.status === 'complete') {
+        // Sign-in was successful, set the active session
+        await setActive({ session: result.createdSessionId });
+        
+        // Get the redirect URL from search params or default to '/'
+        const redirectUrl = searchParams.get('redirect_url') || '/';
+        router.push(redirectUrl);
+      } else {
+        // Handle 2FA or other cases
+        setErrors({ general: 'Sign in requires additional steps. Please continue in the flow.' });
+      }
+    } catch (err: any) {
+      console.error('Sign-in error:', err);
+      setErrors({ general: err.errors?.[0]?.message || 'Invalid email or password. Please try again.' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleSocialLogin = (provider: string) => {
-    alert(`Login with ${provider} - This would redirect to ${provider} OAuth`);
+  // Update the handleSocialLogin function to preserve the redirect_url
+  const handleSocialLogin = async (provider: 'oauth_google' | 'oauth_facebook' | 'oauth_apple') => {
+    if (!isLoaded) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      // Get the redirect URL from search params or default to '/'
+      const redirectUrl = searchParams.get('redirect_url') || '/';
+      
+      await signIn.authenticateWithRedirect({
+        strategy: provider,
+        redirectUrl: '/sso-callback',
+        redirectUrlComplete: redirectUrl, // Use the redirect URL from searchParams
+      });
+    } catch (err) {
+      console.error('Social login error:', err);
+      setErrors({ general: 'Could not sign in with social provider. Please try again.' });
+      setIsLoading(false);
+    }
   };
+  
+  // If user is already signed in and we're in the process of redirecting, show a loading state
+  if (isLoaded && isSignedIn) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-gray-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Already signed in. Redirecting...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
@@ -73,6 +146,17 @@ export default function RefinedMinimalistLogin() {
             </h1>
             <p className="text-[13px] font-light tracking-wider text-slate-400 uppercase pointer-events-none">Sign in to continue</p>
           </div>
+
+          {errors.general && (
+            <motion.div 
+              className="bg-red-50 text-red-500 p-3 rounded-lg text-sm mb-6 text-center"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              transition={{ duration: 0.2 }}
+            >
+              {errors.general}
+            </motion.div>
+          )}
 
           {/* Form */}
           <motion.form 
@@ -246,16 +330,15 @@ export default function RefinedMinimalistLogin() {
               </div>
             </motion.div>
 
-            {/* Social Buttons */}
-            <div className="grid grid-cols-3 gap-3">
-            </div>
+            {/* This div is required for Clerk captcha */}
+            <div id="clerk-captcha" className="hidden"></div>
           </motion.form>
 
           {/* Social Buttons (moved outside form for cleaner organization) */}
           <div className="grid grid-cols-3 gap-3 mt-6">
             <motion.button
               type="button"
-              onClick={() => handleSocialLogin('Google')}
+              onClick={() => handleSocialLogin('oauth_google')}
               className="flex justify-center items-center h-11 bg-white border border-slate-200 rounded-xl overflow-hidden relative group transform-gpu shadow-[0_4px_10px_-2px_rgba(0,0,0,0.1)]"
               style={{ transform: "translateY(-2px)" }}
               initial={{ opacity: 0, scale: 0.95 }}
@@ -298,7 +381,7 @@ export default function RefinedMinimalistLogin() {
 
             <motion.button
               type="button"
-              onClick={() => handleSocialLogin('Facebook')}
+              onClick={() => handleSocialLogin('oauth_facebook')}
               className="flex justify-center items-center h-11 bg-white border border-slate-200 rounded-xl overflow-hidden relative group transform-gpu shadow-[0_4px_10px_-2px_rgba(0,0,0,0.1)]"
               style={{ transform: "translateY(-2px)" }}
               initial={{ opacity: 0, scale: 0.95 }}
@@ -338,7 +421,7 @@ export default function RefinedMinimalistLogin() {
 
             <motion.button
               type="button"
-              onClick={() => handleSocialLogin('Apple')}
+              onClick={() => handleSocialLogin('oauth_apple')}
               className="flex justify-center items-center h-11 bg-white border border-slate-200 rounded-xl overflow-hidden relative group transform-gpu shadow-[0_4px_10px_-2px_rgba(0,0,0,0.1)]"
               style={{ transform: "translateY(-2px)" }}
               initial={{ opacity: 0, scale: 0.95 }}
@@ -386,14 +469,12 @@ export default function RefinedMinimalistLogin() {
           >
             <p className="text-[13px] text-slate-500 font-light tracking-wide">
               Don't have an account?{' '}
-              <motion.a 
+              <Link
                 href="/sign-up" 
                 className="text-[#183636] hover:text-[#1c4141] font-medium tracking-wide"
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.1 }}
               >
                 Sign up
-              </motion.a>
+              </Link>
             </p>
           </motion.div>
         </div>

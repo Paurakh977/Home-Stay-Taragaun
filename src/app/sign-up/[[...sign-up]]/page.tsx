@@ -1,9 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useSignUp, useUser } from '@clerk/nextjs';
+import EmailVerificationForm from '@/components/auth/EmailVerificationForm';
 
 export default function MinimalistSignUp() {
   const [showPassword, setShowPassword] = useState(false);
@@ -11,7 +15,21 @@ export default function MinimalistSignUp() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [agreeToTerms, setAgreeToTerms] = useState(false);
-  const [errors, setErrors] = useState<{email?: string; password?: string; terms?: string}>({});
+  const [errors, setErrors] = useState<{email?: string; password?: string; terms?: string; general?: string}>({});
+  const [pendingVerification, setPendingVerification] = useState(false);
+  
+  const { isLoaded, signUp, setActive } = useSignUp();
+  const { isSignedIn } = useUser();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Redirect if user is already signed in
+  useEffect(() => {
+    if (isSignedIn) {
+      const redirectUrl = searchParams?.get('redirect_url') || '/';
+      router.replace(redirectUrl);
+    }
+  }, [isSignedIn, router, searchParams]);
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -23,7 +41,7 @@ export default function MinimalistSignUp() {
     setIsLoading(true);
     setErrors({});
 
-    const newErrors: {email?: string; password?: string; terms?: string} = {};
+    const newErrors: {email?: string; password?: string; terms?: string; general?: string} = {};
     if (!email) newErrors.email = 'Email is required';
     else if (!validateEmail(email)) newErrors.email = 'Please enter a valid email';
     if (!password) newErrors.password = 'Password is required';
@@ -36,15 +54,75 @@ export default function MinimalistSignUp() {
       return;
     }
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsLoading(false);
-    alert('Account created successfully!');
+    if (!isLoaded) {
+      setErrors({ general: 'Authentication system is loading. Please try again.' });
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // Start the sign-up process
+      await signUp.create({
+        emailAddress: email,
+        password: password,
+      });
+
+      // Start the email verification process
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      
+      // Set the UI to show the verification form
+      setPendingVerification(true);
+    } catch (err: any) {
+      console.error('Sign-up error:', err);
+      setErrors({
+        general: err.errors?.[0]?.message || 'An error occurred during sign up. Please try again.'
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleSocialSignup = (provider: string) => {
-    alert(`Signup with ${provider} - This would redirect to ${provider} OAuth`);
+  const handleSocialSignup = async (provider: 'oauth_google' | 'oauth_facebook' | 'oauth_apple') => {
+    if (!isLoaded) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      // Get the redirect URL from search params or default to '/'
+      const redirectUrl = searchParams?.get('redirect_url') || '/';
+      
+      await signUp.authenticateWithRedirect({
+        strategy: provider,
+        redirectUrl: '/sso-callback',
+        redirectUrlComplete: redirectUrl,
+      });
+    } catch (err) {
+      console.error('Social sign up error:', err);
+      setErrors({
+        general: 'Could not sign up with social provider. Please try again.'
+      });
+      setIsLoading(false);
+    }
   };
+
+  // Handle successful verification
+  const handleVerificationSuccess = () => {
+    // Redirect to the home page after successful verification
+    router.push('/');
+  };
+  
+  // If user is already signed in and we're in the process of redirecting, show a loading state
+  if (isLoaded && isSignedIn) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-gray-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Already signed in. Redirecting...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
@@ -76,331 +154,351 @@ export default function MinimalistSignUp() {
             <p className="text-[13px] font-light tracking-wider text-slate-400 uppercase pointer-events-none">Create your account</p>
           </div>
 
-          {/* Form */}
-          <motion.form 
-            className="space-y-5"
-            onSubmit={handleSubmit}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3, delay: 0.1 }}
-          >
-            {/* Email Field */}
+          {errors.general && (
             <motion.div 
-              className="relative"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.2, delay: 0.15 }}
+              className="bg-red-50 text-red-500 p-3 rounded-lg text-sm mb-6 text-center"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              transition={{ duration: 0.2 }}
             >
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
-                <Mail className="h-5 w-5 text-slate-400" />
-              </div>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={`w-full pl-10 pr-4 py-3 border rounded-xl bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 ${
-                  errors.email ? 'border-red-300' : 'border-slate-200'
-                } placeholder-slate-300 text-slate-700 font-light tracking-wide`}
-                placeholder="Email address"
-                style={{ fontSize: '14px' }}
-              />
-              {errors.email && (
-                <motion.p 
-                  className="mt-1 text-[11px] text-red-500 font-light tracking-wide"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {errors.email}
-                </motion.p>
-              )}
+              {errors.general}
             </motion.div>
+          )}
 
-            {/* Password Field */}
-            <motion.div 
-              className="relative"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.2, delay: 0.2 }}
-            >
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
-                <Lock className="h-5 w-5 text-slate-400" />
-              </div>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={`w-full pl-10 pr-12 py-3 border rounded-xl bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 ${
-                  errors.password ? 'border-red-300' : 'border-slate-200'
-                } placeholder-slate-300 text-slate-700 font-light tracking-wide`}
-                placeholder="Password"
-                style={{ fontSize: '14px' }}
-              />
-              <motion.button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 z-10"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                transition={{ duration: 0.1 }}
+          {!pendingVerification ? (
+            <>
+              {/* Registration Form */}
+              <motion.form 
+                className="space-y-5"
+                onSubmit={handleSubmit}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3, delay: 0.1 }}
               >
-                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-              </motion.button>
-              {errors.password && (
-                <motion.p 
-                  className="mt-1 text-[11px] text-red-500 font-light tracking-wide"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  transition={{ duration: 0.2 }}
+                {/* Email Field */}
+                <motion.div 
+                  className="relative"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.2, delay: 0.15 }}
                 >
-                  {errors.password}
-                </motion.p>
-              )}
-            </motion.div>
-
-            {/* Terms and Conditions */}
-            <motion.div 
-              className="flex items-center space-x-3 text-[12px]"
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2, delay: 0.25 }}
-            >
-              <input
-                type="checkbox"
-                id="terms"
-                checked={agreeToTerms}
-                onChange={() => setAgreeToTerms(!agreeToTerms)}
-                className="rounded border-slate-300 text-[#183636] focus:ring-[#183636] focus:ring-offset-0 h-4 w-4"
-              />
-              <div className="flex-1">
-                <label htmlFor="terms" className="text-slate-500 font-light tracking-wide cursor-pointer">
-                  I agree to the <a href="#" className="text-[#183636] font-medium">Terms of Service</a> and <a href="#" className="text-[#183636] font-medium">Privacy Policy</a>
-                </label>
-                {errors.terms && (
-                  <motion.p 
-                    className="mt-1 text-[11px] text-red-500 font-light tracking-wide"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    {errors.terms}
-                  </motion.p>
-                )}
-              </div>
-            </motion.div>
-
-            {/* Submit Button */}
-            <motion.button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-[#183636] to-[#1c4141] text-white py-3 px-4 rounded-xl font-medium tracking-wider text-sm uppercase disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 relative overflow-hidden group transform-gpu shadow-lg"
-              style={{ 
-                boxShadow: '0 6px 16px rgba(24, 54, 54, 0.2), 0 3px 6px rgba(24, 54, 54, 0.12), 0 1px 3px rgba(24, 54, 54, 0.14), 0 0 0 1px rgba(24, 54, 54, 0.05)',
-                transform: 'translateY(-2px)'
-              }}
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ 
-                duration: 0.2, 
-                delay: 0.35,
-                y: {
-                  type: "spring",
-                  stiffness: 500,
-                  damping: 30
-                }
-              }}
-              whileHover={{ 
-                y: -6,
-                boxShadow: '0 18px 30px rgba(24, 54, 54, 0.25), 0 8px 12px rgba(24, 54, 54, 0.2), 0 1px 4px rgba(24, 54, 54, 0.15), 0 0 0 1px rgba(24, 54, 54, 0.1)',
-                transition: { 
-                  duration: 0.3,
-                  y: {
-                    type: "spring",
-                    stiffness: 500,
-                    damping: 20
-                  }
-                }
-              }}
-              whileTap={{ 
-                y: -1,
-                boxShadow: '0 8px 15px rgba(24, 54, 54, 0.2), 0 3px 6px rgba(24, 54, 54, 0.12), 0 0 0 1px rgba(24, 54, 54, 0.05)',
-                transition: { duration: 0.1 }
-              }}
-            >
-              <span className="absolute inset-0 w-0 bg-gradient-to-r from-[#1c4141] to-[#183636] transition-all duration-300 ease-out group-hover:w-full"></span>
-              <span className="relative">
-                {isLoading ? (
-                  <div className="flex items-center justify-center space-x-2">
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Creating account...</span>
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
+                    <Mail className="h-5 w-5 text-slate-400" />
                   </div>
-                ) : (
-                  'Sign up'
-                )}
-              </span>
-            </motion.button>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={`w-full pl-10 pr-4 py-3 border rounded-xl bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 ${
+                      errors.email ? 'border-red-300' : 'border-slate-200'
+                    } placeholder-slate-300 text-slate-700 font-light tracking-wide`}
+                    placeholder="Email address"
+                    style={{ fontSize: '14px' }}
+                  />
+                  {errors.email && (
+                    <motion.p 
+                      className="mt-1 text-[11px] text-red-500 font-light tracking-wide"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      {errors.email}
+                    </motion.p>
+                  )}
+                </motion.div>
 
-            {/* Divider */}
+                {/* Password Field */}
+                <motion.div 
+                  className="relative"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.2, delay: 0.2 }}
+                >
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
+                    <Lock className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={`w-full pl-10 pr-12 py-3 border rounded-xl bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 ${
+                      errors.password ? 'border-red-300' : 'border-slate-200'
+                    } placeholder-slate-300 text-slate-700 font-light tracking-wide`}
+                    placeholder="Password"
+                    style={{ fontSize: '14px' }}
+                  />
+                  <motion.button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 z-10"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ duration: 0.1 }}
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </motion.button>
+                  {errors.password && (
+                    <motion.p 
+                      className="mt-1 text-[11px] text-red-500 font-light tracking-wide"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      {errors.password}
+                    </motion.p>
+                  )}
+                </motion.div>
+
+                {/* Terms and Conditions */}
+                <motion.div 
+                  className="flex items-center space-x-3 text-[12px]"
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, delay: 0.25 }}
+                >
+                  <input
+                    type="checkbox"
+                    id="terms"
+                    checked={agreeToTerms}
+                    onChange={() => setAgreeToTerms(!agreeToTerms)}
+                    className="rounded border-slate-300 text-[#183636] focus:ring-[#183636] focus:ring-offset-0 h-4 w-4"
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="terms" className="text-slate-500 font-light tracking-wide cursor-pointer">
+                      I agree to the <a href="#" className="text-[#183636] font-medium">Terms of Service</a> and <a href="#" className="text-[#183636] font-medium">Privacy Policy</a>
+                    </label>
+                    {errors.terms && (
+                      <motion.p 
+                        className="mt-1 text-[11px] text-red-500 font-light tracking-wide"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        {errors.terms}
+                      </motion.p>
+                    )}
+                  </div>
+                </motion.div>
+
+                {/* Submit Button */}
+                <motion.button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-gradient-to-r from-[#183636] to-[#1c4141] text-white py-3 px-4 rounded-xl font-medium tracking-wider text-sm uppercase disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 relative overflow-hidden group transform-gpu shadow-lg"
+                  style={{ 
+                    boxShadow: '0 6px 16px rgba(24, 54, 54, 0.2), 0 3px 6px rgba(24, 54, 54, 0.12), 0 1px 3px rgba(24, 54, 54, 0.14), 0 0 0 1px rgba(24, 54, 54, 0.05)',
+                    transform: 'translateY(-2px)'
+                  }}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ 
+                    duration: 0.2, 
+                    delay: 0.35,
+                    y: {
+                      type: "spring",
+                      stiffness: 500,
+                      damping: 30
+                    }
+                  }}
+                  whileHover={{ 
+                    y: -6,
+                    boxShadow: '0 18px 30px rgba(24, 54, 54, 0.25), 0 8px 12px rgba(24, 54, 54, 0.2), 0 1px 4px rgba(24, 54, 54, 0.15), 0 0 0 1px rgba(24, 54, 54, 0.1)',
+                    transition: { 
+                      duration: 0.3,
+                      y: {
+                        type: "spring",
+                        stiffness: 500,
+                        damping: 20
+                      }
+                    }
+                  }}
+                  whileTap={{ 
+                    y: -1,
+                    boxShadow: '0 8px 15px rgba(24, 54, 54, 0.2), 0 3px 6px rgba(24, 54, 54, 0.12), 0 0 0 1px rgba(24, 54, 54, 0.05)',
+                    transition: { duration: 0.1 }
+                  }}
+                >
+                  <span className="absolute inset-0 w-0 bg-gradient-to-r from-[#1c4141] to-[#183636] transition-all duration-300 ease-out group-hover:w-full"></span>
+                  <span className="relative">
+                    {isLoading ? (
+                      <div className="flex items-center justify-center space-x-2">
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Creating account...</span>
+                      </div>
+                    ) : (
+                      'Sign up'
+                    )}
+                  </span>
+                </motion.button>
+
+                {/* Divider */}
+                <motion.div 
+                  className="relative my-6"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3, delay: 0.4 }}
+                >
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-200"></div>
+                  </div>
+                  <div className="relative flex justify-center text-[11px]">
+                    <span className="px-4 bg-white text-slate-400 font-light tracking-wider uppercase">or sign up with</span>
+                  </div>
+                </motion.div>
+
+                {/* This div is required for Clerk captcha */}
+                <div id="clerk-captcha" className="hidden"></div>
+              </motion.form>
+
+              {/* Social Buttons (moved outside form for cleaner organization) */}
+              <div className="grid grid-cols-3 gap-3 mt-6">
+                <motion.button
+                  type="button"
+                  onClick={() => handleSocialSignup('oauth_google')}
+                  className="flex justify-center items-center h-11 bg-white border border-slate-200 rounded-xl overflow-hidden relative group transform-gpu shadow-[0_4px_10px_-2px_rgba(0,0,0,0.1)]"
+                  style={{ transform: "translateY(-2px)" }}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ 
+                    duration: 0.2, 
+                    delay: 0.5,
+                    y: {
+                      type: "spring",
+                      stiffness: 500,
+                      damping: 30
+                    }
+                  }}
+                  whileHover={{ 
+                    y: -6,
+                    boxShadow: '0 20px 35px -7px rgba(0, 0, 0, 0.2)',
+                    transition: { 
+                      duration: 0.3,
+                      y: {
+                        type: "spring",
+                        stiffness: 500,
+                        damping: 20
+                      }
+                    }
+                  }}
+                  whileTap={{ 
+                    y: -3,
+                    boxShadow: '0 10px 20px -5px rgba(0, 0, 0, 0.15)',
+                    transition: { duration: 0.1 }
+                  }}
+                >
+                  <span className="absolute inset-0 w-0 bg-slate-900 transition-all duration-300 ease-out group-hover:w-full"></span>
+                  <svg className="w-5 h-5 relative z-10 transition-all duration-300 group-hover:brightness-0 group-hover:invert" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  onClick={() => handleSocialSignup('oauth_facebook')}
+                  className="flex justify-center items-center h-11 bg-white border border-slate-200 rounded-xl overflow-hidden relative group transform-gpu shadow-[0_4px_10px_-2px_rgba(0,0,0,0.1)]"
+                  style={{ transform: "translateY(-2px)" }}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ 
+                    duration: 0.2, 
+                    delay: 0.55,
+                    y: {
+                      type: "spring",
+                      stiffness: 500,
+                      damping: 30
+                    }
+                  }}
+                  whileHover={{ 
+                    y: -6,
+                    boxShadow: '0 20px 35px -7px rgba(0, 0, 0, 0.2)',
+                    transition: { 
+                      duration: 0.3,
+                      y: {
+                        type: "spring",
+                        stiffness: 500,
+                        damping: 20
+                      }
+                    }
+                  }}
+                  whileTap={{ 
+                    y: -3,
+                    boxShadow: '0 10px 20px -5px rgba(0, 0, 0, 0.15)',
+                    transition: { duration: 0.1 }
+                  }}
+                >
+                  <span className="absolute inset-0 w-0 bg-slate-900 transition-all duration-300 ease-out group-hover:w-full"></span>
+                  <svg className="w-5 h-5 relative z-10 transition-all duration-300 group-hover:fill-white" fill="#1877F2" viewBox="0 0 24 24">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  onClick={() => handleSocialSignup('oauth_apple')}
+                  className="flex justify-center items-center h-11 bg-white border border-slate-200 rounded-xl overflow-hidden relative group transform-gpu shadow-[0_4px_10px_-2px_rgba(0,0,0,0.1)]"
+                  style={{ transform: "translateY(-2px)" }}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ 
+                    duration: 0.2, 
+                    delay: 0.6,
+                    y: {
+                      type: "spring",
+                      stiffness: 500,
+                      damping: 30
+                    }
+                  }}
+                  whileHover={{ 
+                    y: -6,
+                    boxShadow: '0 20px 35px -7px rgba(0, 0, 0, 0.2)',
+                    transition: { 
+                      duration: 0.3,
+                      y: {
+                        type: "spring",
+                        stiffness: 500,
+                        damping: 20
+                      }
+                    }
+                  }}
+                  whileTap={{ 
+                    y: -3,
+                    boxShadow: '0 10px 20px -5px rgba(0, 0, 0, 0.15)',
+                    transition: { duration: 0.1 }
+                  }}
+                >
+                  <span className="absolute inset-0 w-0 bg-slate-900 transition-all duration-300 ease-out group-hover:w-full"></span>
+                  <svg className="w-5 h-5 relative z-10 transition-all duration-300 group-hover:fill-white" fill="#000000" viewBox="0 0 24 24">
+                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+                  </svg>
+                </motion.button>
+              </div>
+            </>
+          ) : (
+            <EmailVerificationForm onSuccess={handleVerificationSuccess} />
+          )}
+
+          {/* Sign In Link - shown only on registration form, not verification */}
+          {!pendingVerification && (
             <motion.div 
-              className="relative my-6"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3, delay: 0.4 }}
+              className="mt-8 text-center"
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, delay: 0.65 }}
             >
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-200"></div>
-              </div>
-              <div className="relative flex justify-center text-[11px]">
-                <span className="px-4 bg-white text-slate-400 font-light tracking-wider uppercase">or sign up with</span>
-              </div>
+              <p className="text-[13px] text-slate-500 font-light tracking-wide">
+                Already have an account?{' '}
+                <Link
+                  href="/sign-in" 
+                  className="text-[#183636] hover:text-[#1c4141] font-medium tracking-wide"
+                >
+                  Sign in
+                </Link>
+              </p>
             </motion.div>
-          </motion.form>
-
-          {/* Social Buttons (moved outside form for cleaner organization) */}
-          <div className="grid grid-cols-3 gap-3 mt-6">
-            <motion.button
-              type="button"
-              onClick={() => handleSocialSignup('Google')}
-              className="flex justify-center items-center h-11 bg-white border border-slate-200 rounded-xl overflow-hidden relative group transform-gpu shadow-[0_4px_10px_-2px_rgba(0,0,0,0.1)]"
-              style={{ transform: "translateY(-2px)" }}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ 
-                duration: 0.2, 
-                delay: 0.5,
-                y: {
-                  type: "spring",
-                  stiffness: 500,
-                  damping: 30
-                }
-              }}
-              whileHover={{ 
-                y: -6,
-                boxShadow: '0 20px 35px -7px rgba(0, 0, 0, 0.2)',
-                transition: { 
-                  duration: 0.3,
-                  y: {
-                    type: "spring",
-                    stiffness: 500,
-                    damping: 20
-                  }
-                }
-              }}
-              whileTap={{ 
-                y: -3,
-                boxShadow: '0 10px 20px -5px rgba(0, 0, 0, 0.15)',
-                transition: { duration: 0.1 }
-              }}
-            >
-              <span className="absolute inset-0 w-0 bg-slate-900 transition-all duration-300 ease-out group-hover:w-full"></span>
-              <svg className="w-5 h-5 relative z-10 transition-all duration-300 group-hover:brightness-0 group-hover:invert" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>
-            </motion.button>
-
-            <motion.button
-              type="button"
-              onClick={() => handleSocialSignup('Facebook')}
-              className="flex justify-center items-center h-11 bg-white border border-slate-200 rounded-xl overflow-hidden relative group transform-gpu shadow-[0_4px_10px_-2px_rgba(0,0,0,0.1)]"
-              style={{ transform: "translateY(-2px)" }}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ 
-                duration: 0.2, 
-                delay: 0.55,
-                y: {
-                  type: "spring",
-                  stiffness: 500,
-                  damping: 30
-                }
-              }}
-              whileHover={{ 
-                y: -6,
-                boxShadow: '0 20px 35px -7px rgba(0, 0, 0, 0.2)',
-                transition: { 
-                  duration: 0.3,
-                  y: {
-                    type: "spring",
-                    stiffness: 500,
-                    damping: 20
-                  }
-                }
-              }}
-              whileTap={{ 
-                y: -3,
-                boxShadow: '0 10px 20px -5px rgba(0, 0, 0, 0.15)',
-                transition: { duration: 0.1 }
-              }}
-            >
-              <span className="absolute inset-0 w-0 bg-slate-900 transition-all duration-300 ease-out group-hover:w-full"></span>
-              <svg className="w-5 h-5 relative z-10 transition-all duration-300 group-hover:fill-white" fill="#1877F2" viewBox="0 0 24 24">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-              </svg>
-            </motion.button>
-
-            <motion.button
-              type="button"
-              onClick={() => handleSocialSignup('Apple')}
-              className="flex justify-center items-center h-11 bg-white border border-slate-200 rounded-xl overflow-hidden relative group transform-gpu shadow-[0_4px_10px_-2px_rgba(0,0,0,0.1)]"
-              style={{ transform: "translateY(-2px)" }}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ 
-                duration: 0.2, 
-                delay: 0.6,
-                y: {
-                  type: "spring",
-                  stiffness: 500,
-                  damping: 30
-                }
-              }}
-              whileHover={{ 
-                y: -6,
-                boxShadow: '0 20px 35px -7px rgba(0, 0, 0, 0.2)',
-                transition: { 
-                  duration: 0.3,
-                  y: {
-                    type: "spring",
-                    stiffness: 500,
-                    damping: 20
-                  }
-                }
-              }}
-              whileTap={{ 
-                y: -3,
-                boxShadow: '0 10px 20px -5px rgba(0, 0, 0, 0.15)',
-                transition: { duration: 0.1 }
-              }}
-            >
-              <span className="absolute inset-0 w-0 bg-slate-900 transition-all duration-300 ease-out group-hover:w-full"></span>
-              <svg className="w-5 h-5 relative z-10 transition-all duration-300 group-hover:fill-white" fill="#000000" viewBox="0 0 24 24">
-                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-              </svg>
-            </motion.button>
-          </div>
-
-          {/* Sign In Link */}
-          <motion.div 
-            className="mt-8 text-center"
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2, delay: 0.65 }}
-          >
-            <p className="text-[13px] text-slate-500 font-light tracking-wide">
-              Already have an account?{' '}
-              <motion.a 
-                href="/sign-in" 
-                className="text-[#183636] hover:text-[#1c4141] font-medium tracking-wide"
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.1 }}
-              >
-                Sign in
-              </motion.a>
-            </p>
-          </motion.div>
+          )}
         </div>
         
         {/* Footer */}
