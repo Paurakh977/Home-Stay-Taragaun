@@ -12,6 +12,10 @@ interface Message {
   audioUrl?: string;
 }
 
+// ADK API Configuration
+const ADK_API_BASE = 'http://localhost:8000';
+const USER_ID = Math.floor(Math.random() * 1000) + 1; // Random user ID for this session
+
 export default function AIChatBubble() {
   const [isOpen, setIsOpen] = useState(false);
   const [showPopup, setShowPopup] = useState(true);
@@ -30,6 +34,7 @@ export default function AIChatBubble() {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [dismissedPopup, setDismissedPopup] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -73,19 +78,94 @@ export default function AIChatBubble() {
     }
   };
 
+  // Function to convert markdown links to HTML
+  const convertMarkdownLinksToHtml = (text: string) => {
+    return text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color: #3b82f6; text-decoration: underline;">$1</a>');
+  };
+
+  // Send message to ADK server
+  const sendToADKServer = async (mimeType: string, data: string) => {
+    try {
+      setIsLoading(true);
+      
+      const payload = {
+        mime_type: mimeType,
+        data: data
+      };
+
+      const response = await fetch(`${ADK_API_BASE}/send/${USER_ID}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.response_text) {
+        // Convert markdown links to HTML for clickable links
+        const htmlContent = convertMarkdownLinksToHtml(result.response_text);
+        
+        const aiResponse: Message = {
+          id: (Date.now() + 1).toString(),
+          text: htmlContent,
+          isUser: false,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, aiResponse]);
+      } else {
+        // Handle error case
+        const errorResponse: Message = {
+          id: (Date.now() + 1).toString(),
+          text: `Sorry, I encountered an error: ${result.error || 'Unknown error occurred'}`,
+          isUser: false,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, errorResponse]);
+      }
+    } catch (error) {
+      console.error('Error communicating with ADK server:', error);
+      const errorResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        text: 'Sorry, I\'m having trouble connecting to the server. Please try again later.',
+        isUser: false,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorResponse]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+      
+      const mediaRecorder = new MediaRecorder(stream, { 
+        mimeType: 'audio/webm;codecs=opus' 
+      });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm;codecs=opus' });
         setAudioBlob(audioBlob);
         stream.getTracks().forEach(track => track.stop());
       };
@@ -132,7 +212,22 @@ export default function AIChatBubble() {
     }
   };
 
-  const sendVoiceMessage = () => {
+  // Convert blob to base64
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        // Extract only the base64 part (after the comma)
+        const base64Data = result.split(',')[1];
+        resolve(base64Data);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  const sendVoiceMessage = async () => {
     if (audioBlob) {
       const audioUrl = URL.createObjectURL(audioBlob);
       const newMessage: Message = {
@@ -145,23 +240,21 @@ export default function AIChatBubble() {
       };
 
       setMessages(prev => [...prev, newMessage]);
+      
+      try {
+        // Convert audio blob to base64 and send to ADK server
+        const base64Audio = await blobToBase64(audioBlob);
+        await sendToADKServer('audio/webm', base64Audio);
+      } catch (error) {
+        console.error('Error processing voice message:', error);
+      }
+      
       setAudioBlob(null);
       setRecordingTime(0);
-      
-      // Simulate AI response
-      setTimeout(() => {
-        const aiResponse: Message = {
-          id: (Date.now() + 1).toString(),
-          text: 'I received your voice message! I\'d be happy to help you find homestays. Could you tell me more about your preferences, such as location, dates, or specific amenities you\'re looking for?',
-          isUser: false,
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, aiResponse]);
-      }, 1000);
     }
   };
 
-  const sendTextMessage = () => {
+  const sendTextMessage = async () => {
     if (inputText.trim()) {
       const newMessage: Message = {
         id: Date.now().toString(),
@@ -171,18 +264,11 @@ export default function AIChatBubble() {
       };
 
       setMessages(prev => [...prev, newMessage]);
+      const messageText = inputText;
       setInputText('');
       
-      // Simulate AI response
-      setTimeout(() => {
-        const aiResponse: Message = {
-          id: (Date.now() + 1).toString(),
-          text: 'Thanks for your message! I\'m here to help you find the perfect homestay. Let me search for options that match your requirements. What location are you interested in?',
-          isUser: false,
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, aiResponse]);
-      }, 1000);
+      // Send to ADK server
+      await sendToADKServer('text/plain', messageText);
     }
   };
 
@@ -284,11 +370,25 @@ export default function AIChatBubble() {
                         )}
                       </div>
                     ) : (
-                      message.text
+                      <div dangerouslySetInnerHTML={{ __html: message.text }} />
                     )}
                   </div>
                 </div>
               ))}
+              
+              {/* Loading indicator */}
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-white text-gray-700 rounded-2xl rounded-bl-md shadow-sm border border-gray-100 p-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                      <span className="text-xs text-gray-500 ml-2">AI is thinking...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Input Area */}
@@ -309,7 +409,8 @@ export default function AIChatBubble() {
                     </button>
                     <button
                       onClick={sendVoiceMessage}
-                      className="bg-gray-900 text-white px-3 py-1 rounded-lg text-xs hover:bg-gray-800 transition-colors"
+                      disabled={isLoading}
+                      className="bg-gray-900 text-white px-3 py-1 rounded-lg text-xs hover:bg-gray-800 transition-colors disabled:opacity-50"
                     >
                       Send
                     </button>
@@ -346,22 +447,24 @@ export default function AIChatBubble() {
                     type="text"
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && sendTextMessage()}
+                    onKeyPress={(e) => e.key === 'Enter' && !isLoading && sendTextMessage()}
                     placeholder="Type your message..."
                     className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-gray-300 focus:border-gray-300 text-sm bg-gray-50 transition-colors"
-                    disabled={isRecording}
+                    disabled={isRecording || isLoading}
                   />
                 </div>
                 
                 {/* Voice Button - Enhanced and Highlighted */}
                 <button
                   onClick={isRecording ? stopRecording : startRecording}
+                  disabled={isLoading}
                   className={`
                     relative w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 group
                     ${isRecording 
                       ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg shadow-red-200 animate-pulse' 
                       : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg shadow-blue-200 hover:shadow-blue-300 hover:scale-110 transform'
                     }
+                    disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none
                   `}
                 >
                   {isRecording ? (
@@ -371,7 +474,7 @@ export default function AIChatBubble() {
                   )}
                   
                   {/* Subtle ring animation when not recording */}
-                  {!isRecording && (
+                  {!isRecording && !isLoading && (
                     <div className="absolute inset-0 rounded-full bg-blue-500 opacity-20 animate-ping"></div>
                   )}
                   
@@ -384,7 +487,7 @@ export default function AIChatBubble() {
                 {/* Send Button */}
                 <button
                   onClick={sendTextMessage}
-                  disabled={!inputText.trim() || isRecording}
+                  disabled={!inputText.trim() || isRecording || isLoading}
                   className="w-9 h-9 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 text-white rounded-full flex items-center justify-center transition-all duration-200 disabled:cursor-not-allowed hover:scale-105"
                 >
                   <Send size={14} strokeWidth={1.5} />
