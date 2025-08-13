@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Search, MapPin, Star, Bed, Home, Filter, X, ChevronDown, ArrowRight, Utensils, Wifi, Users, Mountain } from "lucide-react";
 import TranslateButton from "@/components/ui/translate-button";
+import AIChatBubble from "@/components/AIChatBubble";
 
 // Types
 interface HomestayListing {
@@ -860,9 +861,10 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
           background: #a8a8a8;
         }
       `}</style>
+      <AIChatBubble />
     </div>
   );
-}
+} 
 
 // Main page component now wraps HomestayContent in Suspense
 export default function AllHomestaysPage() {
@@ -871,4 +873,4 @@ export default function AllHomestaysPage() {
       <HomestayContent />
     </Suspense>
   );
-} 
+}

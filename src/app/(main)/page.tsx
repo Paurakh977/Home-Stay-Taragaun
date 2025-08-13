@@ -5,6 +5,7 @@ import Image from "next/image";
 import { ArrowRight, Search, Star, Home as HomeIcon, Users, Shield, MapPin, Quote } from "lucide-react";
 import { useWebContent } from "@/context/WebContentContext";
 import { getImageUrl, shouldUseUnoptimizedImage } from "@/lib/imageUtils";
+import AIChatBubble from "@/components/AIChatBubble";
 
 // Helper function to get the correct icon component
 const getIcon = (iconName: string) => {
@@ -433,6 +434,7 @@ export default function Home() {
           </div>
         </div>
       </section>
+      <AIChatBubble />
     </div>
   );
 }
