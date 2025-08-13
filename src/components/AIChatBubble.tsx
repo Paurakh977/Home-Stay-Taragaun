@@ -12,8 +12,8 @@ interface Message {
   audioUrl?: string;
 }
 
-// ADK API Configuration
-const ADK_API_BASE = 'http://localhost:8000';
+// Environment configuration - these will be set from .env
+const ADK_API_BASE = process.env.REACT_APP_ADK_API_BASE || 'http://localhost:8000';
 const USER_ID = Math.floor(Math.random() * 1000) + 1; // Random user ID for this session
 
 export default function AIChatBubble() {
@@ -78,9 +78,39 @@ export default function AIChatBubble() {
     }
   };
 
-  // Function to convert markdown links to HTML
-  const convertMarkdownLinksToHtml = (text: string) => {
-    return text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color: #3b82f6; text-decoration: underline;">$1</a>');
+  // Enhanced function to convert markdown to HTML with better formatting
+  const convertMarkdownToHtml = (text: string) => {
+    let html = text;
+    
+    // Convert markdown links: [text](url) -> <a href="url" target="_blank">text</a>
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color: #3b82f6; text-decoration: underline; font-weight: 500;">$1</a>');
+    
+    // Convert bullet points: • item -> <li>item</li>
+    html = html.replace(/^[•·*-]\s+(.+)$/gm, '<li style="margin: 4px 0;">$1</li>');
+    
+    // Wrap consecutive <li> elements in <ul>
+    html = html.replace(/(<li[^>]*>.*<\/li>(\s*<li[^>]*>.*<\/li>)*)/gs, '<ul style="margin: 8px 0; padding-left: 20px; list-style-type: disc;">$1</ul>');
+    
+    // Convert line breaks to <br> tags
+    html = html.replace(/\n/g, '<br>');
+    
+    // Convert double line breaks to paragraph breaks
+    html = html.replace(/<br><br>/g, '</p><p style="margin: 12px 0;">');
+    
+    // Wrap in paragraph tags if not already wrapped
+    if (!html.includes('<p>') && !html.includes('<ul>')) {
+      html = `<p style="margin: 0;">${html}</p>`;
+    } else if (html.includes('</p><p')) {
+      html = `<p style="margin: 0;">${html}</p>`;
+    }
+    
+    // Bold text: **text** -> <strong>text</strong>
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // Italic text: *text* -> <em>text</em>
+    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    
+    return html;
   };
 
   // Send message to ADK server
@@ -108,8 +138,8 @@ export default function AIChatBubble() {
       const result = await response.json();
       
       if (result.success && result.response_text) {
-        // Convert markdown links to HTML for clickable links
-        const htmlContent = convertMarkdownLinksToHtml(result.response_text);
+        // Convert markdown to HTML for proper formatting
+        const htmlContent = convertMarkdownToHtml(result.response_text);
         
         const aiResponse: Message = {
           id: (Date.now() + 1).toString(),
@@ -346,7 +376,7 @@ export default function AIChatBubble() {
                 >
                   <div
                     className={`
-                      max-w-[80%] p-3 rounded-2xl text-sm transition-all duration-200
+                      max-w-[85%] p-3 rounded-2xl text-sm transition-all duration-200
                       ${message.isUser 
                         ? 'bg-gray-900 text-white rounded-br-md shadow-sm' 
                         : 'bg-white text-gray-700 rounded-bl-md shadow-sm border border-gray-100'
@@ -370,7 +400,15 @@ export default function AIChatBubble() {
                         )}
                       </div>
                     ) : (
-                      <div dangerouslySetInnerHTML={{ __html: message.text }} />
+                      <div 
+                        className="prose prose-sm max-w-none"
+                        style={{
+                          fontSize: '14px',
+                          lineHeight: '1.5',
+                          color: message.isUser ? 'white' : '#374151'
+                        }}
+                        dangerouslySetInnerHTML={{ __html: message.text }} 
+                      />
                     )}
                   </div>
                 </div>
@@ -526,6 +564,30 @@ export default function AIChatBubble() {
         
         .animate-slide-up {
           animation: slide-up 0.25s ease-out;
+        }
+
+        /* Custom styles for proper link rendering in messages */
+        .prose a {
+          color: #3b82f6 !important;
+          text-decoration: underline !important;
+          font-weight: 500 !important;
+        }
+
+        .prose a:hover {
+          color: #2563eb !important;
+        }
+
+        .prose ul {
+          margin: 8px 0 !important;
+          padding-left: 20px !important;
+        }
+
+        .prose li {
+          margin: 4px 0 !important;
+        }
+
+        .prose p {
+          margin: 4px 0 !important;
         }
       `}</style>
     </>
