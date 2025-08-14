@@ -89,8 +89,8 @@ export default function AIChatBubble() {
     html = html.replace(/^[•·*-]\s+(.+)$/gm, '<li style="margin: 4px 0;">$1</li>');
     
     // Wrap consecutive <li> elements in <ul>
-    html = html.replace(/(<li[^>]*>.*<\/li>(\s*<li[^>]*>.*<\/li>)*)/gs, '<ul style="margin: 8px 0; padding-left: 20px; list-style-type: disc;">$1</ul>');
-    
+    html = html.replace(/(<li[^>]*>[\s\S]*?<\/li>(\s*<li[^>]*>[\s\S]*?<\/li>)*)/g, '<ul style="margin: 8px 0; padding-left: 20px; list-style-type: disc;">$1</ul>');
+
     // Convert line breaks to <br> tags
     html = html.replace(/\n/g, '<br>');
     
