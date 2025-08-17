@@ -13,10 +13,14 @@ interface Message {
 }
 
 // Environment configuration - these will be set from .env
-const ADK_API_BASE = process.env.REACT_APP_ADK_API_BASE || 'http://localhost:8000';
+const ADK_API_BASE = process.env.NEXT_PUBLIC_ADK_API_BASE || 'http://localhost:8000';
 const USER_ID = Math.floor(Math.random() * 1000) + 1; // Random user ID for this session
 
-export default function AIChatBubble() {
+interface AIChatBubbleProps {
+  adminUsername?: string; // if provided, will include admin context
+}
+
+export default function AIChatBubble({ adminUsername }: AIChatBubbleProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showPopup, setShowPopup] = useState(true);
   const [isShaking, setIsShaking] = useState(false);
@@ -118,18 +122,33 @@ export default function AIChatBubble() {
     try {
       setIsLoading(true);
       
-      const payload = {
+      const payload: any = {
         mime_type: mimeType,
         data: data
       };
 
-      const response = await fetch(`${ADK_API_BASE}/send/${USER_ID}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
-      });
+      let response: Response;
+
+      if (adminUsername) {
+        // When used in admin dashboard, forward via internal API that attaches cookies
+        response = await fetch('/api/adk/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include', // include cookies for auth_token
+          body: JSON.stringify({ ...payload, user_id: USER_ID, adminUsername })
+        });
+      } else {
+        // Public usage - direct to ADK server without admin context
+        response = await fetch(`${ADK_API_BASE}/send/${USER_ID}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload)
+        });
+      }
 
       if (!response.ok) {
         throw new Error(`Server responded with status: ${response.status}`);
