@@ -4,6 +4,7 @@ import { useState } from 'react';
 import AdminHomestayClient from '../components/AdminHomestayClient';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import { Menu, X } from 'lucide-react';
+import AIChatBubble from '@/components/AIChatBubble';
 
 interface ClientAdminDashboardProps {
   adminUsername: string;
@@ -48,6 +49,9 @@ export default function ClientAdminDashboard({ adminUsername }: ClientAdminDashb
       <div className="flex-1 flex flex-col overflow-auto md:pl-0">
         <AdminHomestayClient username={adminUsername} noSidebar={true} />
       </div>
+
+      {/* AI Chat Bubble overlay */}
+      <AIChatBubble adminUsername={adminUsername} />
     </div>
   );
-} 
+}
