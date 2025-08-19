@@ -29,7 +29,7 @@ export interface RedisTypingStatus {
   isTyping: boolean;
 }
 
-// Redis connection configuration
+// Redis connection configuration with enhanced reliability
 const getRedisConfig = () => {
   // Support multiple env var names for host for compatibility
   const host = process.env.REDIS_HOST || process.env.REDISDB_HOST || 'localhost';
@@ -53,6 +53,12 @@ const getRedisConfig = () => {
     // Connection pool settings
     family: 4,
     keepAlive: 30000, // Keep alive timeout in milliseconds
+    // Enhanced reconnection strategy
+    retryStrategy: (times: number) => {
+      const delay = Math.min(times * 50, 2000);
+      console.log(`🔄 Redis reconnection attempt ${times}, delay: ${delay}ms`);
+      return delay;
+    },
   } as const;
 };
 
@@ -61,7 +67,43 @@ let redisClient: Redis | null = null;
 let redisSubscriber: Redis | null = null;
 let redisPublisher: Redis | null = null;
 
-// Initialize Redis connections
+// Connection health check
+let lastHealthCheck = 0;
+const HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
+
+export const checkRedisHealth = async (): Promise<boolean> => {
+  const now = Date.now();
+  
+  // Throttle health checks
+  if (now - lastHealthCheck < HEALTH_CHECK_INTERVAL) {
+    return true;
+  }
+  
+  lastHealthCheck = now;
+
+  try {
+    if (!redisClient || !redisPublisher || !redisSubscriber) {
+      console.log('⚠️ Redis clients not initialized');
+      return false;
+    }
+
+    // Ping all clients
+    await Promise.all([
+      redisClient.ping(),
+      redisPublisher.ping(),
+      redisSubscriber.ping()
+    ]);
+
+    console.log('✅ Redis health check passed');
+    return true;
+
+  } catch (error) {
+    console.error('❌ Redis health check failed:', error);
+    return false;
+  }
+};
+
+// Initialize Redis connections with enhanced error handling
 export const initializeRedis = async () => {
   try {
     const config = getRedisConfig();
@@ -69,6 +111,9 @@ export const initializeRedis = async () => {
     // Main Redis client for general operations
     if (!redisClient) {
       redisClient = new Redis(config);
+      
+      // Wait for connection
+      await redisClient.connect();
       await redisClient.ping();
       console.log('✅ Redis main client connected successfully');
     }
@@ -76,6 +121,8 @@ export const initializeRedis = async () => {
     // Publisher client for pub/sub
     if (!redisPublisher) {
       redisPublisher = new Redis(config);
+      
+      await redisPublisher.connect();
       await redisPublisher.ping();
       console.log('✅ Redis publisher connected successfully');
     }
@@ -83,46 +130,67 @@ export const initializeRedis = async () => {
     // Subscriber client for pub/sub
     if (!redisSubscriber) {
       redisSubscriber = new Redis(config);
+      
+      await redisSubscriber.connect();
       await redisSubscriber.ping();
       console.log('✅ Redis subscriber connected successfully');
     }
 
-    // Set up error handlers
-    [redisClient, redisPublisher, redisSubscriber].forEach((client, index) => {
-      const clientName = ['main', 'publisher', 'subscriber'][index];
-      client?.on('error', (error) => {
-        console.error(`❌ Redis ${clientName} client error:`, error);
+    // Set up comprehensive error handlers
+    [
+      { client: redisClient, name: 'main' },
+      { client: redisPublisher, name: 'publisher' },
+      { client: redisSubscriber, name: 'subscriber' }
+    ].forEach(({ client, name }) => {
+      if (!client) return;
+
+      client.on('error', (error) => {
+        console.error(`❌ Redis ${name} client error:`, error);
       });
 
-      client?.on('connect', () => {
-        console.log(`🔗 Redis ${clientName} client connected`);
+      client.on('connect', () => {
+        console.log(`🔗 Redis ${name} client connected`);
       });
 
-      client?.on('ready', () => {
-        console.log(`✅ Redis ${clientName} client ready`);
+      client.on('ready', () => {
+        console.log(`✅ Redis ${name} client ready`);
       });
 
-      client?.on('close', () => {
-        console.log(`🔌 Redis ${clientName} client connection closed`);
+      client.on('close', () => {
+        console.log(`🔌 Redis ${name} client connection closed`);
       });
 
-      client?.on('reconnecting', () => {
-        console.log(`🔄 Redis ${clientName} client reconnecting...`);
+      client.on('reconnecting', (ms: number) => {
+        console.log(`🔄 Redis ${name} client reconnecting in ${ms}ms...`);
+      });
+
+      client.on('end', () => {
+        console.log(`🔚 Redis ${name} client connection ended`);
       });
     });
 
+    // Start periodic health checks
+    setInterval(checkRedisHealth, HEALTH_CHECK_INTERVAL);
+
     return { redisClient, redisPublisher, redisSubscriber };
+
   } catch (error) {
     console.error('❌ Failed to initialize Redis connections:', error);
-    throw error;
+    throw new Error(`Redis initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };
 
-// Get Redis clients
+// Get Redis clients with automatic reconnection
 export const getRedisClient = () => {
   if (!redisClient) {
     throw new Error('Redis client not initialized. Call initializeRedis() first.');
   }
+  
+  // Check connection status
+  if (redisClient.status !== 'ready') {
+    console.warn(`⚠️ Redis main client status: ${redisClient.status}`);
+  }
+  
   return redisClient;
 };
 
@@ -130,6 +198,12 @@ export const getRedisPublisher = () => {
   if (!redisPublisher) {
     throw new Error('Redis publisher not initialized. Call initializeRedis() first.');
   }
+
+  // Check connection status
+  if (redisPublisher.status !== 'ready') {
+    console.warn(`⚠️ Redis publisher status: ${redisPublisher.status}`);
+  }
+  
   return redisPublisher;
 };
 
@@ -137,110 +211,189 @@ export const getRedisSubscriber = () => {
   if (!redisSubscriber) {
     throw new Error('Redis subscriber not initialized. Call initializeRedis() first.');
   }
+
+  // Check connection status
+  if (redisSubscriber.status !== 'ready') {
+    console.warn(`⚠️ Redis subscriber status: ${redisSubscriber.status}`);
+  }
+  
   return redisSubscriber;
 };
 
-// Utility functions for chat-related Redis operations
+// Enhanced utility functions for chat-related Redis operations
 export const setChatUserOnline = async (userId: string, userType: 'clerk' | 'homestay', socketId: string) => {
-  const client = getRedisClient();
-  const key = `user:${userType}:${userId}:status`;
-  
-  await client.hset(key, {
-    isOnline: 'true',
-    lastActiveAt: new Date().toISOString(),
-    socketId,
-    userType,
-  });
+  try {
+    const client = getRedisClient();
+    const key = `user:${userType}:${userId}:status`;
+    
+    await client.hset(key, {
+      isOnline: 'true',
+      lastActiveAt: new Date().toISOString(),
+      socketId,
+      userType,
+    });
 
-  // Set expiry for auto-cleanup
-  await client.expire(key, 7200); // 2 hours
+    // Set expiry for auto-cleanup
+    await client.expire(key, 7200); // 2 hours
+    
+  } catch (error) {
+    console.error('❌ Error setting user online status:', error);
+    throw error;
+  }
 };
 
 export const setChatUserOffline = async (userId: string, userType: 'clerk' | 'homestay') => {
-  const client = getRedisClient();
-  const key = `user:${userType}:${userId}:status`;
-  
-  await client.hset(key, {
-    isOnline: 'false',
-    lastActiveAt: new Date().toISOString(),
-  });
+  try {
+    const client = getRedisClient();
+    const key = `user:${userType}:${userId}:status`;
+    
+    await client.hset(key, {
+      isOnline: 'false',
+      lastActiveAt: new Date().toISOString(),
+    });
 
-  // Remove socketId when offline
-  await client.hdel(key, 'socketId');
+    // Remove socketId when offline
+    await client.hdel(key, 'socketId');
+    
+  } catch (error) {
+    console.error('❌ Error setting user offline status:', error);
+    throw error;
+  }
 };
 
 export const getUserStatus = async (userId: string, userType: 'clerk' | 'homestay') => {
-  const client = getRedisClient();
-  const key = `user:${userType}:${userId}:status`;
-  
-  const status = await client.hgetall(key);
-  if (!status || Object.keys(status).length === 0) {
+  try {
+    const client = getRedisClient();
+    const key = `user:${userType}:${userId}:status`;
+    
+    const status = await client.hgetall(key);
+    if (!status || Object.keys(status).length === 0) {
+      return null;
+    }
+
+    return {
+      userId,
+      userType,
+      isOnline: status.isOnline === 'true',
+      lastActiveAt: new Date(status.lastActiveAt),
+      socketId: status.socketId,
+    };
+    
+  } catch (error) {
+    console.error('❌ Error getting user status:', error);
     return null;
   }
-
-  return {
-    userId,
-    userType,
-    isOnline: status.isOnline === 'true',
-    lastActiveAt: new Date(status.lastActiveAt),
-    socketId: status.socketId,
-  };
 };
 
 export const getSocketIdByUserId = async (userId: string, userType: 'clerk' | 'homestay') => {
-  const client = getRedisClient();
-  const key = `user:${userType}:${userId}:status`;
-  
-  return await client.hget(key, 'socketId');
+  try {
+    const client = getRedisClient();
+    const key = `user:${userType}:${userId}:status`;
+    
+    return await client.hget(key, 'socketId');
+    
+  } catch (error) {
+    console.error('❌ Error getting socket ID:', error);
+    return null;
+  }
 };
 
-// Chat room management
+// Enhanced chat room management with validation
 export const addUserToChatRoom = async (chatId: string, userId: string, userType: 'clerk' | 'homestay') => {
-  const client = getRedisClient();
-  const key = `chat:${chatId}:users`;
-  
-  await client.sadd(key, `${userType}:${userId}`);
-  await client.expire(key, 86400); // 24 hours
+  try {
+    if (!chatId || !userId || !userType) {
+      throw new Error('Invalid parameters for adding user to chat room');
+    }
+
+    const client = getRedisClient();
+    const key = `chat:${chatId}:users`;
+    
+    await client.sadd(key, `${userType}:${userId}`);
+    await client.expire(key, 86400); // 24 hours
+    
+    console.log(`✅ User ${userType}:${userId} added to chat room ${chatId}`);
+    
+  } catch (error) {
+    console.error('❌ Error adding user to chat room:', error);
+    throw error;
+  }
 };
 
 export const removeUserFromChatRoom = async (chatId: string, userId: string, userType: 'clerk' | 'homestay') => {
-  const client = getRedisClient();
-  const key = `chat:${chatId}:users`;
-  
-  await client.srem(key, `${userType}:${userId}`);
+  try {
+    if (!chatId || !userId || !userType) {
+      throw new Error('Invalid parameters for removing user from chat room');
+    }
+
+    const client = getRedisClient();
+    const key = `chat:${chatId}:users`;
+    
+    await client.srem(key, `${userType}:${userId}`);
+    
+    console.log(`✅ User ${userType}:${userId} removed from chat room ${chatId}`);
+    
+  } catch (error) {
+    console.error('❌ Error removing user from chat room:', error);
+    throw error;
+  }
 };
 
 export const getChatRoomUsers = async (chatId: string) => {
-  const client = getRedisClient();
-  const key = `chat:${chatId}:users`;
-  
-  const users = await client.smembers(key);
-  return users.map(user => {
-    const [userType, userId] = user.split(':');
-    return { userId, userType: userType as 'clerk' | 'homestay' };
-  });
+  try {
+    if (!chatId) {
+      throw new Error('Invalid chatId for getting chat room users');
+    }
+
+    const client = getRedisClient();
+    const key = `chat:${chatId}:users`;
+    
+    const users = await client.smembers(key);
+    return users.map(user => {
+      const [userType, userId] = user.split(':');
+      return { userId, userType: userType as 'clerk' | 'homestay' };
+    });
+    
+  } catch (error) {
+    console.error('❌ Error getting chat room users:', error);
+    return [];
+  }
 };
 
-// Clean up Redis connections
+// Clean up Redis connections with proper error handling
 export const closeRedisConnections = async () => {
   try {
+    const disconnectPromises = [];
+
     if (redisClient) {
-      await redisClient.quit();
-      redisClient = null;
-      console.log('🔌 Redis main client disconnected');
+      disconnectPromises.push(
+        redisClient.quit().then(() => {
+          redisClient = null;
+          console.log('🔌 Redis main client disconnected');
+        })
+      );
     }
 
     if (redisPublisher) {
-      await redisPublisher.quit();
-      redisPublisher = null;
-      console.log('🔌 Redis publisher disconnected');
+      disconnectPromises.push(
+        redisPublisher.quit().then(() => {
+          redisPublisher = null;
+          console.log('🔌 Redis publisher disconnected');
+        })
+      );
     }
 
     if (redisSubscriber) {
-      await redisSubscriber.quit();
-      redisSubscriber = null;
-      console.log('🔌 Redis subscriber disconnected');
+      disconnectPromises.push(
+        redisSubscriber.quit().then(() => {
+          redisSubscriber = null;
+          console.log('🔌 Redis subscriber disconnected');
+        })
+      );
     }
+
+    await Promise.all(disconnectPromises);
+    console.log('✅ All Redis connections closed successfully');
+
   } catch (error) {
     console.error('❌ Error closing Redis connections:', error);
   }
@@ -256,3 +409,40 @@ export const REDIS_CHANNELS = {
 } as const;
 
 export type RedisChannel = typeof REDIS_CHANNELS[keyof typeof REDIS_CHANNELS];
+
+// Utility function to safely publish to Redis
+export const safeRedisPublish = async (channel: RedisChannel, data: any) => {
+  try {
+    const publisher = getRedisPublisher();
+    
+    // Check if publisher is ready
+    if (publisher.status !== 'ready') {
+      console.warn(`⚠️ Redis publisher not ready (status: ${publisher.status}), skipping publish`);
+      return false;
+    }
+
+    await publisher.publish(channel, JSON.stringify(data));
+    return true;
+    
+  } catch (error) {
+    console.error('❌ Error publishing to Redis:', error);
+    return false;
+  }
+};
+
+// Emergency reconnection function
+export const forceRedisReconnection = async () => {
+  try {
+    console.log('🔄 Force reconnecting Redis clients...');
+    
+    await closeRedisConnections();
+    await initializeRedis();
+    
+    console.log('✅ Redis force reconnection completed');
+    return true;
+    
+  } catch (error) {
+    console.error('❌ Redis force reconnection failed:', error);
+    return false;
+  }
+};
