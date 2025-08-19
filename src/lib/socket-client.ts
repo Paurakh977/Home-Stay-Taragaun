@@ -9,13 +9,13 @@ import { DefaultEventsMap } from "socket.io";
     senderType: 'clerk' | 'homestay';
     content: string;
     messageType: 'text' | 'image' | 'file';
-    timestamp: Date;
+    timestamp: string;
   }) => void;
   user_status: (data: {
     userId: string;
     userType: 'clerk' | 'homestay';
     isOnline: boolean;
-    lastActiveAt: Date;
+    lastActiveAt: string;
   }) => void;
   typing_status: (data: {
     chatId: string;
