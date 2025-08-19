@@ -9,10 +9,12 @@ import {
   onUserStatus,
   onTypingStatus,
   onErrorMessage,
+  onMessagesMarkedRead,
   offNewMessage,
   offUserStatus,
   offTypingStatus,
   offErrorMessage,
+  offMessagesMarkedRead,
   joinChat,
   leaveChat,
   sendMessage as socketSendMessage,
@@ -95,6 +97,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         onUserStatus(handleUserStatus);
         onTypingStatus(handleTypingStatus);
         onErrorMessage(handleErrorMessage);
+        onMessagesMarkedRead(handleMessagesMarkedRead);
 
         socket.on('connect', () => setIsConnected(true));
         socket.on('disconnect', () => setIsConnected(false));
@@ -113,6 +116,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     offUserStatus();
     offTypingStatus();
     offErrorMessage();
+    offMessagesMarkedRead();
     
     disconnectSocket();
     setIsConnected(false);
@@ -198,6 +202,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setConnectionError(data.message);
   };
 
+  const handleMessagesMarkedRead = (data: any) => {
+    // Optional: update local message read state or conversation unread counts if needed
+    // Currently, unread counting is derived on server; we keep client minimal
+  };
+
   // Actions
   const setCurrentChat = (chatId: string | null) => {
     if (currentChatId) {
@@ -224,8 +233,20 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     sendTyping(chatId, false);
   };
 
-  const markAsRead = (chatId: string, messageIds: string[]) => {
+  const markAsRead = async (chatId: string, messageIds: string[]) => {
+    // 1) Realtime read receipts via socket
     markMessagesAsRead(chatId, messageIds);
+
+    // 2) Persist participant lastReadAt for ordering/unread logic
+    try {
+      await fetch('/api/chat/conversations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatId, action: 'mark_read', timestamp: new Date().toISOString() })
+      });
+    } catch (err) {
+      console.error('Failed to PATCH conversation mark_read:', err);
+    }
   };
 
   const fetchConversations = async () => {
