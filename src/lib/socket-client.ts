@@ -23,6 +23,7 @@ import { DefaultEventsMap } from "socket.io";
     userType: 'clerk' | 'homestay';
     isTyping: boolean;
   }) => void;
+  messages_marked_read: (data: { chatId: string; messageIds: string[] }) => void;
   error_message: (data: { message: string }) => void;
 };
 
@@ -32,6 +33,7 @@ import { DefaultEventsMap } from "socket.io";
   leave_chat: (data: { chatId: string }) => void;
   send_message: (data: { chatId: string; content: string; messageType?: 'text' | 'image' | 'file' }) => void;
   typing: (data: { chatId: string; isTyping: boolean }) => void;
+  mark_read: (data: { chatId: string; messageIds: string[] }) => void;
 };
 
 export type ChatSocket = Socket<
@@ -51,6 +53,8 @@ export const initSocket = async (auth: { tokenType: 'clerk' | 'jwt'; token: stri
 
   // Disconnect existing socket if present
   if (socket) {
+    // Ensure we clean up previous listeners to prevent memory leaks
+    socket.removeAllListeners();
     socket.disconnect();
   }
 
@@ -157,6 +161,15 @@ export const sendTyping = (chatId: string, isTyping: boolean) => {
 };
 
 /**
+ * Mark messages as read
+ */
+export const markMessagesAsRead = (chatId: string, messageIds: string[]) => {
+  if (socket?.connected) {
+    socket.emit('mark_read', { chatId, messageIds });
+  }
+};
+
+/**
  * Register event listeners
  */
 export const onNewMessage = (callback: SocketClientEvents['new_message']) => {
@@ -173,6 +186,10 @@ export const onTypingStatus = (callback: SocketClientEvents['typing_status']) =>
 
 export const onErrorMessage = (callback: SocketClientEvents['error_message']) => {
   socket?.on('error_message', callback);
+};
+
+export const onMessagesMarkedRead = (callback: SocketClientEvents['messages_marked_read']) => {
+  socket?.on('messages_marked_read', callback);
 };
 
 /**
@@ -192,4 +209,8 @@ export const offTypingStatus = (callback?: SocketClientEvents['typing_status']) 
 
 export const offErrorMessage = (callback?: SocketClientEvents['error_message']) => {
   socket?.off('error_message', callback);
+};
+
+export const offMessagesMarkedRead = (callback?: SocketClientEvents['messages_marked_read']) => {
+  socket?.off('messages_marked_read', callback);
 };
