@@ -13,10 +13,9 @@ const nextConfig = {
     domains: ['localhost', 'devhomestay.sthaniyataha.com'],
     unoptimized: true, // Disable the built-in image optimizer to use our API route
   },
-  //  env variables to be accessible in client-side code
   env: {
-    MONGODB_URI: process.env.MONGODB_URI,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://devhomestay.sthaniyataha.com',
+    NEXT_PUBLIC_SOCKET_PATH: '/api/socket',
   },
   // Disable ESLint during builds
   eslint: {
@@ -104,4 +103,4 @@ const nextConfig = {
   }
 };
 
-module.exports = nextConfig; 
+module.exports = nextConfig;
