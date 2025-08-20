@@ -3,7 +3,17 @@ import { Search, X } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChatItem } from './ChatSidebar';
+
+// Local ChatItem interface for compatibility
+interface ChatItem {
+  id: string;
+  name: string;
+  avatar?: string;
+  lastMessage: string;
+  time: string;
+  unread: number;
+  online: boolean;
+}
 
 interface DashboardChatSidebarProps {
   chats: ChatItem[];
@@ -90,10 +100,10 @@ const DashboardChatSidebar: React.FC<DashboardChatSidebarProps> = ({
                   {chat.online && (
                     <span className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 rounded-full border-2 border-white"></span>
                   )}
-                  {chat.unread && (
+                  {chat.unread > 0 && (
                     <span className="absolute -top-1 -right-1 h-5 w-5 bg-primary rounded-full border-2 border-white flex items-center justify-center">
                       <span className="text-white text-xs font-bold">
-                        {chat.unread ? '1' : ''}
+                        {chat.unread > 9 ? '9+' : chat.unread}
                       </span>
                     </span>
                   )}
@@ -103,7 +113,7 @@ const DashboardChatSidebar: React.FC<DashboardChatSidebarProps> = ({
                     <h4 className="font-medium text-gray-900 truncate">{chat.name}</h4>
                     <span className="text-xs text-gray-500 ml-1 flex-shrink-0">{chat.time}</span>
                   </div>
-                  <p className={`text-sm ${chat.unread ? 'text-gray-800 font-medium' : 'text-gray-500'} truncate`}>
+                  <p className={`text-sm ${chat.unread > 0 ? 'text-gray-800 font-medium' : 'text-gray-500'} truncate`}>
                     {chat.lastMessage}
                   </p>
                 </div>
@@ -132,4 +142,4 @@ const DashboardChatSidebar: React.FC<DashboardChatSidebarProps> = ({
   );
 };
 
-export default DashboardChatSidebar; 
+export default DashboardChatSidebar;

@@ -23,6 +23,11 @@ import { DefaultEventsMap } from "socket.io";
     userType: 'clerk' | 'homestay';
     isTyping: boolean;
   }) => void;
+  message_sent: (data: { 
+    messageId: string; 
+    chatId: string; 
+    timestamp: string 
+  }) => void;
   messages_marked_read: (data: { chatId: string; messageIds: string[] }) => void;
   error_message: (data: { message: string }) => void;
 };
@@ -107,7 +112,15 @@ export const initSocket = async (auth: { tokenType: 'clerk' | 'jwt'; token: stri
     });
   });
 };
+export const onMessageSent = (callback: SocketClientEvents['message_sent']) => {
+  socket?.on('message_sent', callback);
+};
 
+export const offMessageSent = (callback?: SocketClientEvents['message_sent']) => {
+  if (!socket) return;
+  if (callback) socket.off('message_sent', callback);
+  else socket.removeAllListeners('message_sent');
+};
 /**
  * Get current socket instance
  */
@@ -196,21 +209,31 @@ export const onMessagesMarkedRead = (callback: SocketClientEvents['messages_mark
  * Remove event listeners
  */
 export const offNewMessage = (callback?: SocketClientEvents['new_message']) => {
-  socket?.off('new_message', callback);
+  if (!socket) return;
+  if (callback) socket.off('new_message', callback);
+  else socket.removeAllListeners('new_message');
 };
 
 export const offUserStatus = (callback?: SocketClientEvents['user_status']) => {
-  socket?.off('user_status', callback);
+  if (!socket) return;
+  if (callback) socket.off('user_status', callback);
+  else socket.removeAllListeners('user_status');
 };
 
 export const offTypingStatus = (callback?: SocketClientEvents['typing_status']) => {
-  socket?.off('typing_status', callback);
+  if (!socket) return;
+  if (callback) socket.off('typing_status', callback);
+  else socket.removeAllListeners('typing_status');
 };
 
 export const offErrorMessage = (callback?: SocketClientEvents['error_message']) => {
-  socket?.off('error_message', callback);
+  if (!socket) return;
+  if (callback) socket.off('error_message', callback);
+  else socket.removeAllListeners('error_message');
 };
 
 export const offMessagesMarkedRead = (callback?: SocketClientEvents['messages_marked_read']) => {
-  socket?.off('messages_marked_read', callback);
+  if (!socket) return;
+  if (callback) socket.off('messages_marked_read', callback);
+  else socket.removeAllListeners('messages_marked_read');
 };

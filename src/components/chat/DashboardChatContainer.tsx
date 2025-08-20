@@ -4,8 +4,24 @@ import DashboardChatSidebar from './DashboardChatSidebar';
 import ChatMessages from './ChatMessages';
 import MessageInput from './MessageInput';
 import DashboardEmptyChat from './DashboardEmptyChat';
-import { dummyChats, dummyMessages } from './ChatData';
+import { useChat } from '@/context/ChatContext';
+import { ChatData, MessageData, UserStatusData } from '@/types/chat';
+import type { Message as ChatMessage } from './ChatMessages';
 import { X } from 'lucide-react';
+
+// Helper interfaces for component compatibility
+interface ChatItem {
+  id: string;
+  name: string;
+  avatar?: string;
+  lastMessage: string;
+  time: string;
+  unread: number;
+  online: boolean;
+}
+
+// Use the Message type from ChatMessages to avoid divergence
+type Message = ChatMessage;
 
 interface DashboardChatContainerProps {
   navbarHeight: number;
@@ -24,7 +40,7 @@ function ClientChatContainer({
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const chatId = searchParams.get('id');
+  const chatId = (searchParams?.get('id') ?? null) as string | null;
 
   return (
     <DashboardChatContainerInner
@@ -40,7 +56,7 @@ function ClientChatContainer({
 interface DashboardChatContainerInnerProps extends DashboardChatContainerProps {
   chatId: string | null;
   router: ReturnType<typeof useRouter>;
-  pathname: string;
+  pathname: string | null;
 }
 
 function DashboardChatContainerInner({ 
@@ -50,7 +66,20 @@ function DashboardChatContainerInner({
   router,
   pathname
 }: DashboardChatContainerInnerProps) {
-  const [currentChatId, setCurrentChatId] = useState<string | null>(chatId);
+  const {
+    conversations,
+    currentChatId,
+    messages,
+    userStatuses,
+    typingUsers,
+    isConnected,
+    setCurrentChat,
+    sendMessage,
+    startTyping,
+    stopTyping,
+    markAsRead
+  } = useChat();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -62,8 +91,58 @@ function DashboardChatContainerInner({
   const basePath = adminUsername ? `/${adminUsername}/dashboard/chat` : '/dashboard/chat';
   const dashboardPath = adminUsername ? `/${adminUsername}/dashboard` : '/dashboard';
 
-  // Find the current chat from the dummy data
-  const currentChat = dummyChats.find(chat => chat.id === currentChatId);
+  // Helper functions to convert data for component compatibility
+  const convertConversationsToChats = (conversations: ChatData[], userStatuses: Record<string, UserStatusData>): ChatItem[] => {
+    return conversations.map(conv => ({
+      id: conv.chatId,
+      name: conv.participants.find(p => p.userId !== conv.participants[0]?.userId)?.name || 'Unknown',
+      avatar: conv.participants.find(p => p.userId !== conv.participants[0]?.userId)?.avatar,
+      lastMessage: conv.lastMessage?.content || 'No messages yet',
+      time: formatTime(conv.lastActivity),
+      unread: conv.unreadCount || 0,
+      online: Object.values(userStatuses).some(status => 
+        conv.participants.some(p => p.userId === status.userId) && status.isOnline
+      )
+    }));
+  };
+
+  const convertMessagesToChatMessages = (msgs: MessageData[]): Message[] => {
+    return msgs.map(msg => ({
+      id: msg.messageId,
+      sender: msg.senderName || 'Unknown',
+      senderAvatar: msg.senderAvatar,
+      content: msg.content,
+      timestamp: msg.timestamp,
+      isSelf: msg.isSelf || false
+    }));
+  };
+
+  const getTypingUsersForChat = (chatId: string | null): string[] => {
+    if (!chatId) return [];
+    return typingUsers[chatId] || [];
+  };
+
+  const formatTime = (date: Date | string): string => {
+    const d = new Date(date);
+    const now = new Date();
+    const diffInHours = (now.getTime() - d.getTime()) / (1000 * 60 * 60);
+    
+    if (diffInHours < 1) {
+      return 'now';
+    } else if (diffInHours < 24) {
+      return `${Math.floor(diffInHours)}h`;
+    } else {
+      return d.toLocaleDateString();
+    }
+  };
+
+  // Convert data for components
+  const chats = convertConversationsToChats(conversations, userStatuses);
+  const chatMessages = convertMessagesToChatMessages(currentChatId ? (messages[currentChatId] || []) : []);
+  const typingUsersInCurrentChat = getTypingUsersForChat(currentChatId);
+  
+  // Find the current chat
+  const currentChat = chats.find(chat => chat.id === currentChatId);
 
   // Set up mobile detection
   useEffect(() => {
@@ -85,12 +164,12 @@ function DashboardChatContainerInner({
       initialRenderDone.current = true;
       
       // Only set default chat on desktop and when there's no chatId in URL
-      if (!currentChatId && dummyChats.length > 0 && !isMobile) {
-        setCurrentChatId(dummyChats[0].id);
+      if (!currentChatId && chats.length > 0 && !isMobile) {
+        setCurrentChat(chats[0].id);
         
         // Update URL without page navigation
         const url = new URL(window.location.href);
-        url.searchParams.set('id', dummyChats[0].id);
+        url.searchParams.set('id', chats[0].id);
         window.history.replaceState({}, '', url);
       }
     }
@@ -99,8 +178,8 @@ function DashboardChatContainerInner({
   // Update sidebar state and current chat ID based on URL
   useEffect(() => {
     // When URL has chatId parameter, update currentChatId and hide sidebar on mobile
-    if (chatId) {
-      setCurrentChatId(chatId);
+    if (chatId && chatId !== currentChatId) {
+      setCurrentChat(chatId);
       setIsMobileSidebarOpen(false);
       // Flag to scroll to bottom when chat changes
       setShouldScrollToBottom(true);
@@ -108,15 +187,15 @@ function DashboardChatContainerInner({
       // Only show sidebar on mobile when no specific chat is selected
       setIsMobileSidebarOpen(true);
     }
-  }, [chatId, isMobile]);
+  }, [chatId, isMobile, currentChatId, setCurrentChat]);
   
   // Ensure we handle route changes correctly when browser navigation occurs
   useEffect(() => {
     if (chatId && currentChatId !== chatId) {
-      setCurrentChatId(chatId);
+      setCurrentChat(chatId);
       setShouldScrollToBottom(true);
     }
-  }, [pathname, chatId, currentChatId]);
+  }, [pathname, chatId, currentChatId, setCurrentChat]);
 
   // Handle scrolling of messages
   useEffect(() => {
@@ -153,7 +232,7 @@ function DashboardChatContainerInner({
 
   // Handle chat selection
   const handleChatSelect = (chatId: string) => {
-    setCurrentChatId(chatId);
+    setCurrentChat(chatId);
     setIsMobileSidebarOpen(false);
     setShouldScrollToBottom(true);
     
@@ -181,10 +260,24 @@ function DashboardChatContainerInner({
 
   // Handle send message
   const handleSendMessage = (message: string) => {
-    // In a real application, you'd send this to an API
-    console.log('Sending message:', message);
-    // Scroll to bottom after sending a message
-    setShouldScrollToBottom(true);
+    if (currentChatId) {
+      sendMessage(currentChatId, message);
+      // Scroll to bottom after sending a message
+      setShouldScrollToBottom(true);
+    }
+  };
+
+  // Handle typing events
+  const handleTypingStart = () => {
+    if (currentChatId) {
+      startTyping(currentChatId);
+    }
+  };
+
+  const handleTypingStop = () => {
+    if (currentChatId) {
+      stopTyping(currentChatId);
+    }
   };
 
   // Determine if we need to show the empty state or a default chat header
@@ -195,7 +288,7 @@ function DashboardChatContainerInner({
     <div className="flex h-full w-full overflow-hidden">
       {/* Chat Sidebar - using Dashboard specific version */}
       <DashboardChatSidebar
-        chats={dummyChats}
+        chats={chats}
         currentChatId={currentChatId}
         searchQuery={searchQuery}
         onSearchChange={handleSearchChange}
@@ -274,12 +367,20 @@ function DashboardChatContainerInner({
               className="chat-messages absolute inset-0 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent pb-[60px]"
               onWheel={(e) => e.stopPropagation()}
             >
-              <ChatMessages messages={dummyMessages} />
+              <ChatMessages 
+                messages={chatMessages} 
+                typingUsers={typingUsersInCurrentChat}
+              />
             </div>
             
             {/* Message Input - fixed at bottom */}
             <div className="mt-auto bg-white border-t border-gray-200 absolute bottom-0 left-0 right-0 z-10">
-              <MessageInput onSendMessage={handleSendMessage} />
+              <MessageInput 
+                onSendMessage={handleSendMessage}
+                onTypingStart={handleTypingStart}
+                onTypingStop={handleTypingStop}
+                disabled={!isConnected}
+              />
             </div>
           </div>
         ) : showEmptyState ? (
@@ -325,4 +426,4 @@ const DashboardChatContainer: React.FC<DashboardChatContainerProps> = (props) =>
   return <ClientChatContainer {...props} />;
 };
 
-export default DashboardChatContainer; 
+export default DashboardChatContainer;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import { 
   initSocket, 
   getSocket, 
@@ -141,10 +141,25 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       isSelf: data.senderId === authData?.userId
     };
 
-    setMessages(prev => ({
-      ...prev,
-      [data.chatId]: [...(prev[data.chatId] || []), message]
-    }));
+    setMessages(prev => {
+      const currentMessages = prev[data.chatId] || [];
+      
+      // Remove optimistic message if this is from the same sender
+      const filteredMessages = message.isSelf 
+        ? currentMessages.filter(msg => !msg.messageId.startsWith('temp-'))
+        : currentMessages;
+      
+      // Check if message already exists to prevent duplicates
+      const messageExists = filteredMessages.some(msg => msg.messageId === data.messageId);
+      if (messageExists) {
+        return prev;
+      }
+      
+      return {
+        ...prev,
+        [data.chatId]: [...filteredMessages, message]
+      };
+    });
 
     // Update conversation last message
     setConversations(prev => 
@@ -209,8 +224,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   // Actions
   const setCurrentChat = (chatId: string | null) => {
-    if (currentChatId) {
+    if (currentChatId && currentChatId !== chatId) {
       leaveChat(currentChatId);
+      // Clear typing indicators for the previous chat
+      setTypingUsers(prev => ({
+        ...prev,
+        [currentChatId]: []
+      }));
     }
     
     setCurrentChatId(chatId);
@@ -222,15 +242,77 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   };
 
   const sendMessage = (chatId: string, content: string, messageType: 'text' | 'image' | 'file' = 'text') => {
+    if (!isConnected || !authData) {
+      console.error('Cannot send message: not connected or not authenticated');
+      return;
+    }
+    
+    // Create optimistic message
+    const optimisticMessage: MessageData = {
+      _id: `temp-${Date.now()}`,
+      messageId: `temp-${Date.now()}`,
+      chatId,
+      senderId: authData.userId,
+      senderType: authData.tokenType === 'clerk' ? 'clerk' : 'homestay',
+      content,
+      messageType,
+      timestamp: new Date().toISOString(),
+      readBy: [],
+      isEdited: false,
+      isDeleted: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      isSelf: true
+    };
+    
+    // Add optimistic message to local state
+    setMessages(prev => ({
+      ...prev,
+      [chatId]: [...(prev[chatId] || []), optimisticMessage]
+    }));
+    
+    // Send via socket
     socketSendMessage(chatId, content, messageType);
   };
 
+  // Typing debounce refs
+  const typingTimeoutRef = React.useRef<{ [chatId: string]: NodeJS.Timeout }>({});
+  const isTypingRef = React.useRef<{ [chatId: string]: boolean }>({});
+
   const startTyping = (chatId: string) => {
-    sendTyping(chatId, true);
+    if (!isConnected) return;
+    
+    // Clear existing timeout
+    if (typingTimeoutRef.current[chatId]) {
+      clearTimeout(typingTimeoutRef.current[chatId]);
+    }
+    
+    // Send typing start if not already typing
+    if (!isTypingRef.current[chatId]) {
+      sendTyping(chatId, true);
+      isTypingRef.current[chatId] = true;
+    }
+    
+    // Set timeout to stop typing
+    typingTimeoutRef.current[chatId] = setTimeout(() => {
+      stopTyping(chatId);
+    }, 3000); // Stop typing after 3 seconds of inactivity
   };
 
   const stopTyping = (chatId: string) => {
-    sendTyping(chatId, false);
+    if (!isConnected) return;
+    
+    // Clear timeout
+    if (typingTimeoutRef.current[chatId]) {
+      clearTimeout(typingTimeoutRef.current[chatId]);
+      delete typingTimeoutRef.current[chatId];
+    }
+    
+    // Send typing stop if currently typing
+    if (isTypingRef.current[chatId]) {
+      sendTyping(chatId, false);
+      isTypingRef.current[chatId] = false;
+    }
   };
 
   const markAsRead = async (chatId: string, messageIds: string[]) => {
@@ -322,7 +404,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (authData && !isConnected && !isConnecting) {
       connectSocket();
     }
-  }, [authData]);
+    
+    // Disconnect when auth data is lost
+    if (!authData && (isConnected || isConnecting)) {
+      disconnectSocketHandler();
+    }
+  }, [authData, isConnected, isConnecting]);
 
   // Fetch conversations on connect
   useEffect(() => {
@@ -334,6 +421,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      // Clear all typing timeouts
+      Object.values(typingTimeoutRef.current).forEach(timeout => {
+        clearTimeout(timeout);
+      });
+      
       disconnectSocketHandler();
     };
   }, []);
