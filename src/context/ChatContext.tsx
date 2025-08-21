@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, ReactNode, useCallback } from 'react';
 import { 
   initSocket, 
   getSocket, 
@@ -76,7 +76,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [typingUsers, setTypingUsers] = useState<{ [chatId: string]: string[] }>({});
 
   // Socket connection
-  const connectSocket = async () => {
+  const connectSocket = useCallback(async () => {
     if (!authData || isConnecting) return;
 
     setIsConnecting(true);
@@ -108,9 +108,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsConnecting(false);
     }
-  };
+  }, [authData]);
 
-  const disconnectSocketHandler = () => {
+  const disconnectSocketHandler = useCallback(() => {
     // Clean up event listeners
     offNewMessage();
     offUserStatus();
@@ -120,7 +120,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     
     disconnectSocket();
     setIsConnected(false);
-  };
+  }, []);
 
   // Event handlers
   const handleNewMessage = (data: any) => {
@@ -144,16 +144,20 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setMessages(prev => {
       const currentMessages = prev[data.chatId] || [];
       
-      // Remove optimistic message if this is from the same sender
-      const filteredMessages = message.isSelf 
-        ? currentMessages.filter(msg => !msg.messageId.startsWith('temp-'))
-        : currentMessages;
-      
       // Check if message already exists to prevent duplicates
-      const messageExists = filteredMessages.some(msg => msg.messageId === data.messageId);
+      const messageExists = currentMessages.some(msg => msg.messageId === data.messageId);
       if (messageExists) {
         return prev;
       }
+      
+      // Remove optimistic message if this is from the same sender and content matches
+      const filteredMessages = message.isSelf 
+        ? currentMessages.filter(msg => 
+            !(msg.messageId.startsWith('temp-') && 
+              msg.content === message.content && 
+              msg.messageType === message.messageType)
+          )
+        : currentMessages;
       
       return {
         ...prev,
@@ -276,8 +280,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   };
 
   // Typing debounce refs
-  const typingTimeoutRef = React.useRef<{ [chatId: string]: NodeJS.Timeout }>({});
-  const isTypingRef = React.useRef<{ [chatId: string]: boolean }>({});
+  const typingTimeoutRef = useRef<{ [chatId: string]: NodeJS.Timeout }>({});
+  const isTypingRef = useRef<{ [chatId: string]: boolean }>({});
 
   const startTyping = (chatId: string) => {
     if (!isConnected) return;
@@ -316,14 +320,27 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   };
 
   const markAsRead = async (chatId: string, messageIds: string[]) => {
+    if (!authData) {
+      console.error('Cannot mark as read: not authenticated');
+      return;
+    }
+
     // 1) Realtime read receipts via socket
     markMessagesAsRead(chatId, messageIds);
 
     // 2) Persist participant lastReadAt for ordering/unread logic
     try {
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+
+      if (authData.tokenType === 'clerk') {
+        headers['Authorization'] = `Bearer ${authData.token}`;
+      }
+
       await fetch('/api/chat/conversations', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ chatId, action: 'mark_read', timestamp: new Date().toISOString() })
       });
     } catch (err) {
@@ -332,8 +349,23 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   };
 
   const fetchConversations = async () => {
+    if (!authData) {
+      console.error('Cannot fetch conversations: not authenticated');
+      return;
+    }
+
     try {
-      const response = await fetch('/api/chat/conversations');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+
+      if (authData.tokenType === 'clerk') {
+        headers['Authorization'] = `Bearer ${authData.token}`;
+      } else {
+        // JWT token is already in cookies, no need to add to headers
+      }
+
+      const response = await fetch('/api/chat/conversations', { headers });
       const data = await response.json();
       
       if (response.ok) {
@@ -347,14 +379,27 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   };
 
   const fetchMessages = async (chatId: string) => {
+    if (!authData) {
+      console.error('Cannot fetch messages: not authenticated');
+      return;
+    }
+
     try {
-      const response = await fetch(`/api/chat/messages?chatId=${chatId}&limit=50`);
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+
+      if (authData.tokenType === 'clerk') {
+        headers['Authorization'] = `Bearer ${authData.token}`;
+      }
+
+      const response = await fetch(`/api/chat/messages?chatId=${chatId}&limit=50`, { headers });
       const data = await response.json();
       
       if (response.ok) {
         const messagesWithSelfFlag = data.messages.map((msg: any) => ({
           ...msg,
-          isSelf: msg.senderId === authData?.userId
+          isSelf: msg.senderId === authData.userId
         }));
         
         setMessages(prev => ({
@@ -370,12 +415,23 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   };
 
   const createConversation = async (participantId: string, participantType: 'clerk' | 'homestay'): Promise<string | null> => {
+    if (!authData) {
+      console.error('Cannot create conversation: not authenticated');
+      return null;
+    }
+
     try {
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+
+      if (authData.tokenType === 'clerk') {
+        headers['Authorization'] = `Bearer ${authData.token}`;
+      }
+
       const response = await fetch('/api/chat/conversations', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           participantId,
           participantType
@@ -409,7 +465,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (!authData && (isConnected || isConnecting)) {
       disconnectSocketHandler();
     }
-  }, [authData, isConnected, isConnecting]);
+  }, [authData, isConnected, isConnecting, connectSocket, disconnectSocketHandler]);
 
   // Fetch conversations on connect
   useEffect(() => {
@@ -422,7 +478,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     return () => {
       // Clear all typing timeouts
-      Object.values(typingTimeoutRef.current).forEach(timeout => {
+      Object.values(typingTimeoutRef.current).forEach((timeout: NodeJS.Timeout) => {
         clearTimeout(timeout);
       });
       
