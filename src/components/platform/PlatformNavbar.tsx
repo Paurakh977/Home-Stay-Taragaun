@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useChat } from "@/context/ChatContext";
+import { useAuthToken } from "@/hooks/useAuthToken";
 
 const PlatformNavbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -26,7 +27,8 @@ const PlatformNavbar = () => {
   const [showChatModal, setShowChatModal] = useState(false);
 
   // Get chat data from context
-  const { conversations, userStatuses } = useChat();
+  const { conversations } = useChat();
+  const authData = useAuthToken();
   const pathname = usePathname();
   const router = useRouter();
   const { content, loading, refreshContent } = useWebContent();
@@ -91,7 +93,11 @@ const PlatformNavbar = () => {
 
   // Convert conversations to chat items for display
   const chatItems = conversations.map(conv => {
-    const otherParticipant = conv.participants.find(p => p.name !== 'You');
+    // Find the other participant (not the current user)
+    const otherParticipant = conv.participants.find(p =>
+      authData && p.userId !== authData.userId
+    );
+
     return {
       id: conv.chatId,
       name: otherParticipant?.name || otherParticipant?.username || 'Unknown User',
@@ -181,7 +187,7 @@ const PlatformNavbar = () => {
   };
 
   // Don't show chat UI in the chat page itself
-  const isInChatPage = pathname.startsWith('/chat');
+  const isInChatPage = pathname?.startsWith('/chat') || false;
 
   return (
     <nav className={`sticky top-0 z-30 w-full transition-all duration-300 ${

@@ -99,17 +99,26 @@ function DashboardChatContainerInner({
 
   // Helper functions to convert data for component compatibility
   const convertConversationsToChats = (conversations: ChatData[], userStatuses: Record<string, UserStatusData>): ChatItem[] => {
-    return conversations.map(conv => ({
-      id: conv.chatId,
-      name: conv.participants.find(p => p.userId !== conv.participants[0]?.userId)?.name || 'Unknown',
-      avatar: conv.participants.find(p => p.userId !== conv.participants[0]?.userId)?.avatar,
-      lastMessage: conv.lastMessage?.content || 'No messages yet',
-      time: formatTime(conv.lastActivity),
-      unread: conv.unreadCount || 0,
-      online: Object.values(userStatuses).some(status => 
-        conv.participants.some(p => p.userId === status.userId) && status.isOnline
-      )
-    }));
+    return conversations.map(conv => {
+      // Find the other participant (not the current user)
+      const otherParticipant = conv.participants.find(p =>
+        authData && p.userId !== authData.userId
+      );
+
+
+
+      return {
+        id: conv.chatId,
+        name: otherParticipant?.name || 'Unknown User',
+        avatar: otherParticipant?.avatar,
+        lastMessage: conv.lastMessage?.content || 'No messages yet',
+        time: formatTime(conv.lastActivity),
+        unread: conv.unreadCount || 0,
+        online: Object.values(userStatuses).some(status =>
+          conv.participants.some(p => p.userId === status.userId) && status.isOnline
+        )
+      };
+    });
   };
 
   const convertMessagesToChatMessages = (msgs: MessageData[]): Message[] => {
