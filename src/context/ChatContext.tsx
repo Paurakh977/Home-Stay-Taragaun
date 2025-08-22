@@ -1,20 +1,24 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useRef, ReactNode, useCallback } from 'react';
-import { 
-  initSocket, 
-  getSocket, 
+import {
+  initSocket,
+  getSocket,
   disconnectSocket,
   onNewMessage,
   onUserStatus,
   onTypingStatus,
   onErrorMessage,
   onMessagesMarkedRead,
+  onChatJoined,
+  onChatLeft,
   offNewMessage,
   offUserStatus,
   offTypingStatus,
   offErrorMessage,
   offMessagesMarkedRead,
+  offChatJoined,
+  offChatLeft,
   joinChat,
   leaveChat,
   sendMessage as socketSendMessage,
@@ -98,6 +102,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         onTypingStatus(handleTypingStatus);
         onErrorMessage(handleErrorMessage);
         onMessagesMarkedRead(handleMessagesMarkedRead);
+        onChatJoined(handleChatJoined);
+        onChatLeft(handleChatLeft);
 
         socket.on('connect', () => setIsConnected(true));
         socket.on('disconnect', () => setIsConnected(false));
@@ -117,7 +123,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     offTypingStatus();
     offErrorMessage();
     offMessagesMarkedRead();
-    
+    offChatJoined();
+    offChatLeft();
+
     disconnectSocket();
     setIsConnected(false);
   }, []);
@@ -226,6 +234,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     // Currently, unread counting is derived on server; we keep client minimal
   };
 
+  const handleChatJoined = (data: any) => {
+    console.log('Successfully joined chat:', data.chatId);
+  };
+
+  const handleChatLeft = (data: any) => {
+    console.log('Successfully left chat:', data.chatId);
+  };
+
   // Actions
   const setCurrentChat = (chatId: string | null) => {
     if (currentChatId && currentChatId !== chatId) {
@@ -250,7 +266,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       console.error('Cannot send message: not connected or not authenticated');
       return;
     }
-    
+
     // Create optimistic message
     const optimisticMessage: MessageData = {
       _id: `temp-${Date.now()}`,
@@ -268,13 +284,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       updatedAt: new Date().toISOString(),
       isSelf: true
     };
-    
+
     // Add optimistic message to local state
     setMessages(prev => ({
       ...prev,
       [chatId]: [...(prev[chatId] || []), optimisticMessage]
     }));
-    
+
     // Send via socket
     socketSendMessage(chatId, content, messageType);
   };
@@ -481,10 +497,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       Object.values(typingTimeoutRef.current).forEach((timeout: NodeJS.Timeout) => {
         clearTimeout(timeout);
       });
-      
+
       disconnectSocketHandler();
     };
-  }, []);
+  }, [disconnectSocketHandler]);
 
   const contextValue: ChatContextType = {
     isConnected,
