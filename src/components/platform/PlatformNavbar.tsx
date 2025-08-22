@@ -27,7 +27,7 @@ const PlatformNavbar = () => {
   const [showChatModal, setShowChatModal] = useState(false);
 
   // Get chat data from context
-  const { conversations } = useChat();
+  const { conversations, totalUnreadCount, unreadCountByChatId } = useChat();
   const authData = useAuthToken();
   const pathname = usePathname();
   const router = useRouter();
@@ -98,18 +98,21 @@ const PlatformNavbar = () => {
       authData && p.userId !== authData.userId
     );
 
+    const unreadCount = unreadCountByChatId[conv.chatId] || 0;
+
     return {
       id: conv.chatId,
       name: otherParticipant?.name || otherParticipant?.username || 'Unknown User',
       avatar: otherParticipant?.avatar || '',
       lastMessage: conv.lastMessage?.content || 'No messages yet',
       time: formatTime(conv.lastActivity),
-      unread: (conv.unreadCount || 0) > 0
+      unread: unreadCount > 0,
+      unreadCount: unreadCount
     };
   });
 
-  // Calculate unread message count
-  const unreadMessageCount = chatItems.filter(chat => chat.unread).length;
+  // Use total unread count from context
+  const unreadMessageCount = totalUnreadCount;
 
   // Navigate to chat view
   const goToChatView = (chatId?: string) => {
@@ -468,8 +471,10 @@ const PlatformNavbar = () => {
                       {chat.name.substring(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  {chat.unread && (
-                    <span className="absolute -top-1 -right-1 h-3 w-3 bg-blue-500 rounded-full border-2 border-white"></span>
+                  {chat.unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center border-2 border-white">
+                      {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
+                    </span>
                   )}
                 </div>
                 <div className="flex-1 text-left min-w-0">

@@ -33,18 +33,22 @@ interface ChatContextType {
   isConnected: boolean;
   isConnecting: boolean;
   connectionError: string | null;
-  
+
   // Chat data
   conversations: ChatData[];
   currentChatId: string | null;
   messages: { [chatId: string]: MessageData[] };
-  
+
   // User statuses
   userStatuses: { [userId: string]: UserStatusData };
-  
+
   // Typing indicators
   typingUsers: { [chatId: string]: { userId: string; userName: string }[] };
-  
+
+  // Unread counts
+  totalUnreadCount: number;
+  unreadCountByChatId: { [chatId: string]: number };
+
   // Actions
   connectSocket: () => Promise<void>;
   disconnectSocket: () => void;
@@ -79,12 +83,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [conversations, setConversations] = useState<ChatData[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<{ [chatId: string]: MessageData[] }>({});
-  
+
   // User statuses
   const [userStatuses, setUserStatuses] = useState<{ [userId: string]: UserStatusData }>({});
-  
+
   // Typing indicators
   const [typingUsers, setTypingUsers] = useState<{ [chatId: string]: { userId: string; userName: string }[] }>({});
+
+  // Unread counts
+  const [unreadCountByChatId, setUnreadCountByChatId] = useState<{ [chatId: string]: number }>({});
+
+  // Calculate total unread count
+  const totalUnreadCount = Object.values(unreadCountByChatId).reduce((sum, count) => sum + count, 0);
 
   // Socket connection
   const connectSocket = useCallback(async () => {
@@ -197,10 +207,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       };
     });
 
-    // Update conversation last message
-    setConversations(prev => 
-      prev.map(conv => 
-        conv.chatId === data.chatId 
+    // Update conversation last message and unread count
+    setConversations(prev =>
+      prev.map(conv =>
+        conv.chatId === data.chatId
           ? {
               ...conv,
               lastMessage: {
@@ -215,6 +225,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           : conv
       )
     );
+
+    // Update unread count if message is not from current user and not in current chat
+    if (!message.isSelf && data.chatId !== currentChatId) {
+      setUnreadCountByChatId(prev => ({
+        ...prev,
+        [data.chatId]: (prev[data.chatId] || 0) + 1
+      }));
+    }
   };
 
   const handleUserStatus = (data: any) => {
@@ -290,6 +308,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setCurrentChatId(chatId);
 
     if (chatId) {
+      // Reset unread count for this chat when opening it
+      setUnreadCountByChatId(prev => ({
+        ...prev,
+        [chatId]: 0
+      }));
+
       joinChat(chatId);
       fetchMessages(chatId);
     }
@@ -375,6 +399,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Reset unread count for this chat
+    setUnreadCountByChatId(prev => ({
+      ...prev,
+      [chatId]: 0
+    }));
+
     // 1) Realtime read receipts via socket
     markMessagesAsRead(chatId, messageIds);
 
@@ -424,6 +454,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       if (response.ok) {
         console.log('Fetched conversations:', data.conversations?.length || 0, 'conversations');
         setConversations(data.conversations || []);
+
+        // Initialize unread counts from API response
+        const unreadCounts: { [chatId: string]: number } = {};
+        (data.conversations || []).forEach((conv: any) => {
+          unreadCounts[conv.chatId] = conv.unreadCount || 0;
+        });
+        setUnreadCountByChatId(unreadCounts);
       } else {
         console.error('Error fetching conversations:', data.error);
       }
@@ -564,6 +601,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     messages,
     userStatuses,
     typingUsers,
+    totalUnreadCount,
+    unreadCountByChatId,
     connectSocket,
     disconnectSocket: disconnectSocketHandler,
     setCurrentChat,

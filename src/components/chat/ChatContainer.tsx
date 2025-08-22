@@ -16,10 +16,11 @@ interface ChatContainerProps {
 }
 
 // Helper function to convert conversations to chat items
-const convertConversationsToChats = (conversations: ChatData[], userStatuses: { [userId: string]: UserStatusData }, currentUserId?: string): ChatItem[] => {
+const convertConversationsToChats = (conversations: ChatData[], userStatuses: { [userId: string]: UserStatusData }, unreadCountByChatId: { [chatId: string]: number }, currentUserId?: string): ChatItem[] => {
   return conversations.map(conv => {
     // Find the other participant (not the current user)
     const otherParticipant = conv.participants.find(p => p.userId !== currentUserId);
+    const unreadCount = unreadCountByChatId[conv.chatId] || 0;
 
     return {
       id: conv.chatId,
@@ -27,7 +28,8 @@ const convertConversationsToChats = (conversations: ChatData[], userStatuses: { 
       avatar: otherParticipant?.avatar || '',
       lastMessage: conv.lastMessage?.content || 'No messages yet',
       time: formatTime(conv.lastActivity),
-      unread: (conv.unreadCount || 0) > 0,
+      unread: unreadCount > 0,
+      unreadCount: unreadCount,
       online: otherParticipant ? userStatuses[otherParticipant.userId]?.isOnline || false : false
     };
   });
@@ -90,6 +92,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ navbarHeight }) => {
     messages,
     userStatuses,
     typingUsers,
+    unreadCountByChatId,
     isConnected,
     isConnecting,
     connectionError,
@@ -101,7 +104,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ navbarHeight }) => {
   } = useChat();
 
   // Build derived chat list and find current chat item for header
-  const chatItems = convertConversationsToChats(conversations, userStatuses, authData?.userId);
+  const chatItems = convertConversationsToChats(conversations, userStatuses, unreadCountByChatId, authData?.userId);
   const currentChat = currentChatId ? chatItems.find(c => c.id === currentChatId) : undefined;
 
   // Set initial chat ID if none is selected

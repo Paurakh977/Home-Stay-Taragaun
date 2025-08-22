@@ -73,6 +73,7 @@ function DashboardChatContainerInner({
     messages,
     userStatuses,
     typingUsers,
+    unreadCountByChatId,
     isConnected,
     isConnecting,
     connectionError,
@@ -98,14 +99,14 @@ function DashboardChatContainerInner({
   const dashboardPath = adminUsername ? `/${adminUsername}/dashboard` : '/dashboard';
 
   // Helper functions to convert data for component compatibility
-  const convertConversationsToChats = (conversations: ChatData[], userStatuses: Record<string, UserStatusData>): ChatItem[] => {
+  const convertConversationsToChats = (conversations: ChatData[], userStatuses: Record<string, UserStatusData>, unreadCountByChatId: { [chatId: string]: number }): ChatItem[] => {
     return conversations.map(conv => {
       // Find the other participant (not the current user)
       const otherParticipant = conv.participants.find(p =>
         authData && p.userId !== authData.userId
       );
 
-
+      const unreadCount = unreadCountByChatId[conv.chatId] || 0;
 
       return {
         id: conv.chatId,
@@ -113,7 +114,7 @@ function DashboardChatContainerInner({
         avatar: otherParticipant?.avatar,
         lastMessage: conv.lastMessage?.content || 'No messages yet',
         time: formatTime(conv.lastActivity),
-        unread: conv.unreadCount || 0,
+        unread: unreadCount,
         online: Object.values(userStatuses).some(status =>
           conv.participants.some(p => p.userId === status.userId) && status.isOnline
         )
@@ -156,7 +157,7 @@ function DashboardChatContainerInner({
   };
 
   // Convert data for components
-  const chats = convertConversationsToChats(conversations, userStatuses);
+  const chats = convertConversationsToChats(conversations, userStatuses, unreadCountByChatId);
   const chatMessages = convertMessagesToChatMessages(currentChatId ? (messages[currentChatId] || []) : []);
   const typingUsersInCurrentChat = getTypingUsersForChat(currentChatId);
   

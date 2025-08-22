@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
-import { Chat, HomestaySingle, type IChat } from '@/lib/models';
+import { Chat, HomestaySingle, Message, type IChat } from '@/lib/models';
 import { auth } from '@clerk/nextjs/server';
 import { createClerkClient } from '@clerk/backend';
 import { jwtVerify } from 'jose';
@@ -121,15 +121,47 @@ async function enrichParticipantData(participants: any[]) {
   return enrichedParticipants;
 }
 
+// Calculate unread message count for a user in a chat
+async function calculateUnreadCount(chatId: string, userId: string, userType: 'clerk' | 'homestay') {
+  try {
+    // Get the user's lastReadAt timestamp from the chat participants
+    const chat = await Chat.findOne({
+      chatId,
+      'participants.userId': userId,
+      'participants.userType': userType
+    }).lean();
+
+    if (!chat) return 0;
+
+    const participant = chat.participants.find(p => p.userId === userId && p.userType === userType);
+    const lastReadAt = participant?.lastReadAt || new Date(0); // Default to epoch if never read
+
+    // Count messages sent after lastReadAt that are not from this user
+    const unreadCount = await Message.countDocuments({
+      chatId,
+      timestamp: { $gt: lastReadAt },
+      $or: [
+        { senderId: { $ne: userId } },
+        { senderType: { $ne: userType } }
+      ]
+    });
+
+    return unreadCount;
+  } catch (error) {
+    console.error('Error calculating unread count:', error);
+    return 0;
+  }
+}
+
 // Verify user authorization for chat access
 async function verifyUserChatAccess(user: { userId: string; userType: 'clerk' | 'homestay' }, chatId?: string) {
   if (!chatId) return true; // For creating new chats
 
-  const chat = await Chat.findOne({ 
+  const chat = await Chat.findOne({
     chatId,
     'participants.userId': user.userId,
     'participants.userType': user.userType,
-    isActive: true 
+    isActive: true
   });
 
   return !!chat;
@@ -164,13 +196,15 @@ export async function GET(request: NextRequest) {
     .limit(validLimit)
     .lean();
 
-    // Enrich conversations with participant data
+    // Enrich conversations with participant data and unread counts
     const enrichedConversations = await Promise.all(
       conversations.map(async (conversation) => {
         const enrichedParticipants = await enrichParticipantData(conversation.participants);
+        const unreadCount = await calculateUnreadCount(conversation.chatId, user.userId, user.userType);
         return {
           ...conversation,
           participants: enrichedParticipants,
+          unreadCount,
         };
       })
     );

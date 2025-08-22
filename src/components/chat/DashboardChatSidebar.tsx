@@ -101,9 +101,9 @@ const DashboardChatSidebar: React.FC<DashboardChatSidebarProps> = ({
                     <span className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 rounded-full border-2 border-white"></span>
                   )}
                   {chat.unread > 0 && (
-                    <span className="absolute -top-1 -right-1 h-5 w-5 bg-primary rounded-full border-2 border-white flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 rounded-full border-2 border-white flex items-center justify-center">
                       <span className="text-white text-xs font-bold">
-                        {chat.unread > 9 ? '9+' : chat.unread}
+                        {chat.unread > 99 ? '99+' : chat.unread}
                       </span>
                     </span>
                   )}
