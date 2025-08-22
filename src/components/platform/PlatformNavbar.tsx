@@ -18,71 +18,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-
-// Dummy chat data for the chat modal
-const dummyChats = [
-  {
-    id: "1",
-    name: "Alex Johnson",
-    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
-    lastMessage: "Hey, how's your stay going?",
-    time: "5m",
-    unread: true
-  },
-  {
-    id: "2",
-    name: "Emma Wilson",
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
-    lastMessage: "The local festival is tomorrow!",
-    time: "30m",
-    unread: true
-  },
-  {
-    id: "3",
-    name: "Michael Chen",
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
-    lastMessage: "I'll send you directions to the cafe.",
-    time: "2h",
-    unread: true
-  },
-  {
-    id: "4",
-    name: "Sarah Lopez",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
-    lastMessage: "Did you enjoy the local food?",
-    time: "5h",
-    unread: false
-  },
-  {
-    id: "5",
-    name: "David Kim",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
-    lastMessage: "Checking in about your reservation.",
-    time: "1d",
-    unread: false
-  },
-  {
-    id: "6",
-    name: "Lisa Wang",
-    avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
-    lastMessage: "I loved the cooking class recommendation!",
-    time: "2d",
-    unread: false
-  },
-  {
-    id: "7",
-    name: "John Davis",
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
-    lastMessage: "When does the trek start tomorrow?",
-    time: "3d",
-    unread: false
-  }
-];
+import { useChat } from "@/context/ChatContext";
 
 const PlatformNavbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [showChatModal, setShowChatModal] = useState(false);
+
+  // Get chat data from context
+  const { conversations, userStatuses } = useChat();
   const pathname = usePathname();
   const router = useRouter();
   const { content, loading, refreshContent } = useWebContent();
@@ -129,8 +73,37 @@ const PlatformNavbar = () => {
     setShowChatModal(!showChatModal);
   };
 
+  // Helper function to format time
+  const formatTime = (timestamp: string): string => {
+    try {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+
+      if (diffInMinutes < 1) return 'now';
+      if (diffInMinutes < 60) return `${diffInMinutes}m`;
+      if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h`;
+      return `${Math.floor(diffInMinutes / 1440)}d`;
+    } catch {
+      return '';
+    }
+  };
+
+  // Convert conversations to chat items for display
+  const chatItems = conversations.map(conv => {
+    const otherParticipant = conv.participants.find(p => p.name !== 'You');
+    return {
+      id: conv.chatId,
+      name: otherParticipant?.name || otherParticipant?.username || 'Unknown User',
+      avatar: otherParticipant?.avatar || '',
+      lastMessage: conv.lastMessage?.content || 'No messages yet',
+      time: formatTime(conv.lastActivity),
+      unread: (conv.unreadCount || 0) > 0
+    };
+  });
+
   // Calculate unread message count
-  const unreadMessageCount = dummyChats.filter(chat => chat.unread).length;
+  const unreadMessageCount = chatItems.filter(chat => chat.unread).length;
 
   // Navigate to chat view
   const goToChatView = (chatId?: string) => {
@@ -470,7 +443,13 @@ const PlatformNavbar = () => {
           </div>
 
           <div className="overflow-auto max-h-[60vh] sm:max-h-[400px]">
-            {dummyChats.map(chat => (
+            {chatItems.length === 0 ? (
+              <div className="px-4 py-8 text-center text-gray-500">
+                <p>No conversations yet</p>
+                <p className="text-sm mt-1">Start chatting with homestays to see them here</p>
+              </div>
+            ) : (
+              chatItems.map(chat => (
               <button 
                 key={chat.id}
                 className="w-full px-4 py-3 flex items-start hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
@@ -497,7 +476,8 @@ const PlatformNavbar = () => {
                   </p>
                 </div>
               </button>
-            ))}
+              ))
+            )}
           </div>
 
           <div className="p-3 border-t">

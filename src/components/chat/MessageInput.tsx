@@ -28,7 +28,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
       if (onTypingStop) {
         onTypingStop();
       }
-      
+
       onSendMessage(message.trim());
       setMessage('');
     }

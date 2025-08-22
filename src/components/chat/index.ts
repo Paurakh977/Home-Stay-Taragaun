@@ -11,5 +11,5 @@ export { default as DashboardChatContainer } from './DashboardChatContainer';
 export { default as DashboardChatSidebar } from './DashboardChatSidebar';
 export { default as DashboardEmptyChat } from './DashboardEmptyChat';
 
-// Data
-export { dummyChats, dummyMessages } from './ChatData'; 
+// Homestay chat component
+export { default as HomestayChat } from './HomestayChat';

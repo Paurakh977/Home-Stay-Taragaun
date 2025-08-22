@@ -6,6 +6,7 @@ import ChatMessages from './ChatMessages';
 import MessageInput from './MessageInput';
 import EmptyChat from './EmptyChat';
 import { useChat } from '@/context/ChatContext';
+import { useAuthToken } from '@/hooks/useAuthToken';
 import type { ChatData, MessageData, UserStatusData } from '@/types/chat';
 import type { ChatItem } from './ChatSidebar';
 import type { Message } from './ChatMessages';
@@ -83,6 +84,9 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ navbarHeight }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  // Get auth data for current user
+  const authData = useAuthToken();
   
   // Use ChatContext
   const {
@@ -92,6 +96,8 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ navbarHeight }) => {
     userStatuses,
     typingUsers,
     isConnected,
+    isConnecting,
+    connectionError,
     setCurrentChat,
     sendMessage,
     startTyping,
@@ -135,6 +141,20 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ navbarHeight }) => {
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
   }, [currentChatId]);
+
+  // Mark messages as read when viewing a chat
+  useEffect(() => {
+    if (currentChatId && messages[currentChatId]) {
+      const unreadMessages = messages[currentChatId].filter(msg =>
+        !msg.isSelf && !msg.readBy.some(r => r.userId === authData?.userId)
+      );
+
+      if (unreadMessages.length > 0) {
+        const messageIds = unreadMessages.map(msg => msg.messageId);
+        markAsRead(currentChatId, messageIds);
+      }
+    }
+  }, [currentChatId, messages, markAsRead]);
 
   // Handle chat selection
   const handleChatSelect = (chatId: string) => {
@@ -183,8 +203,17 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ navbarHeight }) => {
 
   return (
     <div className="flex flex-1 h-full min-h-0 overflow-hidden">
+      {/* Connection Status Banner */}
+      {(isConnecting || connectionError) && (
+        <div className={`fixed top-0 left-0 right-0 z-50 p-2 text-center text-sm ${
+          connectionError ? 'bg-red-500 text-white' : 'bg-yellow-500 text-black'
+        }`}>
+          {connectionError ? `Connection Error: ${connectionError}` : 'Connecting to chat...'}
+        </div>
+      )}
+
       {/* Chat Sidebar */}
-      <ChatSidebar 
+      <ChatSidebar
         chats={chatItems}
         currentChatId={currentChatId}
         searchQuery={searchQuery}
