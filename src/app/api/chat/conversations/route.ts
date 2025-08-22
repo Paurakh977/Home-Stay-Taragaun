@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
-import { Chat, type IChat } from '@/lib/models';
+import { Chat, HomestaySingle, type IChat } from '@/lib/models';
 import { auth } from '@clerk/nextjs/server';
 import { createClerkClient } from '@clerk/backend';
 import { jwtVerify } from 'jose';
@@ -14,6 +14,7 @@ const ENCODED_JWT_SECRET = new TextEncoder().encode(JWT_SECRET);
 async function getUserFromRequest(request: NextRequest) {
   // Check for Authorization header first (for client-side requests)
   const authHeader = request.headers.get('authorization');
+
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7);
 
@@ -72,6 +73,54 @@ async function getUserFromRequest(request: NextRequest) {
   return null;
 }
 
+// Enrich participant data with user information
+async function enrichParticipantData(participants: any[]) {
+  const clerk = createClerkClient({
+    secretKey: process.env.CLERK_SECRET_KEY!,
+    publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!,
+  });
+
+  const enrichedParticipants = await Promise.all(
+    participants.map(async (participant) => {
+      try {
+        if (participant.userType === 'clerk') {
+          // Get Clerk user data
+          const user = await clerk.users.getUser(participant.userId);
+          return {
+            ...participant,
+            name: user.fullName || user.firstName || user.emailAddresses[0]?.emailAddress || 'Unknown User',
+            avatar: user.imageUrl || null,
+            email: user.emailAddresses[0]?.emailAddress || null,
+          };
+        } else if (participant.userType === 'homestay') {
+          // Get homestay data
+          const homestay = await HomestaySingle.findOne({ homestayId: participant.userId }).lean();
+          if (homestay) {
+            return {
+              ...participant,
+              name: homestay.homeStayName || homestay.name || 'Unknown Homestay',
+              avatar: homestay.profileImage || null,
+              email: homestay.email || null,
+            };
+          }
+        }
+      } catch (error) {
+        console.error(`Error enriching participant ${participant.userId}:`, error);
+      }
+
+      // Fallback for failed enrichment
+      return {
+        ...participant,
+        name: 'Unknown User',
+        avatar: null,
+        email: null,
+      };
+    })
+  );
+
+  return enrichedParticipants;
+}
+
 // Verify user authorization for chat access
 async function verifyUserChatAccess(user: { userId: string; userType: 'clerk' | 'homestay' }, chatId?: string) {
   if (!chatId) return true; // For creating new chats
@@ -115,8 +164,19 @@ export async function GET(request: NextRequest) {
     .limit(validLimit)
     .lean();
 
-    return NextResponse.json({ 
-      conversations,
+    // Enrich conversations with participant data
+    const enrichedConversations = await Promise.all(
+      conversations.map(async (conversation) => {
+        const enrichedParticipants = await enrichParticipantData(conversation.participants);
+        return {
+          ...conversation,
+          participants: enrichedParticipants,
+        };
+      })
+    );
+
+    return NextResponse.json({
+      conversations: enrichedConversations,
       pagination: {
         limit: validLimit,
         offset,
@@ -180,9 +240,16 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingChat) {
-      return NextResponse.json({ 
-        conversation: existingChat,
-        isNew: false 
+      // Enrich existing chat with participant data
+      const enrichedParticipants = await enrichParticipantData(existingChat.participants);
+      const enrichedChat = {
+        ...existingChat.toObject(),
+        participants: enrichedParticipants,
+      };
+
+      return NextResponse.json({
+        conversation: enrichedChat,
+        isNew: false
       });
     }
 
@@ -228,9 +295,16 @@ export async function POST(request: NextRequest) {
       // Don't fail the request if Redis publish fails
     }
 
-    return NextResponse.json({ 
-      conversation: newChat,
-      isNew: true 
+    // Enrich new chat with participant data
+    const enrichedParticipants = await enrichParticipantData(newChat.participants);
+    const enrichedNewChat = {
+      ...newChat.toObject(),
+      participants: enrichedParticipants,
+    };
+
+    return NextResponse.json({
+      conversation: enrichedNewChat,
+      isNew: true
     }, { status: 201 });
 
   } catch (error) {
