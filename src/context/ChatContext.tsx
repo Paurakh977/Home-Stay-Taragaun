@@ -62,6 +62,13 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const authData = useAuthToken();
+
+  console.log('ChatProvider initialized with authData:', authData);
+
+  // Add effect to track auth data changes
+  useEffect(() => {
+    console.log('ChatProvider - authData changed:', authData);
+  }, [authData]);
   
   // Connection state
   const [isConnected, setIsConnected] = useState(false);
@@ -381,10 +388,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         // JWT token is already in cookies, no need to add to headers
       }
 
-      const response = await fetch('/api/chat/conversations', { headers });
+      const response = await fetch('/api/chat/conversations', {
+        headers,
+        credentials: 'include' // Include cookies for JWT authentication
+      });
       const data = await response.json();
-      
+
       if (response.ok) {
+        console.log('Fetched conversations:', data.conversations?.length || 0, 'conversations');
         setConversations(data.conversations || []);
       } else {
         console.error('Error fetching conversations:', data.error);
@@ -409,7 +420,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         headers['Authorization'] = `Bearer ${authData.token}`;
       }
 
-      const response = await fetch(`/api/chat/messages?chatId=${chatId}&limit=50`, { headers });
+      const response = await fetch(`/api/chat/messages?chatId=${chatId}&limit=50`, {
+        headers,
+        credentials: 'include' // Include cookies for JWT authentication
+      });
       const data = await response.json();
       
       if (response.ok) {
@@ -448,6 +462,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const response = await fetch('/api/chat/conversations', {
         method: 'POST',
         headers,
+        credentials: 'include', // Include cookies for JWT authentication
         body: JSON.stringify({
           participantId,
           participantType
