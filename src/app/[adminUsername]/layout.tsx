@@ -6,6 +6,7 @@ import { User } from "@/lib/models";
 import dbConnect from "@/lib/mongodb";
 import { getBrandingByAdminUsername } from "@/lib/services/brandingService";
 import BrandingProviderClient from "@/context/BrandingProviderClient";
+import ChatProviderClient from "@/components/providers/ChatProviderClient";
 
 export const dynamic = 'force-dynamic';
 
@@ -40,10 +41,12 @@ export default async function AdminLayout({
     // Return regular layout - our page.tsx now uses a fixed overlay to hide everything
     return (
       <BrandingProviderClient brandingData={brandingData}>
-        <Navbar adminUsername={adminUsername} />
-        <main className="flex-grow">{children}</main>
-        <Footer adminUsername={adminUsername} />
-        <Toaster position="top-right" richColors />
+        <ChatProviderClient>
+          <Navbar adminUsername={adminUsername} />
+          <main className="flex-grow">{children}</main>
+          <Footer adminUsername={adminUsername} />
+          <Toaster position="top-right" richColors />
+        </ChatProviderClient>
       </BrandingProviderClient>
     );
   } catch (error) {
