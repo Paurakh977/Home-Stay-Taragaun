@@ -29,6 +29,8 @@ import { DefaultEventsMap } from "socket.io";
     timestamp: string 
   }) => void;
   messages_marked_read: (data: { chatId: string; messageIds: string[] }) => void;
+  chat_joined: (data: { chatId: string; success: boolean }) => void;
+  chat_left: (data: { chatId: string; success: boolean }) => void;
   error_message: (data: { message: string }) => void;
 };
 
@@ -64,7 +66,7 @@ export const initSocket = async (auth: { tokenType: 'clerk' | 'jwt'; token: stri
   }
 
   const socketPath = process.env.NEXT_PUBLIC_SOCKET_PATH || '/api/socket';
-  const socketUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+  const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
 
   // Ensure the server initializes the Socket.IO instance via API route before connecting
   try {
@@ -161,6 +163,8 @@ export const leaveChat = (chatId: string) => {
 export const sendMessage = (chatId: string, content: string, messageType: 'text' | 'image' | 'file' = 'text') => {
   if (socket?.connected) {
     socket.emit('send_message', { chatId, content, messageType });
+  } else {
+    console.error('Cannot send message: socket not connected');
   }
 };
 
@@ -205,6 +209,14 @@ export const onMessagesMarkedRead = (callback: SocketClientEvents['messages_mark
   socket?.on('messages_marked_read', callback);
 };
 
+export const onChatJoined = (callback: SocketClientEvents['chat_joined']) => {
+  socket?.on('chat_joined', callback);
+};
+
+export const onChatLeft = (callback: SocketClientEvents['chat_left']) => {
+  socket?.on('chat_left', callback);
+};
+
 /**
  * Remove event listeners
  */
@@ -236,4 +248,16 @@ export const offMessagesMarkedRead = (callback?: SocketClientEvents['messages_ma
   if (!socket) return;
   if (callback) socket.off('messages_marked_read', callback);
   else socket.removeAllListeners('messages_marked_read');
+};
+
+export const offChatJoined = (callback?: SocketClientEvents['chat_joined']) => {
+  if (!socket) return;
+  if (callback) socket.off('chat_joined', callback);
+  else socket.removeAllListeners('chat_joined');
+};
+
+export const offChatLeft = (callback?: SocketClientEvents['chat_left']) => {
+  if (!socket) return;
+  if (callback) socket.off('chat_left', callback);
+  else socket.removeAllListeners('chat_left');
 };
