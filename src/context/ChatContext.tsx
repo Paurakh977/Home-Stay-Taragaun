@@ -43,7 +43,7 @@ interface ChatContextType {
   userStatuses: { [userId: string]: UserStatusData };
   
   // Typing indicators
-  typingUsers: { [chatId: string]: string[] };
+  typingUsers: { [chatId: string]: { userId: string; userName: string }[] };
   
   // Actions
   connectSocket: () => Promise<void>;
@@ -84,12 +84,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [userStatuses, setUserStatuses] = useState<{ [userId: string]: UserStatusData }>({});
   
   // Typing indicators
-  const [typingUsers, setTypingUsers] = useState<{ [chatId: string]: string[] }>({});
+  const [typingUsers, setTypingUsers] = useState<{ [chatId: string]: { userId: string; userName: string }[] }>({});
 
   // Socket connection
   const connectSocket = useCallback(async () => {
-    if (!authData || isConnecting) return;
+    if (!authData || isConnecting || typeof window === 'undefined') return;
 
+    console.log('🔌 ChatContext - Attempting to connect socket for:', authData);
     setIsConnecting(true);
     setConnectionError(null);
 
@@ -101,8 +102,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       const socket = getSocket();
       if (socket) {
+        console.log('✅ ChatContext - Socket connected successfully for:', authData.tokenType, authData.userId);
         setIsConnected(true);
-        
+
         // Set up event listeners
         onNewMessage(handleNewMessage);
         onUserStatus(handleUserStatus);
@@ -112,12 +114,25 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         onChatJoined(handleChatJoined);
         onChatLeft(handleChatLeft);
 
-        socket.on('connect', () => setIsConnected(true));
-        socket.on('disconnect', () => setIsConnected(false));
+        socket.on('connect', () => {
+          console.log('✅ ChatContext - Socket connect event fired for:', authData.tokenType, authData.userId);
+          setIsConnected(true);
+
+          // Fetch conversations when socket connects
+          fetchConversations().catch(error => {
+            console.error('❌ ChatContext - Error fetching conversations on connect:', error);
+          });
+        });
+        socket.on('disconnect', () => {
+          console.log('🔌 ChatContext - Socket disconnect event fired for:', authData.tokenType, authData.userId);
+          setIsConnected(false);
+        });
+      } else {
+        console.error('❌ ChatContext - Failed to get socket instance');
       }
     } catch (error) {
       setConnectionError(error instanceof Error ? error.message : 'Connection failed');
-      console.error('Socket connection error:', error);
+      console.error('❌ ChatContext - Socket connection error for:', authData.tokenType, authData.userId, error);
     } finally {
       setIsConnecting(false);
     }
@@ -139,12 +154,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   // Event handlers
   const handleNewMessage = (data: any) => {
+    console.log('📨 ChatContext - Received new message:', data, 'for user:', authData?.userId);
     const message: MessageData = {
       _id: data.messageId,
       messageId: data.messageId,
       chatId: data.chatId,
       senderId: data.senderId,
       senderType: data.senderType,
+      senderName: data.senderName,
       content: data.content,
       messageType: data.messageType,
       timestamp: data.timestamp,
@@ -208,25 +225,35 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   };
 
   const handleTypingStatus = (data: any) => {
+    console.log('⌨️ ChatContext - Received typing status:', data, 'for user:', authData?.userId);
+    // Don't show typing indicator for current user
+    if (data.userId === authData?.userId) {
+      console.log('⌨️ ChatContext - Ignoring typing status for self');
+      return;
+    }
+
     setTypingUsers(prev => {
       const currentTyping = prev[data.chatId] || [];
-      
+
       if (data.isTyping) {
         // Add user to typing list if not already there
-        if (!currentTyping.includes(data.userId)) {
+        const existingUser = currentTyping.find(user => user.userId === data.userId);
+        if (!existingUser) {
+          console.log('⌨️ ChatContext - Adding user to typing list:', data.userId, data.userName);
           return {
             ...prev,
-            [data.chatId]: [...currentTyping, data.userId]
+            [data.chatId]: [...currentTyping, { userId: data.userId, userName: data.userName || 'Someone' }]
           };
         }
       } else {
         // Remove user from typing list
+        console.log('⌨️ ChatContext - Removing user from typing list:', data.userId);
         return {
           ...prev,
-          [data.chatId]: currentTyping.filter(userId => userId !== data.userId)
+          [data.chatId]: currentTyping.filter(user => user.userId !== data.userId)
         };
       }
-      
+
       return prev;
     });
   };
@@ -236,7 +263,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setConnectionError(data.message);
   };
 
-  const handleMessagesMarkedRead = (data: any) => {
+  const handleMessagesMarkedRead = (_data: any) => {
     // Optional: update local message read state or conversation unread counts if needed
     // Currently, unread counting is derived on server; we keep client minimal
   };
@@ -259,9 +286,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         [currentChatId]: []
       }));
     }
-    
+
     setCurrentChatId(chatId);
-    
+
     if (chatId) {
       joinChat(chatId);
       fetchMessages(chatId);
@@ -488,12 +515,23 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   // Auto-connect when auth data is available
   useEffect(() => {
+    console.log('🔄 ChatContext - Auto-connect useEffect triggered:', {
+      authData: !!authData,
+      authDataType: authData?.tokenType,
+      authDataUserId: authData?.userId,
+      isConnected,
+      isConnecting,
+      isBrowser: typeof window !== 'undefined'
+    });
+
     if (authData && !isConnected && !isConnecting) {
+      console.log('🚀 ChatContext - Triggering socket connection for:', authData.tokenType, authData.userId);
       connectSocket();
     }
-    
+
     // Disconnect when auth data is lost
     if (!authData && (isConnected || isConnecting)) {
+      console.log('🔌 ChatContext - Disconnecting socket due to lost auth data');
       disconnectSocketHandler();
     }
   }, [authData, isConnected, isConnecting, connectSocket, disconnectSocketHandler]);

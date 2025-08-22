@@ -37,6 +37,25 @@ export function useAuthToken() {
 
       // Check for JWT authentication via API (homestay users)
       console.log('useAuthToken - Checking JWT via API...');
+      console.log('useAuthToken - Current document.cookie:', document.cookie);
+      console.log('useAuthToken - Looking for auth_token cookie...');
+
+      // Check if auth_token cookie exists in document.cookie
+      const hasAuthTokenCookie = document.cookie.includes('auth_token=');
+      console.log('useAuthToken - auth_token cookie exists:', hasAuthTokenCookie);
+
+      // Check localStorage for user data
+      const userJson = localStorage.getItem("user");
+      console.log('useAuthToken - localStorage user data:', userJson ? 'exists' : 'missing');
+      if (userJson) {
+        try {
+          const userData = JSON.parse(userJson);
+          console.log('useAuthToken - localStorage user:', userData.homestayId);
+        } catch (e) {
+          console.log('useAuthToken - localStorage user data invalid');
+        }
+      }
+
       try {
         const response = await fetch('/api/auth/me', {
           credentials: 'include' // Include cookies

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Toaster } from "sonner";
+import { ChatProvider } from "@/context/ChatContext";
 import {
   User,
   LogOut,
@@ -297,8 +298,9 @@ export default function DashboardLayout({
   }, [pathname, user?.featureAccess]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Toaster position="top-right" />
+    <ChatProvider>
+      <div className="min-h-screen bg-gray-50">
+        <Toaster position="top-right" />
       {/* Mobile top bar - positioned below the main navbar */}
       <div className="lg:hidden fixed top-16 left-0 z-30 w-full bg-white shadow-sm p-4 flex justify-between items-center">
         <div className="font-bold text-lg text-gray-800 truncate">
@@ -528,6 +530,7 @@ export default function DashboardLayout({
       <div className={isCollapsed ? "lg:ml-20" : "lg:ml-64"} style={{ paddingTop: "2rem", paddingBottom: "2rem" }}>
         <div className="p-12 lg:pt-6">{children}</div>
       </div>
-    </div>
+      </div>
+    </ChatProvider>
   );
 }

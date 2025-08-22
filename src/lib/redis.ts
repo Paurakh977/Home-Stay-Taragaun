@@ -6,6 +6,7 @@ export interface RedisMessage {
   messageId: string;
   senderId: string;
   senderType: 'clerk' | 'homestay';
+  senderName?: string;
   content: string;
   messageType: 'text' | 'image' | 'file';
   timestamp: Date;
@@ -26,6 +27,7 @@ export interface RedisTypingStatus {
   chatId: string;
   userId: string;
   userType: 'clerk' | 'homestay';
+  userName?: string;
   isTyping: boolean;
 }
 
@@ -103,6 +105,10 @@ export const checkRedisHealth = async (): Promise<boolean> => {
   }
 };
 
+// Track if event handlers have been set up to prevent duplicates
+let eventHandlersSetup = false;
+let healthCheckInterval: NodeJS.Timeout | null = null;
+
 // Initialize Redis connections with enhanced error handling
 export const initializeRedis = async () => {
   try {
@@ -111,7 +117,8 @@ export const initializeRedis = async () => {
     // Main Redis client for general operations
     if (!redisClient) {
       redisClient = new Redis(config);
-      
+      redisClient.setMaxListeners(30); // Increase limit to prevent warnings
+
       // Wait for connection
       await redisClient.connect();
       await redisClient.ping();
@@ -121,7 +128,8 @@ export const initializeRedis = async () => {
     // Publisher client for pub/sub
     if (!redisPublisher) {
       redisPublisher = new Redis(config);
-      
+      redisPublisher.setMaxListeners(30); // Increase limit to prevent warnings
+
       await redisPublisher.connect();
       await redisPublisher.ping();
       console.log('✅ Redis publisher connected successfully');
@@ -130,47 +138,54 @@ export const initializeRedis = async () => {
     // Subscriber client for pub/sub
     if (!redisSubscriber) {
       redisSubscriber = new Redis(config);
-      
+      redisSubscriber.setMaxListeners(30); // Increase limit to prevent warnings
+
       await redisSubscriber.connect();
       await redisSubscriber.ping();
       console.log('✅ Redis subscriber connected successfully');
     }
 
-    // Set up comprehensive error handlers
-    [
-      { client: redisClient, name: 'main' },
-      { client: redisPublisher, name: 'publisher' },
-      { client: redisSubscriber, name: 'subscriber' }
-    ].forEach(({ client, name }) => {
-      if (!client) return;
+    // Set up comprehensive error handlers only once
+    if (!eventHandlersSetup) {
+      [
+        { client: redisClient, name: 'main' },
+        { client: redisPublisher, name: 'publisher' },
+        { client: redisSubscriber, name: 'subscriber' }
+      ].forEach(({ client, name }) => {
+        if (!client) return;
 
-      client.on('error', (error) => {
-        console.error(`❌ Redis ${name} client error:`, error);
+        client.on('error', (error) => {
+          console.error(`❌ Redis ${name} client error:`, error);
+        });
+
+        client.on('connect', () => {
+          console.log(`🔗 Redis ${name} client connected`);
+        });
+
+        client.on('ready', () => {
+          console.log(`✅ Redis ${name} client ready`);
+        });
+
+        client.on('close', () => {
+          console.log(`🔌 Redis ${name} client connection closed`);
+        });
+
+        client.on('reconnecting', (ms: number) => {
+          console.log(`🔄 Redis ${name} client reconnecting in ${ms}ms...`);
+        });
+
+        client.on('end', () => {
+          console.log(`🔚 Redis ${name} client connection ended`);
+        });
       });
 
-      client.on('connect', () => {
-        console.log(`🔗 Redis ${name} client connected`);
-      });
+      eventHandlersSetup = true;
+    }
 
-      client.on('ready', () => {
-        console.log(`✅ Redis ${name} client ready`);
-      });
-
-      client.on('close', () => {
-        console.log(`🔌 Redis ${name} client connection closed`);
-      });
-
-      client.on('reconnecting', (ms: number) => {
-        console.log(`🔄 Redis ${name} client reconnecting in ${ms}ms...`);
-      });
-
-      client.on('end', () => {
-        console.log(`🔚 Redis ${name} client connection ended`);
-      });
-    });
-
-    // Start periodic health checks
-    setInterval(checkRedisHealth, HEALTH_CHECK_INTERVAL);
+    // Start periodic health checks only once
+    if (!healthCheckInterval) {
+      healthCheckInterval = setInterval(checkRedisHealth, HEALTH_CHECK_INTERVAL);
+    }
 
     return { redisClient, redisPublisher, redisSubscriber };
 
@@ -216,8 +231,41 @@ export const getRedisSubscriber = () => {
   if (redisSubscriber.status !== 'ready') {
     console.warn(`⚠️ Redis subscriber status: ${redisSubscriber.status}`);
   }
-  
+
   return redisSubscriber;
+};
+
+// Cleanup function to properly close Redis connections
+export const closeRedisConnections = async () => {
+  try {
+    if (healthCheckInterval) {
+      clearInterval(healthCheckInterval);
+      healthCheckInterval = null;
+    }
+
+    const promises = [];
+
+    if (redisClient) {
+      promises.push(redisClient.disconnect());
+      redisClient = null;
+    }
+
+    if (redisPublisher) {
+      promises.push(redisPublisher.disconnect());
+      redisPublisher = null;
+    }
+
+    if (redisSubscriber) {
+      promises.push(redisSubscriber.disconnect());
+      redisSubscriber = null;
+    }
+
+    await Promise.all(promises);
+    eventHandlersSetup = false;
+    console.log('✅ All Redis connections closed successfully');
+  } catch (error) {
+    console.error('❌ Error closing Redis connections:', error);
+  }
 };
 
 // Enhanced utility functions for chat-related Redis operations
@@ -359,45 +407,7 @@ export const getChatRoomUsers = async (chatId: string) => {
   }
 };
 
-// Clean up Redis connections with proper error handling
-export const closeRedisConnections = async () => {
-  try {
-    const disconnectPromises = [];
 
-    if (redisClient) {
-      disconnectPromises.push(
-        redisClient.quit().then(() => {
-          redisClient = null;
-          console.log('🔌 Redis main client disconnected');
-        })
-      );
-    }
-
-    if (redisPublisher) {
-      disconnectPromises.push(
-        redisPublisher.quit().then(() => {
-          redisPublisher = null;
-          console.log('🔌 Redis publisher disconnected');
-        })
-      );
-    }
-
-    if (redisSubscriber) {
-      disconnectPromises.push(
-        redisSubscriber.quit().then(() => {
-          redisSubscriber = null;
-          console.log('🔌 Redis subscriber disconnected');
-        })
-      );
-    }
-
-    await Promise.all(disconnectPromises);
-    console.log('✅ All Redis connections closed successfully');
-
-  } catch (error) {
-    console.error('❌ Error closing Redis connections:', error);
-  }
-};
 
 // Redis channels for pub/sub
 export const REDIS_CHANNELS = {

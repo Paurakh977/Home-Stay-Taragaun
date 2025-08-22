@@ -7,6 +7,7 @@ import { DefaultEventsMap } from "socket.io";
     messageId: string;
     senderId: string;
     senderType: 'clerk' | 'homestay';
+    senderName?: string;
     content: string;
     messageType: 'text' | 'image' | 'file';
     timestamp: string;
@@ -21,6 +22,7 @@ import { DefaultEventsMap } from "socket.io";
     chatId: string;
     userId: string;
     userType: 'clerk' | 'homestay';
+    userName?: string;
     isTyping: boolean;
   }) => void;
   message_sent: (data: { 
@@ -54,12 +56,16 @@ let socket: ChatSocket | null = null;
  * Initialize Socket.IO client with authentication
  */
 export const initSocket = async (auth: { tokenType: 'clerk' | 'jwt'; token: string }): Promise<ChatSocket> => {
+  console.log('🔌 Socket Client - Initializing socket for:', auth.tokenType);
+
   if (socket?.connected) {
+    console.log('🔌 Socket Client - Socket already connected for:', auth.tokenType);
     return socket;
   }
 
   // Disconnect existing socket if present
   if (socket) {
+    console.log('🔌 Socket Client - Cleaning up existing socket for:', auth.tokenType);
     // Ensure we clean up previous listeners to prevent memory leaks
     socket.removeAllListeners();
     socket.disconnect();
@@ -82,35 +88,37 @@ export const initSocket = async (auth: { tokenType: 'clerk' | 'jwt'; token: stri
     reconnection: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
+    withCredentials: true, // Enable sending cookies with socket connection
+    forceNew: true // Force new connection to ensure fresh authentication
   }) as ChatSocket;
 
   return new Promise((resolve, reject) => {
     if (!socket) return reject(new Error('Socket initialization failed'));
 
     socket.on('connect', () => {
-      console.log('✅ Socket.IO client connected');
+      console.log('✅ Socket Client - Socket.IO client connected for:', auth.tokenType);
       resolve(socket!);
     });
 
     socket.on('connect_error', (error) => {
-      console.error('❌ Socket.IO connection error:', error);
+      console.error('❌ Socket Client - Socket.IO connection error for:', auth.tokenType, error);
       reject(error);
     });
 
     socket.on('disconnect', (reason) => {
-      console.log('🔌 Socket.IO client disconnected:', reason);
+      console.log('🔌 Socket Client - Socket.IO client disconnected for:', auth.tokenType, 'reason:', reason);
     });
 
     socket.on('reconnect', (attemptNumber:number) => {
-      console.log(`🔄 Socket.IO client reconnected after ${attemptNumber} attempts`);
+      console.log(`🔄 Socket Client - Socket.IO client reconnected for: ${auth.tokenType} after ${attemptNumber} attempts`);
     });
 
     socket.on('reconnect_error', (error:Error) => {
-      console.error('❌ Socket.IO reconnection error:', error);
+      console.error('❌ Socket Client - Socket.IO reconnection error for:', auth.tokenType, error);
     });
 
     socket.on('reconnect_failed', () => {
-      console.error('❌ Socket.IO reconnection failed');
+      console.error('❌ Socket Client - Socket.IO reconnection failed for:', auth.tokenType);
     });
   });
 };
