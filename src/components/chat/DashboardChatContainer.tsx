@@ -124,17 +124,21 @@ function DashboardChatContainerInner({
   const convertMessagesToChatMessages = (msgs: MessageData[]): Message[] => {
     return msgs.map(msg => ({
       id: msg.messageId,
-      sender: msg.senderName || 'Unknown',
+      sender: msg.isSelf ? 'You' : (msg.senderName || 'Unknown User'),
       senderAvatar: msg.senderAvatar,
       content: msg.content,
       timestamp: msg.timestamp,
-      isSelf: msg.isSelf || false
+      isSelf: msg.isSelf || false,
+      isRead: msg.readBy && msg.readBy.length > 1 // Read by more than just the sender
     }));
   };
 
   const getTypingUsersForChat = (chatId: string | null): string[] => {
-    if (!chatId) return [];
-    return typingUsers[chatId] || [];
+    if (!chatId || !typingUsers[chatId]) return [];
+
+    return typingUsers[chatId]
+      .filter(user => user.userId !== authData?.userId) // Filter out current user
+      .map(user => user.userName);
   };
 
   const formatTime = (date: Date | string): string => {

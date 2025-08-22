@@ -19,9 +19,7 @@ interface ChatContainerProps {
 const convertConversationsToChats = (conversations: ChatData[], userStatuses: { [userId: string]: UserStatusData }, currentUserId?: string): ChatItem[] => {
   return conversations.map(conv => {
     // Find the other participant (not the current user)
-    const otherParticipant = conv.participants.find(p =>
-      currentUserId ? p.userId !== currentUserId : (!p.name || p.name !== 'You')
-    );
+    const otherParticipant = conv.participants.find(p => p.userId !== currentUserId);
 
     return {
       id: conv.chatId,
@@ -39,27 +37,22 @@ const convertConversationsToChats = (conversations: ChatData[], userStatuses: { 
 const convertMessagesToChatMessages = (messages: MessageData[]): Message[] => {
   return messages.map(msg => ({
     id: msg.messageId,
-    sender: msg.senderName || (msg.isSelf ? 'You' : 'User'),
+    sender: msg.isSelf ? 'You' : (msg.senderName || 'Unknown User'),
     senderAvatar: msg.senderAvatar,
     content: msg.content,
     timestamp: msg.timestamp,
-    isSelf: msg.isSelf || false
+    isSelf: msg.isSelf || false,
+    isRead: msg.readBy && msg.readBy.length > 1 // Read by more than just the sender
   }));
 };
 
 // Helper function to get typing users for current chat
-const getTypingUsersForChat = (chatId: string | null, typingUsers: { [chatId: string]: string[] }, conversations: ChatData[]): string[] => {
+const getTypingUsersForChat = (chatId: string | null, typingUsers: { [chatId: string]: { userId: string; userName: string }[] }, currentUserId?: string): string[] => {
   if (!chatId || !typingUsers[chatId]) return [];
-  
-  const currentConv = conversations.find(c => c.chatId === chatId);
-  if (!currentConv) return [];
-  
+
   return typingUsers[chatId]
-    .map(userId => {
-      const participant = currentConv.participants.find(p => p.userId === userId);
-      return participant?.name || participant?.username || 'Someone';
-    })
-    .filter(name => name !== 'You'); // Don't show self typing
+    .filter(user => user.userId !== currentUserId) // Filter out current user
+    .map(user => user.userName);
 };
 
 // Helper function to format time
@@ -241,9 +234,9 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ navbarHeight }) => {
           <div className="flex flex-col flex-1 min-h-0">
             {/* Messages */}
             <div className="flex-1 overflow-y-auto min-h-0" ref={messagesContainerRef}>
-              <ChatMessages 
-                messages={convertMessagesToChatMessages(messages[currentChatId] || [])} 
-                typingUsers={getTypingUsersForChat(currentChatId, typingUsers, conversations)}
+              <ChatMessages
+                messages={convertMessagesToChatMessages(messages[currentChatId] || [])}
+                typingUsers={getTypingUsersForChat(currentChatId, typingUsers, authData?.userId)}
               />
             </div>
             {/* Message Input */}

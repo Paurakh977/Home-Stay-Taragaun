@@ -8,6 +8,7 @@ export interface Message {
   content: string;
   timestamp: string;
   isSelf: boolean;
+  isRead?: boolean;
 }
 
 interface ChatMessagesProps {
@@ -75,9 +76,16 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, typingUsers = [] 
             >
               <p className={`text-sm ${message.isSelf ? 'text-white' : 'text-gray-800'}`}>{message.content}</p>
             </div>
-            <p className={`text-xs mt-1 ${message.isSelf ? 'text-right text-gray-500' : 'text-gray-500'}`}>
-              {formatTime(message.timestamp)}
-            </p>
+            <div className={`flex items-center mt-1 gap-1 ${message.isSelf ? 'justify-end' : 'justify-start'}`}>
+              <p className="text-xs text-gray-500">
+                {formatTime(message.timestamp)}
+              </p>
+              {message.isSelf && (
+                <span className="text-xs text-gray-500">
+                  {message.isRead ? '✓✓' : '✓'}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       ))}
