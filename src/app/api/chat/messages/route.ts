@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import { Message, Chat } from '@/lib/models';
 import { auth } from '@clerk/nextjs/server';
+import { createClerkClient } from '@clerk/backend';
 import { jwtVerify } from 'jose';
 import { v4 as uuidv4 } from 'uuid';
 import { getRedisPublisher, REDIS_CHANNELS, initializeRedis, type RedisMessage } from '@/lib/redis';
@@ -11,7 +12,40 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_for_developmen
 const ENCODED_JWT_SECRET = new TextEncoder().encode(JWT_SECRET);
 
 async function getUserFromRequest(request: NextRequest) {
-  // Check for Clerk authentication first
+  // Check for Authorization header first (for client-side requests)
+  const authHeader = request.headers.get('authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+
+    try {
+      // Try to verify as Clerk token
+      const clerk = createClerkClient({
+        secretKey: process.env.CLERK_SECRET_KEY!,
+        publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!,
+      });
+
+      const { toAuth } = await clerk.authenticateRequest(request);
+      const authData = toAuth();
+      if (authData && authData.userId) {
+        return { userId: authData.userId, userType: 'clerk' as const };
+      }
+    } catch (error) {
+      console.log('Clerk token verification failed, trying JWT...');
+
+      // Try to verify as JWT token
+      try {
+        const { payload } = await jwtVerify(token, ENCODED_JWT_SECRET);
+        const homestayId = (payload as any).homestayId;
+        if (homestayId) {
+          return { userId: homestayId, userType: 'homestay' as const };
+        }
+      } catch (jwtError) {
+        console.log('JWT token verification also failed');
+      }
+    }
+  }
+
+  // Fallback to server-side auth (for server-side requests)
   try {
     const { userId } = await auth();
     if (userId) {
@@ -22,7 +56,7 @@ async function getUserFromRequest(request: NextRequest) {
     // Clerk auth failed, continue to JWT check
   }
 
-  // Check for JWT token (homestay/admin users)
+  // Check for JWT token in cookies (homestay/admin users)
   const authToken = request.cookies.get('auth_token')?.value;
   if (authToken) {
     try {
