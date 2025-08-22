@@ -82,8 +82,10 @@ export async function POST(req: NextRequest) {
       path: '/',
       secure: process.env.NODE_ENV === 'production',
       maxAge: 60 * 60 * 24 * 7, // 7 days
-      sameSite: 'lax'
+      sameSite: 'lax' // Keep as lax for both dev and prod
     });
+
+    console.log('🔐 Login - Setting auth_token cookie for homestay:', homestay.homestayId);
     
     return response;
     

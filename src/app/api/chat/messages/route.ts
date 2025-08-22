@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import { Message, Chat } from '@/lib/models';
+import HomestaySingle from '@/lib/models/HomestaySingle';
 import { auth } from '@clerk/nextjs/server';
 import { createClerkClient } from '@clerk/backend';
 import { jwtVerify } from 'jose';
@@ -76,11 +77,11 @@ async function getUserFromRequest(request: NextRequest) {
 // Verify user authorization for chat access
 async function verifyUserChatAccess(user: { userId: string; userType: 'clerk' | 'homestay' }, chatId: string) {
   try {
-    const chat = await Chat.findOne({ 
+    const chat = await Chat.findOne({
       chatId,
       'participants.userId': user.userId,
       'participants.userType': user.userType,
-      isActive: true 
+      isActive: true
     });
 
     return !!chat;
@@ -88,6 +89,43 @@ async function verifyUserChatAccess(user: { userId: string; userType: 'clerk' | 
     console.error('Error verifying chat access:', error);
     return false;
   }
+}
+
+// Enrich messages with sender names
+async function enrichMessagesWithSenderNames(messages: any[]) {
+  const clerk = createClerkClient({
+    secretKey: process.env.CLERK_SECRET_KEY!,
+    publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!,
+  });
+
+  const enrichedMessages = await Promise.all(
+    messages.map(async (message) => {
+      try {
+        let senderName = 'Unknown User';
+
+        if (message.senderType === 'clerk') {
+          const user = await clerk.users.getUser(message.senderId);
+          senderName = user.fullName || user.firstName || user.emailAddresses[0]?.emailAddress || 'Unknown User';
+        } else if (message.senderType === 'homestay') {
+          const homestay = await HomestaySingle.findOne({ homestayId: message.senderId }).lean();
+          senderName = homestay?.homeStayName || homestay?.name || 'Unknown Homestay';
+        }
+
+        return {
+          ...message,
+          senderName
+        };
+      } catch (error) {
+        console.error(`Error enriching message ${message.messageId}:`, error);
+        return {
+          ...message,
+          senderName: 'Unknown User'
+        };
+      }
+    })
+  );
+
+  return enrichedMessages;
 }
 
 // GET - Fetch messages for a chat
@@ -141,8 +179,11 @@ export async function GET(request: NextRequest) {
     // Reverse to get chronological order
     const sortedMessages = messages.reverse();
 
-    return NextResponse.json({ 
-      messages: sortedMessages,
+    // Enrich messages with sender names
+    const enrichedMessages = await enrichMessagesWithSenderNames(sortedMessages);
+
+    return NextResponse.json({
+      messages: enrichedMessages,
       pagination: {
         limit: validLimit,
         before,
@@ -255,11 +296,34 @@ export async function POST(request: NextRequest) {
 
     // Publish new message event via Redis with comprehensive error handling
     try {
+      // Get sender name for the event
+      let senderName = 'Unknown User';
+      if (user.userType === 'clerk') {
+        const clerk = createClerkClient({
+          secretKey: process.env.CLERK_SECRET_KEY!,
+          publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!,
+        });
+        try {
+          const clerkUser = await clerk.users.getUser(user.userId);
+          senderName = clerkUser.fullName || clerkUser.firstName || clerkUser.emailAddresses[0]?.emailAddress || 'Unknown User';
+        } catch (clerkError) {
+          console.error('Error fetching Clerk user for message event:', clerkError);
+        }
+      } else if (user.userType === 'homestay') {
+        try {
+          const homestay = await HomestaySingle.findOne({ homestayId: user.userId }).lean();
+          senderName = homestay?.homeStayName || homestay?.name || 'Unknown Homestay';
+        } catch (homestayError) {
+          console.error('Error fetching homestay for message event:', homestayError);
+        }
+      }
+
       const event: RedisMessage = {
         chatId,
         messageId: msgDoc.messageId,
         senderId: msgDoc.senderId,
         senderType: msgDoc.senderType,
+        senderName,
         content: msgDoc.content,
         messageType: msgDoc.messageType,
         timestamp: msgDoc.timestamp,
