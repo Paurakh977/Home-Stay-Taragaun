@@ -205,8 +205,13 @@ export async function initializeSocketServer(server: HTTPServer) {
         const { tokenType, token } = socket.handshake.auth as { tokenType?: 'clerk' | 'jwt'; token?: string };
         const userAgent = socket.handshake.headers['user-agent'] || 'unknown';
 
-        if (!token || !tokenType) {
-          return next(new Error('Authentication token missing'));
+        if (!tokenType) {
+          return next(new Error('Authentication token type missing'));
+        }
+
+        // For JWT, we read from cookies, so token can be a placeholder
+        if (tokenType === 'clerk' && !token) {
+          return next(new Error('Clerk authentication token missing'));
         }
 
         let user: SocketUser | null = null;
@@ -243,9 +248,30 @@ export async function initializeSocketServer(server: HTTPServer) {
           }
 
         } else if (tokenType === 'jwt') {
-          // Verify custom JWT for homestay/admin users
+          // Verify custom JWT for homestay/admin users - read from cookies
           try {
-            const { payload } = await jwtVerify(token, ENCODED_JWT_SECRET);
+            // Extract JWT token from cookies
+            const cookieHeader = socket.handshake.headers.cookie;
+            console.log('Socket JWT auth - Cookie header:', cookieHeader);
+            let jwtToken = null;
+
+            if (cookieHeader) {
+              const cookies = cookieHeader.split(';').map(c => c.trim());
+              console.log('Socket JWT auth - Parsed cookies:', cookies);
+              const authCookie = cookies.find(c => c.startsWith('auth_token='));
+              console.log('Socket JWT auth - Auth cookie:', authCookie);
+              if (authCookie) {
+                jwtToken = authCookie.split('=')[1];
+                console.log('Socket JWT auth - Extracted token:', jwtToken ? 'Found' : 'Not found');
+              }
+            }
+
+            if (!jwtToken) {
+              console.log('Socket JWT auth - No JWT token found in cookies');
+              return next(new Error('JWT token not found in cookies'));
+            }
+
+            const { payload } = await jwtVerify(jwtToken, ENCODED_JWT_SECRET);
             const homestayId = (payload as JWTPayload & { homestayId?: string }).homestayId;
             const username = (payload as JWTPayload & { username?: string }).username;
 
@@ -253,11 +279,11 @@ export async function initializeSocketServer(server: HTTPServer) {
               return next(new Error('Invalid homestay token - no homestay ID'));
             }
 
-            user = { 
-              userId: homestayId, 
-              userType: 'homestay', 
+            user = {
+              userId: homestayId,
+              userType: 'homestay',
               username,
-              homestayId 
+              homestayId
             };
 
           } catch (jwtError) {
