@@ -52,17 +52,8 @@ export function useAuthToken() {
       // Check for JWT authentication via API (homestay users)
       console.log('useAuthToken - Checking JWT via API...');
 
-      // Quick check if auth_token cookie exists before making API call
-      const hasAuthTokenCookie = document.cookie.includes('auth_token=');
-      console.log('useAuthToken - auth_token cookie exists:', hasAuthTokenCookie);
-
-      if (!hasAuthTokenCookie) {
-        console.log('useAuthToken - No auth_token cookie, skipping API call');
-        setAuthData(null);
-        setIsLoading(false);
-        return;
-      }
-
+      // Note: auth_token cookie is HttpOnly, so we can't check it client-side
+      // We need to make the API call to verify authentication
       try {
         const response = await fetch('/api/auth/me', {
           credentials: 'include' // Include cookies
