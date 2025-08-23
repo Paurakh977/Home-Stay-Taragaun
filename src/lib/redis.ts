@@ -6,6 +6,7 @@ export interface RedisMessage {
   messageId: string;
   senderId: string;
   senderType: 'clerk' | 'homestay';
+  senderName?: string;
   content: string;
   messageType: 'text' | 'image' | 'file';
   timestamp: Date;
@@ -26,6 +27,7 @@ export interface RedisTypingStatus {
   chatId: string;
   userId: string;
   userType: 'clerk' | 'homestay';
+  userName?: string;
   isTyping: boolean;
 }
 
@@ -45,14 +47,18 @@ const getRedisConfig = () => {
     password,
     db,
     retryDelayOnFailover: 100,
-    maxRetriesPerRequest: 3,
+    maxRetriesPerRequest: 1, // Fail fast instead of retrying
     enableReadyCheck: true,
     lazyConnect: true,
-    connectTimeout: 10000,
-    commandTimeout: 5000,
-    // Connection pool settings
+    connectTimeout: 5000, // Reduced from 10s to 5s
+    commandTimeout: 2000, // Reduced to 2s for faster failure detection
+    // Connection pool settings for better performance
     family: 4,
     keepAlive: 30000, // Keep alive timeout in milliseconds
+    // Additional performance optimizations
+    enableOfflineQueue: false, // Don't queue commands when disconnected
+    maxLoadingTimeout: 3000, // Max time to wait for Redis to load data from disk
+    retryDelayOnClusterDown: 300,
     // Enhanced reconnection strategy
     retryStrategy: (times: number) => {
       const delay = Math.min(times * 50, 2000);
@@ -66,6 +72,35 @@ const getRedisConfig = () => {
 let redisClient: Redis | null = null;
 let redisSubscriber: Redis | null = null;
 let redisPublisher: Redis | null = null;
+
+// Circuit breaker for Redis operations
+let redisFailureCount = 0;
+let lastFailureTime = 0;
+const MAX_FAILURES = 5;
+const CIRCUIT_BREAKER_TIMEOUT = 30000; // 30 seconds
+
+const isCircuitBreakerOpen = () => {
+  if (redisFailureCount >= MAX_FAILURES) {
+    const timeSinceLastFailure = Date.now() - lastFailureTime;
+    if (timeSinceLastFailure < CIRCUIT_BREAKER_TIMEOUT) {
+      return true;
+    } else {
+      // Reset circuit breaker after timeout
+      redisFailureCount = 0;
+      return false;
+    }
+  }
+  return false;
+};
+
+const recordRedisFailure = () => {
+  redisFailureCount++;
+  lastFailureTime = Date.now();
+};
+
+const recordRedisSuccess = () => {
+  redisFailureCount = 0;
+};
 
 // Connection health check
 let lastHealthCheck = 0;
@@ -103,6 +138,10 @@ export const checkRedisHealth = async (): Promise<boolean> => {
   }
 };
 
+// Track if event handlers have been set up to prevent duplicates
+let eventHandlersSetup = false;
+let healthCheckInterval: NodeJS.Timeout | null = null;
+
 // Initialize Redis connections with enhanced error handling
 export const initializeRedis = async () => {
   try {
@@ -111,7 +150,8 @@ export const initializeRedis = async () => {
     // Main Redis client for general operations
     if (!redisClient) {
       redisClient = new Redis(config);
-      
+      redisClient.setMaxListeners(30); // Increase limit to prevent warnings
+
       // Wait for connection
       await redisClient.connect();
       await redisClient.ping();
@@ -121,7 +161,8 @@ export const initializeRedis = async () => {
     // Publisher client for pub/sub
     if (!redisPublisher) {
       redisPublisher = new Redis(config);
-      
+      redisPublisher.setMaxListeners(30); // Increase limit to prevent warnings
+
       await redisPublisher.connect();
       await redisPublisher.ping();
       console.log('✅ Redis publisher connected successfully');
@@ -130,47 +171,54 @@ export const initializeRedis = async () => {
     // Subscriber client for pub/sub
     if (!redisSubscriber) {
       redisSubscriber = new Redis(config);
-      
+      redisSubscriber.setMaxListeners(30); // Increase limit to prevent warnings
+
       await redisSubscriber.connect();
       await redisSubscriber.ping();
       console.log('✅ Redis subscriber connected successfully');
     }
 
-    // Set up comprehensive error handlers
-    [
-      { client: redisClient, name: 'main' },
-      { client: redisPublisher, name: 'publisher' },
-      { client: redisSubscriber, name: 'subscriber' }
-    ].forEach(({ client, name }) => {
-      if (!client) return;
+    // Set up comprehensive error handlers only once
+    if (!eventHandlersSetup) {
+      [
+        { client: redisClient, name: 'main' },
+        { client: redisPublisher, name: 'publisher' },
+        { client: redisSubscriber, name: 'subscriber' }
+      ].forEach(({ client, name }) => {
+        if (!client) return;
 
-      client.on('error', (error) => {
-        console.error(`❌ Redis ${name} client error:`, error);
+        client.on('error', (error) => {
+          console.error(`❌ Redis ${name} client error:`, error);
+        });
+
+        client.on('connect', () => {
+          console.log(`🔗 Redis ${name} client connected`);
+        });
+
+        client.on('ready', () => {
+          console.log(`✅ Redis ${name} client ready`);
+        });
+
+        client.on('close', () => {
+          console.log(`🔌 Redis ${name} client connection closed`);
+        });
+
+        client.on('reconnecting', (ms: number) => {
+          console.log(`🔄 Redis ${name} client reconnecting in ${ms}ms...`);
+        });
+
+        client.on('end', () => {
+          console.log(`🔚 Redis ${name} client connection ended`);
+        });
       });
 
-      client.on('connect', () => {
-        console.log(`🔗 Redis ${name} client connected`);
-      });
+      eventHandlersSetup = true;
+    }
 
-      client.on('ready', () => {
-        console.log(`✅ Redis ${name} client ready`);
-      });
-
-      client.on('close', () => {
-        console.log(`🔌 Redis ${name} client connection closed`);
-      });
-
-      client.on('reconnecting', (ms: number) => {
-        console.log(`🔄 Redis ${name} client reconnecting in ${ms}ms...`);
-      });
-
-      client.on('end', () => {
-        console.log(`🔚 Redis ${name} client connection ended`);
-      });
-    });
-
-    // Start periodic health checks
-    setInterval(checkRedisHealth, HEALTH_CHECK_INTERVAL);
+    // Start periodic health checks only once
+    if (!healthCheckInterval) {
+      healthCheckInterval = setInterval(checkRedisHealth, HEALTH_CHECK_INTERVAL);
+    }
 
     return { redisClient, redisPublisher, redisSubscriber };
 
@@ -216,8 +264,41 @@ export const getRedisSubscriber = () => {
   if (redisSubscriber.status !== 'ready') {
     console.warn(`⚠️ Redis subscriber status: ${redisSubscriber.status}`);
   }
-  
+
   return redisSubscriber;
+};
+
+// Cleanup function to properly close Redis connections
+export const closeRedisConnections = async () => {
+  try {
+    if (healthCheckInterval) {
+      clearInterval(healthCheckInterval);
+      healthCheckInterval = null;
+    }
+
+    const promises = [];
+
+    if (redisClient) {
+      promises.push(redisClient.disconnect());
+      redisClient = null;
+    }
+
+    if (redisPublisher) {
+      promises.push(redisPublisher.disconnect());
+      redisPublisher = null;
+    }
+
+    if (redisSubscriber) {
+      promises.push(redisSubscriber.disconnect());
+      redisSubscriber = null;
+    }
+
+    await Promise.all(promises);
+    eventHandlersSetup = false;
+    console.log('✅ All Redis connections closed successfully');
+  } catch (error) {
+    console.error('❌ Error closing Redis connections:', error);
+  }
 };
 
 // Enhanced utility functions for chat-related Redis operations
@@ -359,45 +440,7 @@ export const getChatRoomUsers = async (chatId: string) => {
   }
 };
 
-// Clean up Redis connections with proper error handling
-export const closeRedisConnections = async () => {
-  try {
-    const disconnectPromises = [];
 
-    if (redisClient) {
-      disconnectPromises.push(
-        redisClient.quit().then(() => {
-          redisClient = null;
-          console.log('🔌 Redis main client disconnected');
-        })
-      );
-    }
-
-    if (redisPublisher) {
-      disconnectPromises.push(
-        redisPublisher.quit().then(() => {
-          redisPublisher = null;
-          console.log('🔌 Redis publisher disconnected');
-        })
-      );
-    }
-
-    if (redisSubscriber) {
-      disconnectPromises.push(
-        redisSubscriber.quit().then(() => {
-          redisSubscriber = null;
-          console.log('🔌 Redis subscriber disconnected');
-        })
-      );
-    }
-
-    await Promise.all(disconnectPromises);
-    console.log('✅ All Redis connections closed successfully');
-
-  } catch (error) {
-    console.error('❌ Error closing Redis connections:', error);
-  }
-};
 
 // Redis channels for pub/sub
 export const REDIS_CHANNELS = {
@@ -410,24 +453,134 @@ export const REDIS_CHANNELS = {
 
 export type RedisChannel = typeof REDIS_CHANNELS[keyof typeof REDIS_CHANNELS];
 
-// Utility function to safely publish to Redis
-export const safeRedisPublish = async (channel: RedisChannel, data: any) => {
-  try {
-    const publisher = getRedisPublisher();
-    
-    // Check if publisher is ready
-    if (publisher.status !== 'ready') {
-      console.warn(`⚠️ Redis publisher not ready (status: ${publisher.status}), skipping publish`);
-      return false;
-    }
-
-    await publisher.publish(channel, JSON.stringify(data));
-    return true;
-    
-  } catch (error) {
-    console.error('❌ Error publishing to Redis:', error);
+// Utility function to safely publish to Redis with timeout and retry
+export const safeRedisPublish = async (channel: RedisChannel, data: any, customTimeoutMs?: number) => {
+  // Check circuit breaker first
+  if (isCircuitBreakerOpen()) {
+    console.warn(`⚠️ Redis circuit breaker is open, skipping publish to ${channel}`);
     return false;
   }
+
+  try {
+    const publisher = getRedisPublisher();
+
+    // Set different timeout values based on channel priority
+    let timeoutMs = customTimeoutMs;
+    if (!timeoutMs) {
+      switch (channel) {
+        case REDIS_CHANNELS.MESSAGE_READ:
+          timeoutMs = 2000; // 2s for read receipts (less critical)
+          break;
+        case REDIS_CHANNELS.TYPING_STATUS:
+          timeoutMs = 1000; // 1s for typing indicators (least critical)
+          break;
+        case REDIS_CHANNELS.NEW_MESSAGE:
+          timeoutMs = 5000; // 5s for new messages (most critical)
+          break;
+        case REDIS_CHANNELS.USER_STATUS:
+          timeoutMs = 3000; // 3s for user status
+          break;
+        default:
+          timeoutMs = 3000; // 3s default
+      }
+    }
+
+    // Check if publisher is ready
+    if (publisher.status !== 'ready') {
+      console.warn(`⚠️ Redis publisher not ready (status: ${publisher.status}), attempting reconnection...`);
+
+      // Try to reconnect if not ready
+      try {
+        await publisher.connect();
+        await publisher.ping();
+      } catch (reconnectError) {
+        console.error('❌ Redis publisher reconnection failed:', reconnectError);
+        return false;
+      }
+    }
+
+    // Create a timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`Redis publish timeout for channel ${channel}`)), timeoutMs);
+    });
+
+    // Race between publish and timeout
+    await Promise.race([
+      publisher.publish(channel, JSON.stringify(data)),
+      timeoutPromise
+    ]);
+
+    // Record success for circuit breaker
+    recordRedisSuccess();
+    return true;
+
+  } catch (error) {
+    // Record failure for circuit breaker
+    recordRedisFailure();
+
+    if (error instanceof Error && error.message.includes('timeout')) {
+      console.warn(`⚠️ Redis publish timeout for channel ${channel}:`, error.message);
+    } else {
+      console.error('❌ Error publishing to Redis:', error);
+    }
+    return false;
+  }
+};
+
+// Non-blocking publish for less critical events (fire-and-forget)
+export const nonBlockingRedisPublish = async (channel: RedisChannel, data: any) => {
+  // Don't await this - fire and forget
+  safeRedisPublish(channel, data).catch(error => {
+    // Silently log errors for non-blocking publishes
+    console.warn(`⚠️ Non-blocking Redis publish failed for ${channel}:`, error.message);
+  });
+};
+
+// Batch publishing for high-frequency events
+const publishBatch = new Map<RedisChannel, any[]>();
+const batchTimeouts = new Map<RedisChannel, NodeJS.Timeout>();
+const BATCH_SIZE = 10;
+const BATCH_TIMEOUT_MS = 100; // 100ms
+
+export const batchedRedisPublish = async (channel: RedisChannel, data: any) => {
+  if (!publishBatch.has(channel)) {
+    publishBatch.set(channel, []);
+  }
+
+  const batch = publishBatch.get(channel)!;
+  batch.push(data);
+
+  // If batch is full, publish immediately
+  if (batch.length >= BATCH_SIZE) {
+    await flushBatch(channel);
+    return;
+  }
+
+  // Set timeout to publish batch if not full
+  if (!batchTimeouts.has(channel)) {
+    const timeoutId = setTimeout(() => {
+      flushBatch(channel);
+    }, BATCH_TIMEOUT_MS);
+    batchTimeouts.set(channel, timeoutId);
+  }
+};
+
+const flushBatch = async (channel: RedisChannel) => {
+  const batch = publishBatch.get(channel);
+  if (!batch || batch.length === 0) return;
+
+  // Clear timeout
+  const timeoutId = batchTimeouts.get(channel);
+  if (timeoutId) {
+    clearTimeout(timeoutId);
+    batchTimeouts.delete(channel);
+  }
+
+  // Publish batch as a single message
+  await nonBlockingRedisPublish(channel, { batch, timestamp: Date.now() });
+
+  // Clear batch
+  publishBatch.set(channel, []);
 };
 
 // Emergency reconnection function

@@ -13,6 +13,7 @@ export interface ChatItem {
   lastMessage: string;
   time: string;
   unread: boolean;
+  unreadCount?: number;
   online?: boolean;
 }
 
@@ -89,10 +90,10 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 {chat.online && (
                   <span className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 rounded-full border-2 border-white"></span>
                 )}
-                {chat.unread && (
-                  <span className="absolute -top-1 -right-1 h-5 w-5 bg-blue-500 rounded-full border-2 border-white flex items-center justify-center">
+                {chat.unreadCount && chat.unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 rounded-full border-2 border-white flex items-center justify-center">
                     <span className="text-white text-xs font-bold">
-                      {chat.unread ? '1' : ''}
+                      {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
                     </span>
                   </span>
                 )}

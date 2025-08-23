@@ -22,7 +22,6 @@ const userStatusSchema = new Schema<IUserStatus>(
     userId: {
       type: String,
       required: true,
-      unique: true,
       index: true
     },
     userType: {
@@ -58,7 +57,7 @@ const userStatusSchema = new Schema<IUserStatus>(
 
 // Compound indexes
 userStatusSchema.index({ userType: 1, isOnline: 1 });
-userStatusSchema.index({ userId: 1, userType: 1 });
+userStatusSchema.index({ userId: 1, userType: 1 }, { unique: true });
 
 const UserStatus = (models?.UserStatus as Model<IUserStatus>) || mongoose.model<IUserStatus>('UserStatus', userStatusSchema);
 

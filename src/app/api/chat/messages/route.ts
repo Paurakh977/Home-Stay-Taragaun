@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import { Message, Chat } from '@/lib/models';
+import HomestaySingle from '@/lib/models/HomestaySingle';
 import { auth } from '@clerk/nextjs/server';
+import { createClerkClient } from '@clerk/backend';
 import { jwtVerify } from 'jose';
 import { v4 as uuidv4 } from 'uuid';
 import { getRedisPublisher, REDIS_CHANNELS, initializeRedis, type RedisMessage } from '@/lib/redis';
@@ -11,7 +13,40 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_for_developmen
 const ENCODED_JWT_SECRET = new TextEncoder().encode(JWT_SECRET);
 
 async function getUserFromRequest(request: NextRequest) {
-  // Check for Clerk authentication first
+  // Check for Authorization header first (for client-side requests)
+  const authHeader = request.headers.get('authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+
+    try {
+      // Try to verify as Clerk token
+      const clerk = createClerkClient({
+        secretKey: process.env.CLERK_SECRET_KEY!,
+        publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!,
+      });
+
+      const { toAuth } = await clerk.authenticateRequest(request);
+      const authData = toAuth();
+      if (authData && authData.userId) {
+        return { userId: authData.userId, userType: 'clerk' as const };
+      }
+    } catch (error) {
+      console.log('Clerk token verification failed, trying JWT...');
+
+      // Try to verify as JWT token
+      try {
+        const { payload } = await jwtVerify(token, ENCODED_JWT_SECRET);
+        const homestayId = (payload as any).homestayId;
+        if (homestayId) {
+          return { userId: homestayId, userType: 'homestay' as const };
+        }
+      } catch (jwtError) {
+        console.log('JWT token verification also failed');
+      }
+    }
+  }
+
+  // Fallback to server-side auth (for server-side requests)
   try {
     const { userId } = await auth();
     if (userId) {
@@ -22,7 +57,7 @@ async function getUserFromRequest(request: NextRequest) {
     // Clerk auth failed, continue to JWT check
   }
 
-  // Check for JWT token (homestay/admin users)
+  // Check for JWT token in cookies (homestay/admin users)
   const authToken = request.cookies.get('auth_token')?.value;
   if (authToken) {
     try {
@@ -42,11 +77,11 @@ async function getUserFromRequest(request: NextRequest) {
 // Verify user authorization for chat access
 async function verifyUserChatAccess(user: { userId: string; userType: 'clerk' | 'homestay' }, chatId: string) {
   try {
-    const chat = await Chat.findOne({ 
+    const chat = await Chat.findOne({
       chatId,
       'participants.userId': user.userId,
       'participants.userType': user.userType,
-      isActive: true 
+      isActive: true
     });
 
     return !!chat;
@@ -54,6 +89,43 @@ async function verifyUserChatAccess(user: { userId: string; userType: 'clerk' | 
     console.error('Error verifying chat access:', error);
     return false;
   }
+}
+
+// Enrich messages with sender names
+async function enrichMessagesWithSenderNames(messages: any[]) {
+  const clerk = createClerkClient({
+    secretKey: process.env.CLERK_SECRET_KEY!,
+    publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!,
+  });
+
+  const enrichedMessages = await Promise.all(
+    messages.map(async (message) => {
+      try {
+        let senderName = 'Unknown User';
+
+        if (message.senderType === 'clerk') {
+          const user = await clerk.users.getUser(message.senderId);
+          senderName = user.fullName || user.firstName || user.emailAddresses[0]?.emailAddress || 'Unknown User';
+        } else if (message.senderType === 'homestay') {
+          const homestay = await HomestaySingle.findOne({ homestayId: message.senderId }).lean();
+          senderName = homestay?.homeStayName || homestay?.name || 'Unknown Homestay';
+        }
+
+        return {
+          ...message,
+          senderName
+        };
+      } catch (error) {
+        console.error(`Error enriching message ${message.messageId}:`, error);
+        return {
+          ...message,
+          senderName: 'Unknown User'
+        };
+      }
+    })
+  );
+
+  return enrichedMessages;
 }
 
 // GET - Fetch messages for a chat
@@ -107,8 +179,11 @@ export async function GET(request: NextRequest) {
     // Reverse to get chronological order
     const sortedMessages = messages.reverse();
 
-    return NextResponse.json({ 
-      messages: sortedMessages,
+    // Enrich messages with sender names
+    const enrichedMessages = await enrichMessagesWithSenderNames(sortedMessages);
+
+    return NextResponse.json({
+      messages: enrichedMessages,
       pagination: {
         limit: validLimit,
         before,
@@ -221,11 +296,34 @@ export async function POST(request: NextRequest) {
 
     // Publish new message event via Redis with comprehensive error handling
     try {
+      // Get sender name for the event
+      let senderName = 'Unknown User';
+      if (user.userType === 'clerk') {
+        const clerk = createClerkClient({
+          secretKey: process.env.CLERK_SECRET_KEY!,
+          publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!,
+        });
+        try {
+          const clerkUser = await clerk.users.getUser(user.userId);
+          senderName = clerkUser.fullName || clerkUser.firstName || clerkUser.emailAddresses[0]?.emailAddress || 'Unknown User';
+        } catch (clerkError) {
+          console.error('Error fetching Clerk user for message event:', clerkError);
+        }
+      } else if (user.userType === 'homestay') {
+        try {
+          const homestay = await HomestaySingle.findOne({ homestayId: user.userId }).lean();
+          senderName = homestay?.homeStayName || homestay?.name || 'Unknown Homestay';
+        } catch (homestayError) {
+          console.error('Error fetching homestay for message event:', homestayError);
+        }
+      }
+
       const event: RedisMessage = {
         chatId,
         messageId: msgDoc.messageId,
         senderId: msgDoc.senderId,
         senderType: msgDoc.senderType,
+        senderName,
         content: msgDoc.content,
         messageType: msgDoc.messageType,
         timestamp: msgDoc.timestamp,

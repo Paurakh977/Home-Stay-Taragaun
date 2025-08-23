@@ -1,17 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
-import { Chat, type IChat } from '@/lib/models';
+import { Chat, HomestaySingle, Message, type IChat } from '@/lib/models';
 import { auth } from '@clerk/nextjs/server';
+import { createClerkClient } from '@clerk/backend';
 import { jwtVerify } from 'jose';
 import { v4 as uuidv4 } from 'uuid';
-import { getRedisPublisher, REDIS_CHANNELS, initializeRedis } from '@/lib/redis';
+import { REDIS_CHANNELS, initializeRedis, safeRedisPublish } from '@/lib/redis';
 
 // JWT verification for homestay users
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_for_development';
 const ENCODED_JWT_SECRET = new TextEncoder().encode(JWT_SECRET);
 
 async function getUserFromRequest(request: NextRequest) {
-  // Check for Clerk authentication first
+  // Check for Authorization header first (for client-side requests)
+  const authHeader = request.headers.get('authorization');
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+
+    try {
+      // Try to verify as Clerk token
+      const clerk = createClerkClient({
+        secretKey: process.env.CLERK_SECRET_KEY!,
+        publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!,
+      });
+
+      const { toAuth } = await clerk.authenticateRequest(request);
+      const authData = toAuth();
+      if (authData && authData.userId) {
+        return { userId: authData.userId, userType: 'clerk' as const };
+      }
+    } catch (error) {
+      console.log('Clerk token verification failed, trying JWT...');
+
+      // Try to verify as JWT token
+      try {
+        const { payload } = await jwtVerify(token, ENCODED_JWT_SECRET);
+        const homestayId = (payload as any).homestayId;
+        if (homestayId) {
+          return { userId: homestayId, userType: 'homestay' as const };
+        }
+      } catch (jwtError) {
+        console.log('JWT token verification also failed');
+      }
+    }
+  }
+
+  // Fallback to server-side auth (for server-side requests)
   try {
     const { userId } = await auth();
     if (userId) {
@@ -21,7 +56,7 @@ async function getUserFromRequest(request: NextRequest) {
     // Clerk auth failed, continue to JWT check
   }
 
-  // Check for JWT token (homestay/admin users)
+  // Check for JWT token in cookies (homestay/admin users)
   const authToken = request.cookies.get('auth_token')?.value;
   if (authToken) {
     try {
@@ -38,15 +73,113 @@ async function getUserFromRequest(request: NextRequest) {
   return null;
 }
 
+// Cache for user data to reduce API calls
+const userDataCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Enrich participant data with user information (with caching)
+async function enrichParticipantData(participants: any[]) {
+  const clerk = createClerkClient({
+    secretKey: process.env.CLERK_SECRET_KEY!,
+    publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!,
+  });
+
+  const enrichedParticipants = await Promise.all(
+    participants.map(async (participant) => {
+      const cacheKey = `${participant.userType}:${participant.userId}`;
+      const now = Date.now();
+
+      // Check cache first
+      const cached = userDataCache.get(cacheKey);
+      if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+        return { ...participant, ...cached.data };
+      }
+
+      try {
+        let userData: { name: string; avatar: string | null; email: string | null } = {
+          name: 'Unknown User',
+          avatar: null,
+          email: null
+        };
+
+        if (participant.userType === 'clerk') {
+          // Get Clerk user data
+          const user = await clerk.users.getUser(participant.userId);
+          userData = {
+            name: user.fullName || user.firstName || user.emailAddresses[0]?.emailAddress || 'Unknown User',
+            avatar: user.imageUrl || null,
+            email: user.emailAddresses[0]?.emailAddress || null,
+          };
+        } else if (participant.userType === 'homestay') {
+          // Get homestay data
+          const homestay = await HomestaySingle.findOne({ homestayId: participant.userId }).lean();
+          if (homestay) {
+            userData = {
+              name: homestay.homeStayName || homestay.name || 'Unknown Homestay',
+              avatar: homestay.profileImage || null,
+              email: homestay.email || null,
+            };
+          }
+        }
+
+        // Cache the result
+        userDataCache.set(cacheKey, { data: userData, timestamp: now });
+
+        return { ...participant, ...userData };
+      } catch (error) {
+        console.error(`Error enriching participant ${participant.userId}:`, error);
+
+        // Return fallback data
+        const fallbackData = { name: 'Unknown User', avatar: null, email: null };
+        return { ...participant, ...fallbackData };
+      }
+    })
+  );
+
+  return enrichedParticipants;
+}
+
+// Calculate unread message count for a user in a chat
+async function calculateUnreadCount(chatId: string, userId: string, userType: 'clerk' | 'homestay') {
+  try {
+    // Get the user's lastReadAt timestamp from the chat participants
+    const chat = await Chat.findOne({
+      chatId,
+      'participants.userId': userId,
+      'participants.userType': userType
+    }).lean();
+
+    if (!chat) return 0;
+
+    const participant = chat.participants.find(p => p.userId === userId && p.userType === userType);
+    const lastReadAt = participant?.lastReadAt || new Date(0); // Default to epoch if never read
+
+    // Count messages sent after lastReadAt that are not from this user
+    const unreadCount = await Message.countDocuments({
+      chatId,
+      timestamp: { $gt: lastReadAt },
+      $or: [
+        { senderId: { $ne: userId } },
+        { senderType: { $ne: userType } }
+      ]
+    });
+
+    return unreadCount;
+  } catch (error) {
+    console.error('Error calculating unread count:', error);
+    return 0;
+  }
+}
+
 // Verify user authorization for chat access
 async function verifyUserChatAccess(user: { userId: string; userType: 'clerk' | 'homestay' }, chatId?: string) {
   if (!chatId) return true; // For creating new chats
 
-  const chat = await Chat.findOne({ 
+  const chat = await Chat.findOne({
     chatId,
     'participants.userId': user.userId,
     'participants.userType': user.userType,
-    isActive: true 
+    isActive: true
   });
 
   return !!chat;
@@ -71,18 +204,33 @@ export async function GET(request: NextRequest) {
     // Validate limit bounds
     const validLimit = Math.min(Math.max(limit, 1), 100);
 
+    // Optimize query with projection to reduce data transfer
     const conversations = await Chat.find({
       'participants.userId': user.userId,
       'participants.userType': user.userType,
       isActive: true,
     })
+    .select('chatId participants lastMessage lastActivity chatType createdAt')
     .sort({ lastActivity: -1 })
     .skip(offset)
     .limit(validLimit)
     .lean();
 
-    return NextResponse.json({ 
-      conversations,
+    // Enrich conversations with participant data and unread counts
+    const enrichedConversations = await Promise.all(
+      conversations.map(async (conversation) => {
+        const enrichedParticipants = await enrichParticipantData(conversation.participants);
+        const unreadCount = await calculateUnreadCount(conversation.chatId, user.userId, user.userType);
+        return {
+          ...conversation,
+          participants: enrichedParticipants,
+          unreadCount,
+        };
+      })
+    );
+
+    return NextResponse.json({
+      conversations: enrichedConversations,
       pagination: {
         limit: validLimit,
         offset,
@@ -146,9 +294,16 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingChat) {
-      return NextResponse.json({ 
-        conversation: existingChat,
-        isNew: false 
+      // Enrich existing chat with participant data
+      const enrichedParticipants = await enrichParticipantData(existingChat.participants);
+      const enrichedChat = {
+        ...existingChat.toObject(),
+        participants: enrichedParticipants,
+      };
+
+      return NextResponse.json({
+        conversation: enrichedChat,
+        isNew: false
       });
     }
 
@@ -176,27 +331,31 @@ export async function POST(request: NextRequest) {
     });
 
     // Publish chat created event via Redis with error handling
-    try {
-      const chatCreatedEvent = {
-        chatId: newChat.chatId,
-        participants: newChat.participants,
-        createdBy: user.userId,
-        createdByType: user.userType,
-        timestamp: new Date(),
-      };
+    const chatCreatedEvent = {
+      chatId: newChat.chatId,
+      participants: newChat.participants,
+      createdBy: user.userId,
+      createdByType: user.userType,
+      timestamp: new Date(),
+    };
 
-      const publisher = getRedisPublisher();
-      await publisher.publish(REDIS_CHANNELS.CHAT_CREATED, JSON.stringify(chatCreatedEvent));
+    const publishSuccess = await safeRedisPublish(REDIS_CHANNELS.CHAT_CREATED, chatCreatedEvent);
+    if (publishSuccess) {
       console.log('✅ Chat created event published to Redis');
-
-    } catch (redisError) {
-      console.error('❌ Failed to publish chat created event:', redisError);
-      // Don't fail the request if Redis publish fails
+    } else {
+      console.warn('⚠️ Failed to publish chat created event to Redis');
     }
 
-    return NextResponse.json({ 
-      conversation: newChat,
-      isNew: true 
+    // Enrich new chat with participant data
+    const enrichedParticipants = await enrichParticipantData(newChat.participants);
+    const enrichedNewChat = {
+      ...newChat.toObject(),
+      participants: enrichedParticipants,
+    };
+
+    return NextResponse.json({
+      conversation: enrichedNewChat,
+      isNew: true
     }, { status: 201 });
 
   } catch (error) {

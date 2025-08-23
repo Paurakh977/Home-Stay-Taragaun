@@ -1,21 +1,24 @@
 import { Server as IOServer } from 'socket.io';
 import type { Server as HTTPServer } from 'http';
 import { createAdapter } from '@socket.io/redis-adapter';
-import { 
-  getRedisPublisher, 
-  getRedisSubscriber, 
-  initializeRedis, 
-  REDIS_CHANNELS, 
-  type RedisMessage, 
-  type RedisTypingStatus, 
-  type RedisUserStatus, 
-  setChatUserOnline, 
-  setChatUserOffline, 
-  addUserToChatRoom, 
-  removeUserFromChatRoom 
+import {
+  getRedisPublisher,
+  getRedisSubscriber,
+  initializeRedis,
+  REDIS_CHANNELS,
+  type RedisMessage,
+  type RedisTypingStatus,
+  type RedisUserStatus,
+  setChatUserOnline,
+  setChatUserOffline,
+  addUserToChatRoom,
+  removeUserFromChatRoom,
+  safeRedisPublish,
+  nonBlockingRedisPublish
 } from './redis';
 import dbConnect from './mongodb';
 import { Chat, Message, UserStatus } from './models';
+import HomestaySingle from './models/HomestaySingle';
 import { jwtVerify } from 'jose';
 import { createClerkClient, type ClerkClient } from '@clerk/backend';
 import type { JWTPayload } from 'jose';
@@ -84,19 +87,44 @@ const ENCODED_JWT_SECRET = new TextEncoder().encode(JWT_SECRET);
 
 let io: IOServer | null = null;
 
+// Local cache for user statuses to reduce Redis load
+const userStatusCache = new Map<string, { isOnline: boolean; lastActiveAt: Date; socketId?: string }>();
+const USER_STATUS_CACHE_TTL = 300000; // 5 minutes
+
+// Typing status debouncing to prevent spam
+const typingDebounceMap = new Map<string, NodeJS.Timeout>();
+const TYPING_DEBOUNCE_MS = 1000; // 1 second debounce
+
 export const getIO = () => {
   if (!io) throw new Error('Socket.io server not initialized');
   return io;
 };
 
+// Cleanup function for debounce maps
+export const cleanupSocketServer = () => {
+  // Clear all pending typing timeouts
+  typingDebounceMap.forEach((timeoutId) => {
+    clearTimeout(timeoutId);
+  });
+  typingDebounceMap.clear();
+
+  // Clear user status cache
+  userStatusCache.clear();
+
+  if (io) {
+    io.close();
+    io = null;
+  }
+};
+
 // Verify user has access to specific chat
 async function verifyUserChatAccess(user: SocketUser, chatId: string): Promise<boolean> {
   try {
-    const chat = await Chat.findOne({ 
+    const chat = await Chat.findOne({
       chatId,
       'participants.userId': user.userId,
       'participants.userType': user.userType,
-      isActive: true 
+      isActive: true
     });
 
     return !!chat;
@@ -104,6 +132,28 @@ async function verifyUserChatAccess(user: SocketUser, chatId: string): Promise<b
     console.error('Error verifying chat access:', error);
     return false;
   }
+}
+
+// Get user name by ID and type
+async function getUserName(userId: string, userType: 'clerk' | 'homestay'): Promise<string> {
+  try {
+    if (userType === 'clerk') {
+      const clerk = createClerkClient({
+        secretKey: process.env.CLERK_SECRET_KEY!,
+        publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!,
+      });
+
+      const user = await clerk.users.getUser(userId);
+      return user.fullName || user.firstName || user.emailAddresses[0]?.emailAddress || 'Unknown User';
+    } else if (userType === 'homestay') {
+      const homestay = await HomestaySingle.findOne({ homestayId: userId }).lean();
+      return homestay?.homeStayName || homestay?.name || 'Unknown Homestay';
+    }
+  } catch (error) {
+    console.error(`Error fetching user name for ${userType}:${userId}:`, error);
+  }
+
+  return 'Unknown User';
 }
 
 export async function initializeSocketServer(server: HTTPServer) {
@@ -155,11 +205,11 @@ export async function initializeSocketServer(server: HTTPServer) {
     try {
       const subClient = getRedisSubscriber();
       await subClient.subscribe(
-        REDIS_CHANNELS.NEW_MESSAGE, 
-        REDIS_CHANNELS.USER_STATUS, 
-        REDIS_CHANNELS.TYPING_STATUS, 
-        REDIS_CHANNELS.CHAT_CREATED,
-        REDIS_CHANNELS.MESSAGE_READ
+        REDIS_CHANNELS.NEW_MESSAGE,
+        REDIS_CHANNELS.USER_STATUS,
+        REDIS_CHANNELS.TYPING_STATUS,
+        REDIS_CHANNELS.CHAT_CREATED
+        // Removed MESSAGE_READ to eliminate Redis timeouts for rapid read events
       );
 
       subClient.on('message', async (channel, message) => {
@@ -169,16 +219,38 @@ export async function initializeSocketServer(server: HTTPServer) {
           switch (channel) {
             case REDIS_CHANNELS.NEW_MESSAGE: {
               const msg = data as RedisMessage;
+              console.log('📨 Socket Server - Broadcasting new message to room:', msg.chatId, 'message:', msg.content);
+              console.log('📨 Socket Server - Message from:', msg.senderType, msg.senderId, 'to recipients:', msg.recipientIds);
+
+              // Log which sockets are in this room
+              const socketsInRoom = io?.sockets.adapter.rooms.get(msg.chatId);
+              console.log('📨 Socket Server - Sockets in room', msg.chatId, ':', socketsInRoom ? Array.from(socketsInRoom) : 'none');
+
+              // Log all connected sockets and their user info
+              const allSockets = Array.from(io?.sockets.sockets.values() || []);
+              console.log('📨 Socket Server - All connected sockets:', allSockets.map(s => {
+                const user = (s as any).user as SocketUser;
+                return user ? `${user.userType}:${user.userId}(${s.id})` : `unknown(${s.id})`;
+              }));
+
               io?.to(msg.chatId).emit('new_message', msg);
+              console.log('📨 Socket Server - Message broadcasted to room:', msg.chatId);
               break;
             }
             case REDIS_CHANNELS.USER_STATUS: {
               const status = data as RedisUserStatus;
+              console.log('👤 Socket Server - Broadcasting user status:', status.userId, status.isOnline);
               io?.emit('user_status', status);
               break;
             }
             case REDIS_CHANNELS.TYPING_STATUS: {
               const typing = data as RedisTypingStatus;
+              console.log('⌨️ Socket Server - Broadcasting typing status to room:', typing.chatId, 'user:', typing.userId, 'typing:', typing.isTyping);
+
+              // Log which sockets are in this room
+              const socketsInRoom = io?.sockets.adapter.rooms.get(typing.chatId);
+              console.log('⌨️ Socket Server - Sockets in room', typing.chatId, ':', socketsInRoom ? Array.from(socketsInRoom) : 'none');
+
               io?.to(typing.chatId).emit('typing_status', typing);
               break;
             }
@@ -186,10 +258,7 @@ export async function initializeSocketServer(server: HTTPServer) {
               io?.emit('chat_created', data);
               break;
             }
-            case REDIS_CHANNELS.MESSAGE_READ: {
-              io?.to(data.chatId).emit('messages_marked_read', data);
-              break;
-            }
+            // Removed MESSAGE_READ case - now handled locally only
           }
         } catch (err) {
           console.error('❌ Failed to process Redis pub/sub message:', err);
@@ -205,8 +274,13 @@ export async function initializeSocketServer(server: HTTPServer) {
         const { tokenType, token } = socket.handshake.auth as { tokenType?: 'clerk' | 'jwt'; token?: string };
         const userAgent = socket.handshake.headers['user-agent'] || 'unknown';
 
-        if (!token || !tokenType) {
-          return next(new Error('Authentication token missing'));
+        if (!tokenType) {
+          return next(new Error('Authentication token type missing'));
+        }
+
+        // For JWT, we read from cookies, so token can be a placeholder
+        if (tokenType === 'clerk' && !token) {
+          return next(new Error('Clerk authentication token missing'));
         }
 
         let user: SocketUser | null = null;
@@ -243,25 +317,52 @@ export async function initializeSocketServer(server: HTTPServer) {
           }
 
         } else if (tokenType === 'jwt') {
-          // Verify custom JWT for homestay/admin users
+          // Verify custom JWT for homestay/admin users - read from cookies
           try {
-            const { payload } = await jwtVerify(token, ENCODED_JWT_SECRET);
+            console.log('🔐 Socket JWT auth - Starting JWT authentication for homestay user');
+            // Extract JWT token from cookies
+            const cookieHeader = socket.handshake.headers.cookie;
+            console.log('🔐 Socket JWT auth - Cookie header:', cookieHeader);
+            let jwtToken = null;
+
+            if (cookieHeader) {
+              const cookies = cookieHeader.split(';').map(c => c.trim());
+              console.log('🔐 Socket JWT auth - Parsed cookies:', cookies);
+              const authCookie = cookies.find(c => c.startsWith('auth_token='));
+              console.log('🔐 Socket JWT auth - Auth cookie:', authCookie);
+              if (authCookie) {
+                jwtToken = authCookie.split('=')[1];
+                console.log('🔐 Socket JWT auth - Extracted token:', jwtToken ? 'Found' : 'Not found');
+              }
+            }
+
+            if (!jwtToken) {
+              console.log('❌ Socket JWT auth - No JWT token found in cookies');
+              return next(new Error('JWT token not found in cookies'));
+            }
+
+            console.log('🔐 Socket JWT auth - Verifying JWT token...');
+            const { payload } = await jwtVerify(jwtToken, ENCODED_JWT_SECRET);
+            console.log('🔐 Socket JWT auth - JWT payload:', payload);
+
             const homestayId = (payload as JWTPayload & { homestayId?: string }).homestayId;
             const username = (payload as JWTPayload & { username?: string }).username;
 
             if (!homestayId) {
+              console.log('❌ Socket JWT auth - No homestayId in JWT payload');
               return next(new Error('Invalid homestay token - no homestay ID'));
             }
 
-            user = { 
-              userId: homestayId, 
-              userType: 'homestay', 
+            console.log('✅ Socket JWT auth - Successfully authenticated homestay user:', homestayId);
+            user = {
+              userId: homestayId,
+              userType: 'homestay',
               username,
-              homestayId 
+              homestayId
             };
 
           } catch (jwtError) {
-            console.error('JWT verification error:', jwtError);
+            console.error('❌ Socket JWT auth - JWT verification error:', jwtError);
             return next(new Error('JWT authentication failed'));
           }
         }
@@ -286,18 +387,34 @@ export async function initializeSocketServer(server: HTTPServer) {
             { upsert: true, new: true }
           );
 
-          await setChatUserOnline(user.userId, user.userType, socket.id);
-
-          // Publish status update via Redis
-          const statusEvent: RedisUserStatus = {
-            userId: user.userId,
-            userType: user.userType,
+          // Update local cache first for immediate access
+          const userKey = `${user.userType}:${user.userId}`;
+          userStatusCache.set(userKey, {
             isOnline: true,
             lastActiveAt: new Date(),
-            socketId: socket.id,
-          };
-          
-          getRedisPublisher().publish(REDIS_CHANNELS.USER_STATUS, JSON.stringify(statusEvent));
+            socketId: socket.id
+          });
+
+          // Try to update Redis, but don't block if it fails
+          try {
+            await setChatUserOnline(user.userId, user.userType, socket.id);
+
+            // Use non-blocking publish for status updates
+            const statusEvent: RedisUserStatus = {
+              userId: user.userId,
+              userType: user.userType,
+              isOnline: true,
+              lastActiveAt: new Date(),
+              socketId: socket.id,
+            };
+
+            // Fire-and-forget Redis publish
+            safeRedisPublish(REDIS_CHANNELS.USER_STATUS, statusEvent).catch(err => {
+              console.warn('⚠️ Failed to publish user status to Redis:', err.message);
+            });
+          } catch (redisError) {
+            console.warn('⚠️ Redis user status update failed, using local cache only:', redisError);
+          }
           
         } catch (statusError) {
           console.error('Error updating user status:', statusError);
@@ -314,13 +431,39 @@ export async function initializeSocketServer(server: HTTPServer) {
     });
 
     // Connection handler with comprehensive error handling
-    io.on('connection', (socket) => {
+    io.on('connection', async (socket) => {
       const user = (socket as any).user as SocketUser;
-      console.log(`🔗 User connected: ${user.userType}:${user.userId} (${socket.id})`);
+      console.log(`🔗 Socket Server - User connected: ${user.userType}:${user.userId} (${socket.id})`);
+
+      // Log all rooms this socket is in
+      console.log(`🏠 Socket Server - User ${user.userType}:${user.userId} is in rooms:`, Array.from(socket.rooms));
+
+      // Auto-join user to their active chats
+      try {
+        const activeChats = await Chat.find({
+          'participants.userId': user.userId,
+          'participants.userType': user.userType,
+          isActive: true
+        }).select('chatId').limit(10); // Limit to prevent overwhelming
+
+        for (const chat of activeChats) {
+          await addUserToChatRoom(chat.chatId, user.userId, user.userType);
+          socket.join(chat.chatId);
+          console.log(`🏠 Socket Server - Auto-joined ${user.userType}:${user.userId} to active chat ${chat.chatId}`);
+        }
+
+        if (activeChats.length > 0) {
+          console.log(`🏠 Socket Server - User ${user.userType}:${user.userId} auto-joined to ${activeChats.length} active chats`);
+        }
+      } catch (autoJoinError) {
+        console.error('❌ Error auto-joining user to active chats:', autoJoinError);
+        // Continue with connection even if auto-join fails
+      }
 
       // Join chat room with validation
       socket.on('join_chat', async ({ chatId }: { chatId: string }) => {
         try {
+          console.log(`🏠 Socket Server - User ${user.userType}:${user.userId} attempting to join chat ${chatId}`);
           if (!chatId) {
             socket.emit('error_message', { message: 'Invalid chatId' });
             return;
@@ -329,18 +472,26 @@ export async function initializeSocketServer(server: HTTPServer) {
           // Verify user has access to this chat
           const hasAccess = await verifyUserChatAccess(user, chatId);
           if (!hasAccess) {
+            console.log(`❌ Socket Server - User ${user.userType}:${user.userId} denied access to chat ${chatId}`);
             socket.emit('error_message', { message: 'Access denied to this chat' });
             return;
           }
 
           await addUserToChatRoom(chatId, user.userId, user.userType);
           socket.join(chatId);
-          
-          console.log(`✅ User ${user.userId} joined chat ${chatId}`);
+
+          // Log all rooms this socket is now in
+          console.log(`✅ Socket Server - User ${user.userType}:${user.userId} successfully joined chat ${chatId}`);
+          console.log(`🏠 Socket Server - User ${user.userType}:${user.userId} is now in rooms:`, Array.from(socket.rooms));
+
+          // Log all sockets in this chat room
+          const socketsInRoom = io?.sockets.adapter.rooms.get(chatId);
+          console.log(`🏠 Socket Server - All sockets in room ${chatId}:`, socketsInRoom ? Array.from(socketsInRoom) : 'none');
+
           socket.emit('chat_joined', { chatId, success: true });
 
         } catch (error) {
-          console.error('❌ Error joining chat:', error);
+          console.error('❌ Socket Server - Error joining chat:', error);
           socket.emit('error_message', { message: 'Failed to join chat' });
         }
       });
@@ -380,14 +531,44 @@ export async function initializeSocketServer(server: HTTPServer) {
             return;
           }
 
-          const typing: RedisTypingStatus = { 
-            chatId, 
-            userId: user.userId, 
-            userType: user.userType, 
-            isTyping 
-          };
-          
-          await getRedisPublisher().publish(REDIS_CHANNELS.TYPING_STATUS, JSON.stringify(typing));
+          // Debounce typing indicators to prevent spam
+          const typingKey = `${chatId}:${user.userId}:${user.userType}`;
+
+          // Clear existing timeout
+          if (typingDebounceMap.has(typingKey)) {
+            clearTimeout(typingDebounceMap.get(typingKey)!);
+          }
+
+          // Only send typing indicators if user is typing (not when stopping)
+          if (isTyping) {
+            // Set debounced timeout for typing
+            const timeoutId = setTimeout(async () => {
+              const userName = await getUserName(user.userId, user.userType);
+
+              // Broadcast locally only (no Redis) for better performance
+              io?.to(chatId).emit('typing_status', {
+                chatId,
+                userId: user.userId,
+                userType: user.userType,
+                userName,
+                isTyping: true
+              });
+
+              typingDebounceMap.delete(typingKey);
+            }, TYPING_DEBOUNCE_MS);
+
+            typingDebounceMap.set(typingKey, timeoutId);
+          } else {
+            // Immediately broadcast stop typing
+            const userName = await getUserName(user.userId, user.userType);
+            io?.to(chatId).emit('typing_status', {
+              chatId,
+              userId: user.userId,
+              userType: user.userType,
+              userName,
+              isTyping: false
+            });
+          }
           
         } catch (error) {
           console.error('❌ Error handling typing event:', error);
@@ -427,6 +608,47 @@ export async function initializeSocketServer(server: HTTPServer) {
             return;
           }
 
+          // Ensure sender is in the chat room
+          if (!socket.rooms.has(chatId)) {
+            await addUserToChatRoom(chatId, user.userId, user.userType);
+            socket.join(chatId);
+            console.log(`🏠 Socket Server - Auto-joined sender ${user.userType}:${user.userId} to chat ${chatId}`);
+          }
+
+          // Auto-join all connected participants to the chat room
+          try {
+            const chat = await Chat.findOne({ chatId }).select('participants');
+            if (chat?.participants) {
+              for (const participant of chat.participants) {
+                // Skip the sender as they're already in the room
+                if (participant.userId === user.userId && participant.userType === user.userType) {
+                  continue;
+                }
+
+                // Find all connected sockets for this participant
+                const participantSockets = Array.from(io?.sockets.sockets.values() || [])
+                  .filter(s => {
+                    const socketUser = (s as any).user as SocketUser;
+                    return socketUser &&
+                           socketUser.userId === participant.userId &&
+                           socketUser.userType === participant.userType;
+                  });
+
+                // Join each connected socket to the room
+                for (const participantSocket of participantSockets) {
+                  if (!participantSocket.rooms.has(chatId)) {
+                    await addUserToChatRoom(chatId, participant.userId, participant.userType);
+                    participantSocket.join(chatId);
+                    console.log(`🏠 Socket Server - Auto-joined participant ${participant.userType}:${participant.userId} to chat ${chatId}`);
+                  }
+                }
+              }
+            }
+          } catch (autoJoinError) {
+            console.error('❌ Error auto-joining participants:', autoJoinError);
+            // Continue with message sending even if auto-join fails
+          }
+
           // Create message with proper error handling
           const messageId = uuidv4();
           const msgDoc = await Message.create({
@@ -461,19 +683,23 @@ export async function initializeSocketServer(server: HTTPServer) {
             .filter(p => !(p.userId === user.userId && p.userType === user.userType))
             .map(p => p.userId) || [];
 
+          // Get sender name for message
+          const senderName = await getUserName(user.userId, user.userType);
+
           // Publish message via Redis
           const event: RedisMessage = {
             chatId,
             messageId: msgDoc.messageId,
             senderId: msgDoc.senderId,
             senderType: msgDoc.senderType,
+            senderName,
             content: msgDoc.content,
             messageType: msgDoc.messageType,
             timestamp: msgDoc.timestamp,
             recipientIds,
           };
 
-          await getRedisPublisher().publish(REDIS_CHANNELS.NEW_MESSAGE, JSON.stringify(event));
+          await safeRedisPublish(REDIS_CHANNELS.NEW_MESSAGE, event);
           
           // Confirm message sent to sender
           socket.emit('message_sent', { 
@@ -540,16 +766,16 @@ export async function initializeSocketServer(server: HTTPServer) {
             }
           );
 
-          // Publish read receipt across instances via Redis (best-effort)
-          try {
-            await getRedisPublisher().publish(
-              REDIS_CHANNELS.MESSAGE_READ,
-              JSON.stringify({ chatId, messageIds, userId: user.userId, userType: user.userType })
-            );
-          } catch (pubErr) {
-            console.warn('⚠️ Failed to publish MESSAGE_READ event:', pubErr);
-          }
+          // Broadcast read receipts only to local socket room (no Redis)
+          // This eliminates Redis timeouts for rapid read events
+          io?.to(chatId).emit('messages_marked_read', {
+            chatId,
+            messageIds,
+            userId: user.userId,
+            userType: user.userType
+          });
 
+          // Also emit to the sender's socket immediately
           socket.emit('messages_marked_read', { chatId, messageIds });
 
         } catch (error) {
@@ -574,18 +800,43 @@ export async function initializeSocketServer(server: HTTPServer) {
             { new: true }
           );
 
-          // Update Redis status
-          await setChatUserOffline(user.userId, user.userType);
-
-          // Publish offline status
-          const statusEvent: RedisUserStatus = {
-            userId: user.userId,
-            userType: user.userType,
+          // Update local cache immediately
+          const userKey = `${user.userType}:${user.userId}`;
+          userStatusCache.set(userKey, {
             isOnline: false,
-            lastActiveAt: new Date(),
-          };
-          
-          await getRedisPublisher().publish(REDIS_CHANNELS.USER_STATUS, JSON.stringify(statusEvent));
+            lastActiveAt: new Date()
+          });
+
+          // Clear any pending typing timeouts for this user
+          const typingKeys = Array.from(typingDebounceMap.keys()).filter(key =>
+            key.includes(user.userId)
+          );
+          typingKeys.forEach(key => {
+            const timeoutId = typingDebounceMap.get(key);
+            if (timeoutId) {
+              clearTimeout(timeoutId);
+              typingDebounceMap.delete(key);
+            }
+          });
+
+          // Try Redis updates but don't block on them
+          try {
+            await setChatUserOffline(user.userId, user.userType);
+
+            // Fire-and-forget Redis publish
+            const statusEvent: RedisUserStatus = {
+              userId: user.userId,
+              userType: user.userType,
+              isOnline: false,
+              lastActiveAt: new Date(),
+            };
+
+            safeRedisPublish(REDIS_CHANNELS.USER_STATUS, statusEvent).catch(err => {
+              console.warn('⚠️ Failed to publish offline status to Redis:', err.message);
+            });
+          } catch (redisError) {
+            console.warn('⚠️ Redis offline status update failed:', redisError);
+          }
 
         } catch (err) {
           console.error('❌ Error handling disconnect:', err);

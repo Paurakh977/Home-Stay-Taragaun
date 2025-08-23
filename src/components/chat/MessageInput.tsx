@@ -1,20 +1,76 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, Smile } from 'lucide-react';
 
 interface MessageInputProps {
   onSendMessage: (message: string) => void;
+  disabled?: boolean;
+  onTypingStart?: () => void;
+  onTypingStop?: () => void;
 }
 
-const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage }) => {
+const MessageInput: React.FC<MessageInputProps> = ({ 
+  onSendMessage, 
+  disabled = false, 
+  onTypingStart, 
+  onTypingStop 
+}) => {
   const [message, setMessage] = useState('');
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim()) {
+    if (message.trim() && !disabled) {
+      // Clear typing timeout and stop typing
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      if (onTypingStop) {
+        onTypingStop();
+      }
+
       onSendMessage(message.trim());
       setMessage('');
     }
   };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setMessage(value);
+    
+    // Handle typing indicators
+    if (value.trim() && onTypingStart && !disabled) {
+      onTypingStart();
+      
+      // Clear existing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      
+      // Set timeout to stop typing after 3 seconds of inactivity
+      typingTimeoutRef.current = setTimeout(() => {
+        if (onTypingStop) {
+          onTypingStop();
+        }
+      }, 3000);
+    } else if (!value.trim() && onTypingStop) {
+      // Stop typing if input is empty
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      onTypingStop();
+    }
+  };
+
+  useEffect(() => {
+    // Cleanup typing timeout on unmount
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <form 
@@ -32,9 +88,12 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage }) => {
       <div className="flex-1 relative">
         <textarea
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Type a message..."
-          className="w-full p-3 pr-10 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent resize-none leading-5 text-gray-700"
+          onChange={handleInputChange}
+          placeholder={disabled ? "Connecting..." : "Type a message..."}
+          disabled={disabled}
+          className={`w-full p-3 pr-10 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent resize-none leading-5 ${
+            disabled ? 'text-gray-400 bg-gray-50' : 'text-gray-700'
+          }`}
           style={{ maxHeight: '120px', minHeight: '40px' }}
           rows={1}
           onKeyDown={(e) => {
@@ -55,9 +114,9 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage }) => {
       
       <button
         type="submit"
-        disabled={!message.trim()}
+        disabled={!message.trim() || disabled}
         className={`p-3 rounded-full flex-shrink-0 focus:outline-none ${
-          message.trim() 
+          message.trim() && !disabled
             ? 'bg-primary text-white hover:bg-primary-dark' 
             : 'bg-gray-200 text-gray-500 cursor-not-allowed'
         }`}
@@ -69,4 +128,4 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage }) => {
   );
 };
 
-export default MessageInput; 
+export default MessageInput;
