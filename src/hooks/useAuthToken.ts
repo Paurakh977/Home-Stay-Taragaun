@@ -1,5 +1,5 @@
 import { useAuth } from '@clerk/nextjs';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export function useAuthToken() {
   const { getToken, userId } = useAuth();
@@ -9,11 +9,24 @@ export function useAuthToken() {
     userId: string;
   } | null>(null);
 
+  const [isLoading, setIsLoading] = useState(true);
+  const lastCheckRef = useRef<number>(0);
+  const CACHE_DURATION = 30000; // 30 seconds cache
+
   useEffect(() => {
     const getAuthData = async () => {
+      setIsLoading(true);
+
+      // Throttle API calls to prevent excessive requests
+      const now = Date.now();
+      if (now - lastCheckRef.current < CACHE_DURATION && authData) {
+        setIsLoading(false);
+        return;
+      }
+      lastCheckRef.current = now;
+
       console.log('useAuthToken - getAuthData called');
       console.log('useAuthToken - Clerk userId:', userId);
-      console.log('useAuthToken - All cookies:', document.cookie);
 
       // Check for Clerk authentication first
       if (userId) {
@@ -26,6 +39,7 @@ export function useAuthToken() {
               tokenType: 'clerk',
               userId
             });
+            setIsLoading(false);
             return;
           }
         } catch (error) {
@@ -37,23 +51,16 @@ export function useAuthToken() {
 
       // Check for JWT authentication via API (homestay users)
       console.log('useAuthToken - Checking JWT via API...');
-      console.log('useAuthToken - Current document.cookie:', document.cookie);
-      console.log('useAuthToken - Looking for auth_token cookie...');
 
-      // Check if auth_token cookie exists in document.cookie
+      // Quick check if auth_token cookie exists before making API call
       const hasAuthTokenCookie = document.cookie.includes('auth_token=');
       console.log('useAuthToken - auth_token cookie exists:', hasAuthTokenCookie);
 
-      // Check localStorage for user data
-      const userJson = localStorage.getItem("user");
-      console.log('useAuthToken - localStorage user data:', userJson ? 'exists' : 'missing');
-      if (userJson) {
-        try {
-          const userData = JSON.parse(userJson);
-          console.log('useAuthToken - localStorage user:', userData.homestayId);
-        } catch (e) {
-          console.log('useAuthToken - localStorage user data invalid');
-        }
+      if (!hasAuthTokenCookie) {
+        console.log('useAuthToken - No auth_token cookie, skipping API call');
+        setAuthData(null);
+        setIsLoading(false);
+        return;
       }
 
       try {
@@ -81,6 +88,7 @@ export function useAuthToken() {
             console.log('useAuthToken - About to set auth data:', newAuthData);
             setAuthData(newAuthData);
             console.log('useAuthToken - Auth data set successfully');
+            setIsLoading(false);
             return;
           } else {
             console.log('useAuthToken - API response not authenticated or not homestay');
@@ -94,6 +102,7 @@ export function useAuthToken() {
 
       // No valid auth found; clear state
       setAuthData(null);
+      setIsLoading(false);
     };
 
     getAuthData();

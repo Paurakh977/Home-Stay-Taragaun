@@ -47,11 +47,11 @@ const getRedisConfig = () => {
     password,
     db,
     retryDelayOnFailover: 100,
-    maxRetriesPerRequest: 3,
+    maxRetriesPerRequest: 5,
     enableReadyCheck: true,
     lazyConnect: true,
-    connectTimeout: 10000,
-    commandTimeout: 5000,
+    connectTimeout: 15000,
+    commandTimeout: 30000, // Increased from 5s to 30s to prevent timeouts
     // Connection pool settings
     family: 4,
     keepAlive: 30000, // Keep alive timeout in milliseconds
@@ -420,22 +420,44 @@ export const REDIS_CHANNELS = {
 
 export type RedisChannel = typeof REDIS_CHANNELS[keyof typeof REDIS_CHANNELS];
 
-// Utility function to safely publish to Redis
-export const safeRedisPublish = async (channel: RedisChannel, data: any) => {
+// Utility function to safely publish to Redis with timeout and retry
+export const safeRedisPublish = async (channel: RedisChannel, data: any, timeoutMs: number = 10000) => {
   try {
     const publisher = getRedisPublisher();
-    
+
     // Check if publisher is ready
     if (publisher.status !== 'ready') {
-      console.warn(`⚠️ Redis publisher not ready (status: ${publisher.status}), skipping publish`);
-      return false;
+      console.warn(`⚠️ Redis publisher not ready (status: ${publisher.status}), attempting reconnection...`);
+
+      // Try to reconnect if not ready
+      try {
+        await publisher.connect();
+        await publisher.ping();
+      } catch (reconnectError) {
+        console.error('❌ Redis publisher reconnection failed:', reconnectError);
+        return false;
+      }
     }
 
-    await publisher.publish(channel, JSON.stringify(data));
+    // Create a timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`Redis publish timeout for channel ${channel}`)), timeoutMs);
+    });
+
+    // Race between publish and timeout
+    await Promise.race([
+      publisher.publish(channel, JSON.stringify(data)),
+      timeoutPromise
+    ]);
+
     return true;
-    
+
   } catch (error) {
-    console.error('❌ Error publishing to Redis:', error);
+    if (error instanceof Error && error.message.includes('timeout')) {
+      console.warn(`⚠️ Redis publish timeout for channel ${channel}:`, error.message);
+    } else {
+      console.error('❌ Error publishing to Redis:', error);
+    }
     return false;
   }
 };

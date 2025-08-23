@@ -66,13 +66,19 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const authData = useAuthToken();
+  const [isMounted, setIsMounted] = useState(false);
 
-  console.log('ChatProvider initialized with authData:', authData);
+  // Track mounting state to prevent SSR issues
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Add effect to track auth data changes
   useEffect(() => {
-    console.log('ChatProvider - authData changed:', authData);
-  }, [authData]);
+    if (isMounted) {
+      console.log('ChatProvider - authData changed:', authData);
+    }
+  }, [authData, isMounted]);
   
   // Connection state
   const [isConnected, setIsConnected] = useState(false);
@@ -98,7 +104,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   // Socket connection
   const connectSocket = useCallback(async () => {
-    if (!authData || isConnecting || typeof window === 'undefined') return;
+    if (!authData || isConnecting || typeof window === 'undefined' || !isMounted) {
+      if (!isMounted) {
+        console.log('ChatProvider - Not mounted yet, skipping initialization');
+      }
+      return;
+    }
 
     console.log('🔌 ChatContext - Attempting to connect socket for:', authData);
     setIsConnecting(true);
@@ -146,7 +157,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsConnecting(false);
     }
-  }, [authData]);
+  }, [authData, isMounted]);
 
   const disconnectSocketHandler = useCallback(() => {
     // Clean up event listeners
@@ -550,20 +561,28 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Auto-connect when auth data is available
+  // Auto-connect when auth data is available and component is mounted
   useEffect(() => {
+    if (!isMounted) return;
+
     console.log('🔄 ChatContext - Auto-connect useEffect triggered:', {
       authData: !!authData,
       authDataType: authData?.tokenType,
       authDataUserId: authData?.userId,
       isConnected,
       isConnecting,
-      isBrowser: typeof window !== 'undefined'
+      isBrowser: typeof window !== 'undefined',
+      isMounted
     });
 
     if (authData && !isConnected && !isConnecting) {
       console.log('🚀 ChatContext - Triggering socket connection for:', authData.tokenType, authData.userId);
-      connectSocket();
+      // Add a small delay to ensure auth is fully established
+      const connectTimer = setTimeout(() => {
+        connectSocket();
+      }, 100);
+
+      return () => clearTimeout(connectTimer);
     }
 
     // Disconnect when auth data is lost
@@ -571,7 +590,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       console.log('🔌 ChatContext - Disconnecting socket due to lost auth data');
       disconnectSocketHandler();
     }
-  }, [authData, isConnected, isConnecting, connectSocket, disconnectSocketHandler]);
+  }, [authData, isConnected, isConnecting, connectSocket, disconnectSocketHandler, isMounted]);
 
   // Fetch conversations on connect
   useEffect(() => {

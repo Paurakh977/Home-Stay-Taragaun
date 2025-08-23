@@ -84,10 +84,11 @@ export const initSocket = async (auth: { tokenType: 'clerk' | 'jwt'; token: stri
     path: socketPath,
     auth,
     transports: ['websocket', 'polling'],
-    timeout: 20000,
+    timeout: 30000, // Increased timeout
     reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 1000,
+    reconnectionAttempts: 10, // More attempts
+    reconnectionDelay: 2000, // Longer delay between attempts
+    reconnectionDelayMax: 10000, // Max delay
     withCredentials: true, // Enable sending cookies with socket connection
     forceNew: true // Force new connection to ensure fresh authentication
   }) as ChatSocket;

@@ -5,7 +5,7 @@ import { Toaster } from "sonner";
 import Script from 'next/script';
 import { TranslateProvider } from "@/components/shared/TranslateProvider";
 import { ClerkProvider } from "@clerk/nextjs";
-import { ChatProvider } from "@/context/ChatContext";
+import ChatProviderClient from "@/components/providers/ChatProviderClient";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -238,12 +238,12 @@ export default function RootLayout({
         </Script>
         
         <ClerkProvider>
-          <ChatProvider>
+          <ChatProviderClient>
             <TranslateProvider>
               {children}
             </TranslateProvider>
             <Toaster position="top-right" richColors />
-          </ChatProvider>
+          </ChatProviderClient>
         </ClerkProvider>
       </body>
     </html>

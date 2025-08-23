@@ -5,7 +5,7 @@ import { auth } from '@clerk/nextjs/server';
 import { createClerkClient } from '@clerk/backend';
 import { jwtVerify } from 'jose';
 import { v4 as uuidv4 } from 'uuid';
-import { getRedisPublisher, REDIS_CHANNELS, initializeRedis } from '@/lib/redis';
+import { REDIS_CHANNELS, initializeRedis, safeRedisPublish } from '@/lib/redis';
 
 // JWT verification for homestay users
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_for_development';
@@ -73,7 +73,11 @@ async function getUserFromRequest(request: NextRequest) {
   return null;
 }
 
-// Enrich participant data with user information
+// Cache for user data to reduce API calls
+const userDataCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Enrich participant data with user information (with caching)
 async function enrichParticipantData(participants: any[]) {
   const clerk = createClerkClient({
     secretKey: process.env.CLERK_SECRET_KEY!,
@@ -82,12 +86,26 @@ async function enrichParticipantData(participants: any[]) {
 
   const enrichedParticipants = await Promise.all(
     participants.map(async (participant) => {
+      const cacheKey = `${participant.userType}:${participant.userId}`;
+      const now = Date.now();
+
+      // Check cache first
+      const cached = userDataCache.get(cacheKey);
+      if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+        return { ...participant, ...cached.data };
+      }
+
       try {
+        let userData: { name: string; avatar: string | null; email: string | null } = {
+          name: 'Unknown User',
+          avatar: null,
+          email: null
+        };
+
         if (participant.userType === 'clerk') {
           // Get Clerk user data
           const user = await clerk.users.getUser(participant.userId);
-          return {
-            ...participant,
+          userData = {
             name: user.fullName || user.firstName || user.emailAddresses[0]?.emailAddress || 'Unknown User',
             avatar: user.imageUrl || null,
             email: user.emailAddresses[0]?.emailAddress || null,
@@ -96,25 +114,25 @@ async function enrichParticipantData(participants: any[]) {
           // Get homestay data
           const homestay = await HomestaySingle.findOne({ homestayId: participant.userId }).lean();
           if (homestay) {
-            return {
-              ...participant,
+            userData = {
               name: homestay.homeStayName || homestay.name || 'Unknown Homestay',
               avatar: homestay.profileImage || null,
               email: homestay.email || null,
             };
           }
         }
+
+        // Cache the result
+        userDataCache.set(cacheKey, { data: userData, timestamp: now });
+
+        return { ...participant, ...userData };
       } catch (error) {
         console.error(`Error enriching participant ${participant.userId}:`, error);
-      }
 
-      // Fallback for failed enrichment
-      return {
-        ...participant,
-        name: 'Unknown User',
-        avatar: null,
-        email: null,
-      };
+        // Return fallback data
+        const fallbackData = { name: 'Unknown User', avatar: null, email: null };
+        return { ...participant, ...fallbackData };
+      }
     })
   );
 
@@ -186,11 +204,13 @@ export async function GET(request: NextRequest) {
     // Validate limit bounds
     const validLimit = Math.min(Math.max(limit, 1), 100);
 
+    // Optimize query with projection to reduce data transfer
     const conversations = await Chat.find({
       'participants.userId': user.userId,
       'participants.userType': user.userType,
       isActive: true,
     })
+    .select('chatId participants lastMessage lastActivity chatType createdAt')
     .sort({ lastActivity: -1 })
     .skip(offset)
     .limit(validLimit)
@@ -311,22 +331,19 @@ export async function POST(request: NextRequest) {
     });
 
     // Publish chat created event via Redis with error handling
-    try {
-      const chatCreatedEvent = {
-        chatId: newChat.chatId,
-        participants: newChat.participants,
-        createdBy: user.userId,
-        createdByType: user.userType,
-        timestamp: new Date(),
-      };
+    const chatCreatedEvent = {
+      chatId: newChat.chatId,
+      participants: newChat.participants,
+      createdBy: user.userId,
+      createdByType: user.userType,
+      timestamp: new Date(),
+    };
 
-      const publisher = getRedisPublisher();
-      await publisher.publish(REDIS_CHANNELS.CHAT_CREATED, JSON.stringify(chatCreatedEvent));
+    const publishSuccess = await safeRedisPublish(REDIS_CHANNELS.CHAT_CREATED, chatCreatedEvent);
+    if (publishSuccess) {
       console.log('✅ Chat created event published to Redis');
-
-    } catch (redisError) {
-      console.error('❌ Failed to publish chat created event:', redisError);
-      // Don't fail the request if Redis publish fails
+    } else {
+      console.warn('⚠️ Failed to publish chat created event to Redis');
     }
 
     // Enrich new chat with participant data

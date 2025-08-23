@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -91,25 +91,27 @@ const PlatformNavbar = () => {
     }
   };
 
-  // Convert conversations to chat items for display
-  const chatItems = conversations.map(conv => {
-    // Find the other participant (not the current user)
-    const otherParticipant = conv.participants.find(p =>
-      authData && p.userId !== authData.userId
-    );
+  // Convert conversations to chat items for display (memoized to prevent unnecessary re-renders)
+  const chatItems = useMemo(() => {
+    return conversations.map(conv => {
+      // Find the other participant (not the current user)
+      const otherParticipant = conv.participants.find(p =>
+        authData && p.userId !== authData.userId
+      );
 
-    const unreadCount = unreadCountByChatId[conv.chatId] || 0;
+      const unreadCount = unreadCountByChatId[conv.chatId] || 0;
 
-    return {
-      id: conv.chatId,
-      name: otherParticipant?.name || otherParticipant?.username || 'Unknown User',
-      avatar: otherParticipant?.avatar || '',
-      lastMessage: conv.lastMessage?.content || 'No messages yet',
-      time: formatTime(conv.lastActivity),
-      unread: unreadCount > 0,
-      unreadCount: unreadCount
-    };
-  });
+      return {
+        id: conv.chatId,
+        name: otherParticipant?.name || otherParticipant?.username || 'Unknown User',
+        avatar: otherParticipant?.avatar || '',
+        lastMessage: conv.lastMessage?.content || 'No messages yet',
+        time: formatTime(conv.lastActivity),
+        unread: unreadCount > 0,
+        unreadCount: unreadCount
+      };
+    });
+  }, [conversations, unreadCountByChatId, authData]);
 
   // Use total unread count from context
   const unreadMessageCount = totalUnreadCount;

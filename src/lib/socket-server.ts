@@ -12,7 +12,8 @@ import {
   setChatUserOnline,
   setChatUserOffline,
   addUserToChatRoom,
-  removeUserFromChatRoom
+  removeUserFromChatRoom,
+  safeRedisPublish
 } from './redis';
 import dbConnect from './mongodb';
 import { Chat, Message, UserStatus } from './models';
@@ -365,7 +366,7 @@ export async function initializeSocketServer(server: HTTPServer) {
 
           await setChatUserOnline(user.userId, user.userType, socket.id);
 
-          // Publish status update via Redis
+          // Publish status update via Redis with safe publishing
           const statusEvent: RedisUserStatus = {
             userId: user.userId,
             userType: user.userType,
@@ -373,8 +374,8 @@ export async function initializeSocketServer(server: HTTPServer) {
             lastActiveAt: new Date(),
             socketId: socket.id,
           };
-          
-          getRedisPublisher().publish(REDIS_CHANNELS.USER_STATUS, JSON.stringify(statusEvent));
+
+          await safeRedisPublish(REDIS_CHANNELS.USER_STATUS, statusEvent);
           
         } catch (statusError) {
           console.error('Error updating user status:', statusError);
@@ -502,7 +503,7 @@ export async function initializeSocketServer(server: HTTPServer) {
             isTyping
           };
 
-          await getRedisPublisher().publish(REDIS_CHANNELS.TYPING_STATUS, JSON.stringify(typing));
+          await safeRedisPublish(REDIS_CHANNELS.TYPING_STATUS, typing);
           
         } catch (error) {
           console.error('❌ Error handling typing event:', error);
@@ -633,7 +634,7 @@ export async function initializeSocketServer(server: HTTPServer) {
             recipientIds,
           };
 
-          await getRedisPublisher().publish(REDIS_CHANNELS.NEW_MESSAGE, JSON.stringify(event));
+          await safeRedisPublish(REDIS_CHANNELS.NEW_MESSAGE, event);
           
           // Confirm message sent to sender
           socket.emit('message_sent', { 
@@ -701,13 +702,13 @@ export async function initializeSocketServer(server: HTTPServer) {
           );
 
           // Publish read receipt across instances via Redis (best-effort)
-          try {
-            await getRedisPublisher().publish(
-              REDIS_CHANNELS.MESSAGE_READ,
-              JSON.stringify({ chatId, messageIds, userId: user.userId, userType: user.userType })
-            );
-          } catch (pubErr) {
-            console.warn('⚠️ Failed to publish MESSAGE_READ event:', pubErr);
+          const publishSuccess = await safeRedisPublish(
+            REDIS_CHANNELS.MESSAGE_READ,
+            { chatId, messageIds, userId: user.userId, userType: user.userType }
+          );
+
+          if (!publishSuccess) {
+            console.warn('⚠️ Failed to publish MESSAGE_READ event via Redis');
           }
 
           socket.emit('messages_marked_read', { chatId, messageIds });
@@ -745,7 +746,7 @@ export async function initializeSocketServer(server: HTTPServer) {
             lastActiveAt: new Date(),
           };
           
-          await getRedisPublisher().publish(REDIS_CHANNELS.USER_STATUS, JSON.stringify(statusEvent));
+          await safeRedisPublish(REDIS_CHANNELS.USER_STATUS, statusEvent);
 
         } catch (err) {
           console.error('❌ Error handling disconnect:', err);
