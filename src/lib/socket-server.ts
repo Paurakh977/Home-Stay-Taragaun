@@ -13,7 +13,8 @@ import {
   setChatUserOffline,
   addUserToChatRoom,
   removeUserFromChatRoom,
-  safeRedisPublish
+  safeRedisPublish,
+  nonBlockingRedisPublish
 } from './redis';
 import dbConnect from './mongodb';
 import { Chat, Message, UserStatus } from './models';
@@ -86,9 +87,34 @@ const ENCODED_JWT_SECRET = new TextEncoder().encode(JWT_SECRET);
 
 let io: IOServer | null = null;
 
+// Local cache for user statuses to reduce Redis load
+const userStatusCache = new Map<string, { isOnline: boolean; lastActiveAt: Date; socketId?: string }>();
+const USER_STATUS_CACHE_TTL = 300000; // 5 minutes
+
+// Typing status debouncing to prevent spam
+const typingDebounceMap = new Map<string, NodeJS.Timeout>();
+const TYPING_DEBOUNCE_MS = 1000; // 1 second debounce
+
 export const getIO = () => {
   if (!io) throw new Error('Socket.io server not initialized');
   return io;
+};
+
+// Cleanup function for debounce maps
+export const cleanupSocketServer = () => {
+  // Clear all pending typing timeouts
+  typingDebounceMap.forEach((timeoutId) => {
+    clearTimeout(timeoutId);
+  });
+  typingDebounceMap.clear();
+
+  // Clear user status cache
+  userStatusCache.clear();
+
+  if (io) {
+    io.close();
+    io = null;
+  }
 };
 
 // Verify user has access to specific chat
@@ -179,11 +205,11 @@ export async function initializeSocketServer(server: HTTPServer) {
     try {
       const subClient = getRedisSubscriber();
       await subClient.subscribe(
-        REDIS_CHANNELS.NEW_MESSAGE, 
-        REDIS_CHANNELS.USER_STATUS, 
-        REDIS_CHANNELS.TYPING_STATUS, 
-        REDIS_CHANNELS.CHAT_CREATED,
-        REDIS_CHANNELS.MESSAGE_READ
+        REDIS_CHANNELS.NEW_MESSAGE,
+        REDIS_CHANNELS.USER_STATUS,
+        REDIS_CHANNELS.TYPING_STATUS,
+        REDIS_CHANNELS.CHAT_CREATED
+        // Removed MESSAGE_READ to eliminate Redis timeouts for rapid read events
       );
 
       subClient.on('message', async (channel, message) => {
@@ -232,10 +258,7 @@ export async function initializeSocketServer(server: HTTPServer) {
               io?.emit('chat_created', data);
               break;
             }
-            case REDIS_CHANNELS.MESSAGE_READ: {
-              io?.to(data.chatId).emit('messages_marked_read', data);
-              break;
-            }
+            // Removed MESSAGE_READ case - now handled locally only
           }
         } catch (err) {
           console.error('❌ Failed to process Redis pub/sub message:', err);
@@ -364,18 +387,34 @@ export async function initializeSocketServer(server: HTTPServer) {
             { upsert: true, new: true }
           );
 
-          await setChatUserOnline(user.userId, user.userType, socket.id);
-
-          // Publish status update via Redis with safe publishing
-          const statusEvent: RedisUserStatus = {
-            userId: user.userId,
-            userType: user.userType,
+          // Update local cache first for immediate access
+          const userKey = `${user.userType}:${user.userId}`;
+          userStatusCache.set(userKey, {
             isOnline: true,
             lastActiveAt: new Date(),
-            socketId: socket.id,
-          };
+            socketId: socket.id
+          });
 
-          await safeRedisPublish(REDIS_CHANNELS.USER_STATUS, statusEvent);
+          // Try to update Redis, but don't block if it fails
+          try {
+            await setChatUserOnline(user.userId, user.userType, socket.id);
+
+            // Use non-blocking publish for status updates
+            const statusEvent: RedisUserStatus = {
+              userId: user.userId,
+              userType: user.userType,
+              isOnline: true,
+              lastActiveAt: new Date(),
+              socketId: socket.id,
+            };
+
+            // Fire-and-forget Redis publish
+            safeRedisPublish(REDIS_CHANNELS.USER_STATUS, statusEvent).catch(err => {
+              console.warn('⚠️ Failed to publish user status to Redis:', err.message);
+            });
+          } catch (redisError) {
+            console.warn('⚠️ Redis user status update failed, using local cache only:', redisError);
+          }
           
         } catch (statusError) {
           console.error('Error updating user status:', statusError);
@@ -492,18 +531,44 @@ export async function initializeSocketServer(server: HTTPServer) {
             return;
           }
 
-          // Get user name for typing indicator
-          const userName = await getUserName(user.userId, user.userType);
+          // Debounce typing indicators to prevent spam
+          const typingKey = `${chatId}:${user.userId}:${user.userType}`;
 
-          const typing: RedisTypingStatus = {
-            chatId,
-            userId: user.userId,
-            userType: user.userType,
-            userName,
-            isTyping
-          };
+          // Clear existing timeout
+          if (typingDebounceMap.has(typingKey)) {
+            clearTimeout(typingDebounceMap.get(typingKey)!);
+          }
 
-          await safeRedisPublish(REDIS_CHANNELS.TYPING_STATUS, typing);
+          // Only send typing indicators if user is typing (not when stopping)
+          if (isTyping) {
+            // Set debounced timeout for typing
+            const timeoutId = setTimeout(async () => {
+              const userName = await getUserName(user.userId, user.userType);
+
+              // Broadcast locally only (no Redis) for better performance
+              io?.to(chatId).emit('typing_status', {
+                chatId,
+                userId: user.userId,
+                userType: user.userType,
+                userName,
+                isTyping: true
+              });
+
+              typingDebounceMap.delete(typingKey);
+            }, TYPING_DEBOUNCE_MS);
+
+            typingDebounceMap.set(typingKey, timeoutId);
+          } else {
+            // Immediately broadcast stop typing
+            const userName = await getUserName(user.userId, user.userType);
+            io?.to(chatId).emit('typing_status', {
+              chatId,
+              userId: user.userId,
+              userType: user.userType,
+              userName,
+              isTyping: false
+            });
+          }
           
         } catch (error) {
           console.error('❌ Error handling typing event:', error);
@@ -701,16 +766,16 @@ export async function initializeSocketServer(server: HTTPServer) {
             }
           );
 
-          // Publish read receipt across instances via Redis (best-effort)
-          const publishSuccess = await safeRedisPublish(
-            REDIS_CHANNELS.MESSAGE_READ,
-            { chatId, messageIds, userId: user.userId, userType: user.userType }
-          );
+          // Broadcast read receipts only to local socket room (no Redis)
+          // This eliminates Redis timeouts for rapid read events
+          io?.to(chatId).emit('messages_marked_read', {
+            chatId,
+            messageIds,
+            userId: user.userId,
+            userType: user.userType
+          });
 
-          if (!publishSuccess) {
-            console.warn('⚠️ Failed to publish MESSAGE_READ event via Redis');
-          }
-
+          // Also emit to the sender's socket immediately
           socket.emit('messages_marked_read', { chatId, messageIds });
 
         } catch (error) {
@@ -735,18 +800,43 @@ export async function initializeSocketServer(server: HTTPServer) {
             { new: true }
           );
 
-          // Update Redis status
-          await setChatUserOffline(user.userId, user.userType);
-
-          // Publish offline status
-          const statusEvent: RedisUserStatus = {
-            userId: user.userId,
-            userType: user.userType,
+          // Update local cache immediately
+          const userKey = `${user.userType}:${user.userId}`;
+          userStatusCache.set(userKey, {
             isOnline: false,
-            lastActiveAt: new Date(),
-          };
-          
-          await safeRedisPublish(REDIS_CHANNELS.USER_STATUS, statusEvent);
+            lastActiveAt: new Date()
+          });
+
+          // Clear any pending typing timeouts for this user
+          const typingKeys = Array.from(typingDebounceMap.keys()).filter(key =>
+            key.includes(user.userId)
+          );
+          typingKeys.forEach(key => {
+            const timeoutId = typingDebounceMap.get(key);
+            if (timeoutId) {
+              clearTimeout(timeoutId);
+              typingDebounceMap.delete(key);
+            }
+          });
+
+          // Try Redis updates but don't block on them
+          try {
+            await setChatUserOffline(user.userId, user.userType);
+
+            // Fire-and-forget Redis publish
+            const statusEvent: RedisUserStatus = {
+              userId: user.userId,
+              userType: user.userType,
+              isOnline: false,
+              lastActiveAt: new Date(),
+            };
+
+            safeRedisPublish(REDIS_CHANNELS.USER_STATUS, statusEvent).catch(err => {
+              console.warn('⚠️ Failed to publish offline status to Redis:', err.message);
+            });
+          } catch (redisError) {
+            console.warn('⚠️ Redis offline status update failed:', redisError);
+          }
 
         } catch (err) {
           console.error('❌ Error handling disconnect:', err);
