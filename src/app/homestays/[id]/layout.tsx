@@ -43,36 +43,9 @@ export default function HomestayLayout({
   const [homestay, setHomestay] = useState<HomestayData | null>(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isSuperadmin, setIsSuperadmin] = useState(false);
-  const [isTemporaryPage, setIsTemporaryPage] = useState(false);
+  // Removed temporary page and superadmin gating logic
   
-  // Check if this is the temporary page
-  useEffect(() => {
-    setIsTemporaryPage(pathname?.includes('/temporary') || false);
-  }, [pathname]);
-  
-  // Check superadmin status
-  useEffect(() => {
-    const checkSuperadminStatus = async () => {
-      try {
-        const response = await fetch('/api/superadmin/auth/me', {
-          credentials: 'include' // Important to send the cookies
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.user && data.user.role === 'superadmin') {
-            setIsSuperadmin(true);
-          }
-        }
-      } catch (err) {
-        console.error('Error checking superadmin status:', err);
-        // Don't update state - default is false
-      }
-    };
-
-    checkSuperadminStatus();
-  }, []);
+  // Navigation is now open to all users - no superadmin check required
   
   useEffect(() => {
     // Fetch homestay data for header/footer
@@ -145,9 +118,8 @@ export default function HomestayLayout({
   const contactEmail = primaryContact?.email || "info@hamrohomestay.com";
   const contactPhone = primaryContact?.mobile || "+977 9800000000";
 
-  // Determine whether to show navigation and footer
-  // Only show them for superadmins viewing the regular pages (not temporary)
-  const showNavigation = isSuperadmin && !isTemporaryPage;
+  // Navigation is now available to all users - no gating required
+  const showNavigation = true;
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
@@ -433,4 +405,4 @@ export default function HomestayLayout({
       )}
     </div>
   );
-} 
+}
