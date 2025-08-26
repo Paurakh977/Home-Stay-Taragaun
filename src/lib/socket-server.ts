@@ -9,6 +9,8 @@ import {
   type RedisMessage,
   type RedisTypingStatus,
   type RedisUserStatus,
+  type RedisBookingNotification,
+  type RedisBookingStatusUpdate,
   setChatUserOnline,
   setChatUserOffline,
   addUserToChatRoom,
@@ -208,7 +210,9 @@ export async function initializeSocketServer(server: HTTPServer) {
         REDIS_CHANNELS.NEW_MESSAGE,
         REDIS_CHANNELS.USER_STATUS,
         REDIS_CHANNELS.TYPING_STATUS,
-        REDIS_CHANNELS.CHAT_CREATED
+        REDIS_CHANNELS.CHAT_CREATED,
+        REDIS_CHANNELS.NEW_BOOKING,
+        REDIS_CHANNELS.BOOKING_STATUS_UPDATE
         // Removed MESSAGE_READ to eliminate Redis timeouts for rapid read events
       );
 
@@ -256,6 +260,49 @@ export async function initializeSocketServer(server: HTTPServer) {
             }
             case REDIS_CHANNELS.CHAT_CREATED: {
               io?.emit('chat_created', data);
+              break;
+            }
+            case REDIS_CHANNELS.NEW_BOOKING: {
+              const booking = data as RedisBookingNotification;
+              console.log('📋 Socket Server - Broadcasting new booking notification to homestay:', booking.homestayId);
+
+              // Emit to all sockets connected for this homestay
+              const allSockets = Array.from(io?.sockets.sockets.values() || []);
+              const homestaySocketIds = allSockets
+                .filter(socket => {
+                  const user = (socket as any).user as SocketUser;
+                  return user && user.userType === 'homestay' && user.userId === booking.homestayId;
+                })
+                .map(socket => socket.id);
+
+              console.log('📋 Socket Server - Found homestay sockets:', homestaySocketIds);
+
+              homestaySocketIds.forEach(socketId => {
+                io?.to(socketId).emit('new_booking', booking);
+              });
+              break;
+            }
+            case REDIS_CHANNELS.BOOKING_STATUS_UPDATE: {
+              const statusUpdate = data as RedisBookingStatusUpdate;
+              console.log('📋 Socket Server - Broadcasting booking status update:', statusUpdate.bookingId, 'new status:', statusUpdate.newStatus);
+
+              // Emit to both homestay and clerk user
+              const allSockets = Array.from(io?.sockets.sockets.values() || []);
+              const targetSocketIds = allSockets
+                .filter(socket => {
+                  const user = (socket as any).user as SocketUser;
+                  return user && (
+                    (user.userType === 'homestay' && user.userId === statusUpdate.homestayId) ||
+                    (user.userType === 'clerk' && user.userId === statusUpdate.clerkUserId)
+                  );
+                })
+                .map(socket => socket.id);
+
+              console.log('📋 Socket Server - Found target sockets for status update:', targetSocketIds);
+
+              targetSocketIds.forEach(socketId => {
+                io?.to(socketId).emit('booking_status_update', statusUpdate);
+              });
               break;
             }
             // Removed MESSAGE_READ case - now handled locally only

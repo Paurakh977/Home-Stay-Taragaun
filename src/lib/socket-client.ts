@@ -34,6 +34,30 @@ import { DefaultEventsMap } from "socket.io";
   chat_joined: (data: { chatId: string; success: boolean }) => void;
   chat_left: (data: { chatId: string; success: boolean }) => void;
   error_message: (data: { message: string }) => void;
+  new_booking: (data: {
+    bookingId: string;
+    homestayId: string;
+    homestayName: string;
+    clerkUserId: string;
+    clerkUserName: string;
+    clerkUserEmail: string;
+    guestName: string;
+    checkInDate: string;
+    checkOutDate: string;
+    numberOfGuests: number;
+    numberOfRooms: number;
+    status: string;
+    timestamp: string;
+  }) => void;
+  booking_status_update: (data: {
+    bookingId: string;
+    homestayId: string;
+    clerkUserId: string;
+    oldStatus: string;
+    newStatus: string;
+    message?: string;
+    timestamp: string;
+  }) => void;
 };
 
 // Define events the client can send to the server
@@ -226,6 +250,14 @@ export const onChatLeft = (callback: SocketClientEvents['chat_left']) => {
   socket?.on('chat_left', callback);
 };
 
+export const onNewBooking = (callback: SocketClientEvents['new_booking']) => {
+  socket?.on('new_booking', callback);
+};
+
+export const onBookingStatusUpdate = (callback: SocketClientEvents['booking_status_update']) => {
+  socket?.on('booking_status_update', callback);
+};
+
 /**
  * Remove event listeners
  */
@@ -269,4 +301,16 @@ export const offChatLeft = (callback?: SocketClientEvents['chat_left']) => {
   if (!socket) return;
   if (callback) socket.off('chat_left', callback);
   else socket.removeAllListeners('chat_left');
+};
+
+export const offNewBooking = (callback?: SocketClientEvents['new_booking']) => {
+  if (!socket) return;
+  if (callback) socket.off('new_booking', callback);
+  else socket.removeAllListeners('new_booking');
+};
+
+export const offBookingStatusUpdate = (callback?: SocketClientEvents['booking_status_update']) => {
+  if (!socket) return;
+  if (callback) socket.off('booking_status_update', callback);
+  else socket.removeAllListeners('booking_status_update');
 };

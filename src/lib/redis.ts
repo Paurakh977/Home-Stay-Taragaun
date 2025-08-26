@@ -31,6 +31,34 @@ export interface RedisTypingStatus {
   isTyping: boolean;
 }
 
+// Type for booking notification broadcasting
+export interface RedisBookingNotification {
+  bookingId: string;
+  homestayId: string;
+  homestayName: string;
+  clerkUserId: string;
+  clerkUserName: string;
+  clerkUserEmail: string;
+  guestName: string;
+  checkInDate: string;
+  checkOutDate: string;
+  numberOfGuests: number;
+  numberOfRooms: number;
+  status: string;
+  timestamp: string;
+}
+
+// Type for booking status update broadcasting
+export interface RedisBookingStatusUpdate {
+  bookingId: string;
+  homestayId: string;
+  clerkUserId: string;
+  oldStatus: string;
+  newStatus: string;
+  message?: string;
+  timestamp: string;
+}
+
 // Redis connection configuration with enhanced reliability
 const getRedisConfig = () => {
   // Support multiple env var names for host for compatibility
@@ -449,6 +477,8 @@ export const REDIS_CHANNELS = {
   TYPING_STATUS: 'chat:typing_status',
   MESSAGE_READ: 'chat:message_read',
   CHAT_CREATED: 'chat:chat_created',
+  NEW_BOOKING: 'booking:new_booking',
+  BOOKING_STATUS_UPDATE: 'booking:status_update'
 } as const;
 
 export type RedisChannel = typeof REDIS_CHANNELS[keyof typeof REDIS_CHANNELS];
@@ -479,6 +509,12 @@ export const safeRedisPublish = async (channel: RedisChannel, data: any, customT
           break;
         case REDIS_CHANNELS.USER_STATUS:
           timeoutMs = 3000; // 3s for user status
+          break;
+        case REDIS_CHANNELS.NEW_BOOKING:
+          timeoutMs = 5000; // 5s for new bookings (critical)
+          break;
+        case REDIS_CHANNELS.BOOKING_STATUS_UPDATE:
+          timeoutMs = 4000; // 4s for booking status updates (important)
           break;
         default:
           timeoutMs = 3000; // 3s default
@@ -587,15 +623,24 @@ const flushBatch = async (channel: RedisChannel) => {
 export const forceRedisReconnection = async () => {
   try {
     console.log('🔄 Force reconnecting Redis clients...');
-    
+
     await closeRedisConnections();
     await initializeRedis();
-    
+
     console.log('✅ Redis force reconnection completed');
     return true;
-    
+
   } catch (error) {
     console.error('❌ Redis force reconnection failed:', error);
     return false;
   }
+};
+
+// Booking notification publishing functions
+export const publishNewBookingNotification = async (data: RedisBookingNotification) => {
+  return await safeRedisPublish(REDIS_CHANNELS.NEW_BOOKING, data);
+};
+
+export const publishBookingStatusUpdate = async (data: RedisBookingStatusUpdate) => {
+  return await safeRedisPublish(REDIS_CHANNELS.BOOKING_STATUS_UPDATE, data);
 };
