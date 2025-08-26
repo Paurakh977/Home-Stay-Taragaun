@@ -39,29 +39,39 @@ async function getBooking(req: NextApiRequest, res: NextApiResponse, bookingId: 
 
     // Check if user has permission to view this booking
     if (userId) {
+      // Find the associated homestay to get coordinates
+      const homestay = await HomestaySingle.findOne({
+        homestayId: booking.homestayId
+      }).select('latitude longitude');
+      
       // User can view their own booking
       if (booking.clerkUserId === userId) {
         return res.status(200).json({
           success: true,
           message: 'Booking retrieved successfully',
-          data: booking
+          data: {
+            ...booking.toObject(),
+            homestayCoordinates: homestay ? {
+              latitude: homestay.latitude,
+              longitude: homestay.longitude
+            } : undefined
+          }
         });
       }
 
       // Check if user owns the homestay
-      const homestay = await HomestaySingle.findOne({
-        $or: [
-          { homestayId: booking.homestayId },
-          { _id: booking.homestayId }
-        ]
-      });
-
       if (homestay) {
         // For now, allow access - in production you'd verify ownership
         return res.status(200).json({
           success: true,
           message: 'Booking retrieved successfully',
-          data: booking
+          data: {
+            ...booking.toObject(),
+            homestayCoordinates: {
+              latitude: homestay.latitude,
+              longitude: homestay.longitude
+            }
+          }
         });
       }
     }
@@ -93,10 +103,7 @@ async function updateBooking(req: NextApiRequest, res: NextApiResponse, bookingI
 
     // Verify homestay ownership
     const homestay = await HomestaySingle.findOne({
-      $or: [
-        { homestayId: booking.homestayId },
-        { _id: booking.homestayId }
-      ]
+      homestayId: booking.homestayId
     });
 
     if (!homestay) {
