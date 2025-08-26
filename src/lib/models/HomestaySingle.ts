@@ -199,6 +199,11 @@ export interface IHomestaySingle extends Document {
     startDate?: Date;
     endDate?: Date;
     bookedDates?: Date[];
+    isAvailable?: boolean;
+    maxGuestsPerBooking?: number;
+    maxRoomsPerBooking?: number;
+    minimumStayNights?: number;
+    advanceBookingDays?: number;
   };
   contactPerson?: {
     name?: string;
@@ -393,6 +398,11 @@ const homestaySchema = new Schema<IHomestaySingle>(
       startDate: Date,
       endDate: Date,
       bookedDates: [Date],
+      isAvailable: { type: Boolean, default: true },
+      maxGuestsPerBooking: { type: Number, default: 10 },
+      maxRoomsPerBooking: { type: Number, default: 5 },
+      minimumStayNights: { type: Number, default: 1 },
+      advanceBookingDays: { type: Number, default: 365 }
     },
     contactPerson: {
       name: String,
