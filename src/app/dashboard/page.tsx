@@ -3,30 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { HomeIcon, Building2Icon, CalendarIcon, MapPinIcon, UserIcon, ClipboardCheckIcon } from 'lucide-react';
+import { CalendarIcon, MapPinIcon, UserIcon, ClipboardCheckIcon, BookOpenIcon, Building2Icon } from 'lucide-react';
 import BrandedDashboardHeader from '@/components/dashboard/BrandedDashboardHeader';
+import { BookingNotificationProvider } from '@/context/BookingNotificationContext';
+import BookingNotifications from '@/components/booking/BookingNotifications';
+import BookingManagement from '@/components/dashboard/BookingManagement';
+import { useAuthToken } from '@/hooks/useAuthToken';
 
-interface HomeStay {
-  _id: string;
-  homeStayName: string;
-  villageName: string;
-  province: string;
-  district: string;
-  municipality: string;
-  homeStayType: string;
-  status: string;
-  createdAt: string;
-  featureAccess?: {
-    dashboard?: boolean;
-    profile?: boolean;
-    portal?: boolean;
-    documents?: boolean;
-    imageUpload?: boolean;
-    settings?: boolean;
-    chat?: boolean;
-    updateInfo?: boolean;
-  };
-}
+
 
 interface UserInfo {
   homestayId: string;
@@ -48,10 +32,8 @@ interface DashboardPageProps {
 }
 
 export default function DashboardPage({ adminUsername }: DashboardPageProps) {
-  const [homestays, setHomestays] = useState<HomeStay[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<UserInfo | null>(null);
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalBookings: 0,
     totalVisits: 0,
@@ -59,122 +41,111 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
     pendingInquiries: 0
   });
   const router = useRouter();
+  const authData = useAuthToken();
 
-  // Load user data from localStorage
+  // Load user data based on authentication
   useEffect(() => {
-    try {
-      const userJson = localStorage.getItem('user');
-      if (userJson) {
-        const userData = JSON.parse(userJson);
-        setUser(userData);
-      } else {
-        router.push(adminUsername ? `/${adminUsername}/login` : '/login');
+    const loadUserData = async () => {
+      console.log('Dashboard - Auth data:', authData);
+
+      if (!authData) {
+        console.log('Dashboard - No auth data, still loading...');
+        return;
       }
-    } catch (err) {
-      console.error('Error loading user data:', err);
-      router.push(adminUsername ? `/${adminUsername}/login` : '/login');
-    }
-  }, [router, adminUsername]);
 
-  // Fetch homestay data
-  useEffect(() => {
-    const fetchHomestays = async () => {
-      try {
-        // Check if user is logged in first
-        const userJson = localStorage.getItem('user');
-        if (!userJson) {
-          router.push(adminUsername ? `/${adminUsername}/login` : '/login');
-          return;
-        }
+      if (authData.tokenType === 'jwt') {
+        // For homestay users, fetch the homestay data
+        try {
+          console.log('Dashboard - Fetching homestay data for:', authData.userId);
+          const response = await fetch(`/api/homestays/${authData.userId}`);
+          if (response.ok) {
+            const homestayData = await response.json();
+            console.log('Dashboard - Homestay data received:', homestayData);
 
-        setLoading(true);
-        setError(null);
-        
-        const user = JSON.parse(userJson);
-        // Build API URL with adminUsername if available
-        const apiUrl = adminUsername 
-          ? `/api/homestays?limit=5&adminUsername=${adminUsername}`
-          : `/api/homestays?limit=5`;
-          
-        const response = await fetch(apiUrl);
-        
-        if (!response.ok) {
-          if (response.status === 401 || response.status === 403) {
-            localStorage.removeItem('user');
-            router.push(adminUsername ? `/${adminUsername}/login` : '/login');
-            return;
+            if (homestayData.homestay) {
+              setUser({
+                homestayId: homestayData.homestay.homestayId,
+                homeStayName: homestayData.homestay.homeStayName,
+                featureAccess: homestayData.homestay.featureAccess
+              });
+              setLoading(false);
+              return;
+            }
           }
-          throw new Error('Failed to fetch homestays');
+          console.error('Dashboard - Failed to fetch homestay data');
+        } catch (error) {
+          console.error('Dashboard - Error fetching homestay data:', error);
         }
-        
-        const data = await response.json();
-        setHomestays(data.data?.slice(0, 5) || []); // Only take first 5
-        
-        // If we have the first homestay data, update the user's feature access from it
-        if (data.data && data.data.length > 0 && data.data[0].featureAccess) {
-          // Get the first homestay to extract featureAccess
-          const firstHomestay = data.data[0];
-          // Update the user data with feature access
-          const updatedUser = {
-            ...user,
-            featureAccess: firstHomestay.featureAccess
-          };
-          setUser(updatedUser);
-          // Update in localStorage too
-          localStorage.setItem('user', JSON.stringify(updatedUser));
-        }
-        
-        // Set mock stats (would come from real API in production)
-        setStats({
-          totalBookings: 24,
-          totalVisits: 145,
-          avgRating: 4.7,
-          pendingInquiries: 3
-        });
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-        console.error('Error fetching homestays:', err);
-      } finally {
-        setLoading(false);
       }
+
+      // If we get here, authentication failed or user not found
+      console.log('Dashboard - Redirecting to login');
+      router.push(adminUsername ? `/${adminUsername}/login` : '/login');
+      setLoading(false);
     };
-    
-    fetchHomestays();
-  }, [router, adminUsername]);
-  
-  // Format date
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
+
+    loadUserData();
+  }, [authData, router, adminUsername]);
+
+  // Load stats data
+  useEffect(() => {
+    // Mock stats for now - in a real app, you'd fetch this from an API
+    setStats({
+      totalBookings: 24,
+      totalVisits: 145,
+      avgRating: 4.7,
+      pendingInquiries: 3
     });
-  };
-  
-  // Status badge color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'rejected':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  }, []);
+
+
+  // Debug logging
+  console.log('Dashboard user data:', user);
+  console.log('Dashboard userId for notifications:', user?.homestayId);
+  console.log('Dashboard auth data:', authData);
+  console.log('Dashboard loading state:', loading);
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if no user data
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600">Unable to load user data. Please try logging in again.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      {/* Branded Header */}
-      <BrandedDashboardHeader adminUsername={adminUsername} />
-      
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">ड्यासबोर्ड</h1>
-        <p className="text-gray-600">तपाईंको होमस्टे व्यवस्थापन ड्यासबोर्डमा स्वागत छ</p>
-      </div>
+    <BookingNotificationProvider
+      userId={user.homestayId}
+      userType="homestay"
+    >
+      <div>
+        {/* Branded Header */}
+        <BrandedDashboardHeader adminUsername={adminUsername} />
+
+        <div className="mb-6">
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">ड्यासबोर्ड</h1>
+              <p className="text-gray-600">तपाईंको होमस्टे व्यवस्थापन ड्यासबोर्डमा स्वागत छ</p>
+            </div>
+            <BookingNotifications />
+          </div>
+        </div>
       
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -231,112 +202,14 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
         </div>
       </div>
       
-      {/* Recent Homestays */}
-      <div className="bg-white rounded-lg shadow mb-8">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">हालैका होमस्टेहरू</h2>
-        </div>
-        <div className="px-6 py-4">
-        {/* Error message */}
-        {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
-            <div className="flex">
-              <div>
-                <p className="text-red-700 font-medium">त्रुटि</p>
-                <p className="text-sm text-red-700">{error}</p>
-              </div>
-            </div>
-          </div>
+      {/* Booking Management */}
+      <div className="mb-8">
+        {user?.homestayId && (
+          <BookingManagement
+            homestayId={user.homestayId}
+            adminUsername={adminUsername}
+          />
         )}
-        
-          {/* Loading state */}
-        {loading ? (
-            <div className="flex justify-center items-center h-40">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-          </div>
-        ) : homestays.length === 0 ? (
-            <div className="text-center py-8">
-              <Building2Icon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">कुनै होमस्टे फेला परेन</h3>
-            <p className="text-gray-600 mb-4">अहिलेसम्म कुनै होमस्टे दर्ता गरिएको छैन।</p>
-            <Link href={adminUsername ? `/${adminUsername}/register` : "/register"}>
-              <button className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark transition">
-                होमस्टे दर्ता गर्नुहोस्
-              </button>
-            </Link>
-          </div>
-        ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      होमस्टे
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      स्थान
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      स्थिति
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      मिति
-                    </th>
-                    <th scope="col" className="relative px-6 py-3">
-                      <span className="sr-only">हेर्नुहोस्</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {homestays.map((homestay) => (
-                    <tr key={homestay._id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10 flex items-center justify-center bg-primary/10 rounded-full">
-                            <HomeIcon className="h-5 w-5 text-primary" />
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">{homestay.homeStayName}</div>
-                            <div className="text-sm text-gray-500">{homestay.villageName}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{homestay.municipality}</div>
-                        <div className="text-sm text-gray-500">{homestay.district}, {homestay.province}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(homestay.status)}`}>
-                          {homestay.status && typeof homestay.status === 'string' 
-                            ? homestay.status.charAt(0).toUpperCase() + homestay.status.slice(1)
-                            : '-' /* Display '-' if status is null/undefined */}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(homestay.createdAt)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link href={adminUsername ? `/${adminUsername}/dashboard/homestays/${homestay._id}` : `/dashboard/homestays/${homestay._id}`}>
-                          <span className="text-primary hover:text-primary-dark">हेर्नुहोस्</span>
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          
-          {homestays.length > 0 && (
-            <div className="mt-4 text-right">
-              <Link href={adminUsername ? `/${adminUsername}/dashboard/homestays` : "/dashboard/homestays"}>
-                <span className="text-primary hover:text-primary-dark text-sm font-medium">
-                  सबै होमस्टेहरू हेर्नुहोस् →
-                </span>
-              </Link>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Quick Links */}
@@ -346,6 +219,20 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
         </div>
         <div className="px-6 py-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Link href={adminUsername ? `/${adminUsername}/dashboard/bookings` : "/dashboard/bookings"}>
+              <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
+                <div className="flex items-center">
+                  <div className="p-2 bg-blue-100 rounded-md">
+                    <CalendarIcon className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-gray-900">बुकिङ व्यवस्थापन</p>
+                    <p className="text-xs text-gray-500">आफ्ना बुकिङहरू र उपलब्धता व्यवस्थापन गर्नुहोस्</p>
+                  </div>
+                </div>
+              </div>
+            </Link>
+
             <Link href={adminUsername ? `/${adminUsername}/dashboard/profile` : "/dashboard/profile"}>
               <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
                 <div className="flex items-center">
@@ -395,5 +282,6 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
         </div>
       </div>
     </div>
+    </BookingNotificationProvider>
   );
 }
