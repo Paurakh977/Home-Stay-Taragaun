@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CalendarIcon, UserIcon, ClockIcon } from 'lucide-react';
+import { CalendarIcon, UserIcon, ClockIcon, PhoneIcon, MailIcon, HomeIcon, UtensilsIcon } from 'lucide-react';
 import Link from 'next/link';
 import type { Booking } from '@/types/booking';
 import { useBookingNotifications } from '@/context/BookingNotificationContext';
@@ -156,35 +156,19 @@ export default function BookingManagement({ homestayId, adminUsername }: Booking
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-4">
-            <p className="text-gray-600 mb-4">
-              {availability.isAvailable
-                ? 'तपाईंको होमस्टे अहिले बुकिङका लागि उपलब्ध छ।'
-                : 'तपाईंको होमस्टे अहिले बुकिङका लागि उपलब्ध छैन।'
-              }
-            </p>
-            <div className="mt-4">
-              <Link href={adminUsername ? `/${adminUsername}/dashboard/bookings` : "/dashboard/bookings"}>
-                <Button variant="outline" size="sm">
-                  बुकिङ व्यवस्थापन
-                </Button>
-              </Link>
-            </div>
-          </div>
+          <p className="text-gray-600 text-center">
+            {availability.isAvailable
+              ? 'तपाईंको होमस्टे अहिले बुकिङका लागि उपलब्ध छ।'
+              : 'तपाईंको होमस्टे अहिले बुकिङका लागि उपलब्ध छैन।'
+            }
+          </p>
         </CardContent>
       </Card>
 
       {/* Recent Bookings */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>हालैका बुकिङहरू</span>
-            <Link href={adminUsername ? `/${adminUsername}/dashboard/bookings` : "/dashboard/bookings"}>
-              <Button variant="outline" size="sm">
-                सबै हेर्नुहोस्
-              </Button>
-            </Link>
-          </CardTitle>
+          <CardTitle>आगामी पाहुनाहरू</CardTitle>
         </CardHeader>
         <CardContent>
           {recentBookings.length === 0 ? (
@@ -197,30 +181,86 @@ export default function BookingManagement({ homestayId, adminUsername }: Booking
             <div className="space-y-4">
               {recentBookings.map((booking) => (
                 <div key={booking._id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-2">
                       <UserIcon className="h-4 w-4 text-gray-500" />
                       <span className="font-medium">{booking.guestInfo.name}</span>
                     </div>
                     {getStatusBadge(booking.status)}
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm text-gray-600">
-                    <div className="flex items-center space-x-1">
-                      <CalendarIcon className="h-3 w-3" />
-                      <span>{formatDate(booking.checkInDate)} - {formatDate(booking.checkOutDate)}</span>
+                  
+                  {/* Contact Information */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                    <div className="flex items-center space-x-2 text-sm text-gray-600">
+                      <PhoneIcon className="h-3 w-3" />
+                      <span>{booking.guestInfo.phone}</span>
                     </div>
-                    <div className="flex items-center space-x-1">
+                    <div className="flex items-center space-x-2 text-sm text-gray-600">
+                      <MailIcon className="h-3 w-3" />
+                      <span>{booking.guestInfo.email}</span>
+                    </div>
+                  </div>
+                  
+                  {/* Booking Details */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
+                    <div className="flex items-center space-x-1 text-sm text-gray-600">
+                      <CalendarIcon className="h-3 w-3" />
+                      <span>{formatDate(booking.checkInDate)}</span>
+                    </div>
+                    <div className="flex items-center space-x-1 text-sm text-gray-600">
+                      <HomeIcon className="h-3 w-3" />
+                      <span>{booking.guestInfo.numberOfRooms} कोठा</span>
+                    </div>
+                    <div className="flex items-center space-x-1 text-sm text-gray-600">
                       <UserIcon className="h-3 w-3" />
                       <span>{booking.guestInfo.numberOfGuests} पाहुना</span>
                     </div>
-                    <div className="flex items-center space-x-1">
-                      <ClockIcon className="h-3 w-3" />
-                      <span>{booking.numberOfNights} रात</span>
+                  </div>
+                  
+                  {/* Arrival Time */}
+                  {booking.guestInfo.arrivalTime && (
+                    <div className="mb-3">
+                      <div className="flex items-center space-x-1 text-sm text-gray-600">
+                        <ClockIcon className="h-3 w-3" />
+                        <span>आगमन समय: {booking.guestInfo.arrivalTime}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="mt-2 text-xs text-gray-500">
-                    बुकिङ ID: {booking.bookingId}
-                  </div>
+                  )}
+                  
+                  {/* Food Requirements */}
+                  {booking.guestInfo.needsFood && (booking.guestInfo.needsFood.breakfast || booking.guestInfo.needsFood.lunch || booking.guestInfo.needsFood.dinner) && (
+                    <div className="mb-3">
+                      <div className="flex items-center space-x-2 text-sm">
+                        <UtensilsIcon className="h-3 w-3 text-gray-500" />
+                        <span className="text-gray-600">खाना:</span>
+                        <div className="flex space-x-2">
+                          {booking.guestInfo.needsFood.breakfast && <Badge variant="outline" className="text-xs">बिहानको खाना</Badge>}
+                          {booking.guestInfo.needsFood.lunch && <Badge variant="outline" className="text-xs">दिउँसोको खाना</Badge>}
+                          {booking.guestInfo.needsFood.dinner && <Badge variant="outline" className="text-xs">बेलुकाको खाना</Badge>}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Special Requests */}
+                  {booking.guestInfo.specialRequests && (
+                    <div className="mb-3">
+                      <div className="text-sm">
+                        <span className="text-gray-600 font-medium">विशेष अनुरोध:</span>
+                        <p className="text-gray-700 mt-1">{booking.guestInfo.specialRequests}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Dietary Requirements */}
+                  {booking.guestInfo.dietaryRequirements && (
+                    <div>
+                      <div className="text-sm">
+                        <span className="text-gray-600 font-medium">खाना सम्बन्धी आवश्यकता:</span>
+                        <p className="text-gray-700 mt-1">{booking.guestInfo.dietaryRequirements}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

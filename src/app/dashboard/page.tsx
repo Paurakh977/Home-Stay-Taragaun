@@ -219,19 +219,7 @@ export default function DashboardPage({ adminUsername }: DashboardPageProps) {
         </div>
         <div className="px-6 py-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Link href={adminUsername ? `/${adminUsername}/dashboard/bookings` : "/dashboard/bookings"}>
-              <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
-                <div className="flex items-center">
-                  <div className="p-2 bg-blue-100 rounded-md">
-                    <CalendarIcon className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-900">बुकिङ व्यवस्थापन</p>
-                    <p className="text-xs text-gray-500">आफ्ना बुकिङहरू र उपलब्धता व्यवस्थापन गर्नुहोस्</p>
-                  </div>
-                </div>
-              </div>
-            </Link>
+
 
             <Link href={adminUsername ? `/${adminUsername}/dashboard/profile` : "/dashboard/profile"}>
               <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
