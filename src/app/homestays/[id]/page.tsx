@@ -18,6 +18,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import HomestayChat from "@/components/chat/HomestayChat";
+import BookingModal from "@/components/booking/BookingModal";
 
 // Define interfaces for typing
 interface GalleryImage {
@@ -349,7 +350,7 @@ const formatImageUrl = (imagePath: string | undefined): string => {
 export default function HomestayDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const homestayId = params.id as string;
+  const homestayId = params?.id as string;
 
   // Add global styles here to avoid nested style tags
   // This replaces both style tags that were causing conflicts
@@ -381,6 +382,7 @@ export default function HomestayDetailPage() {
 
   const { isSignedIn } = useAuth();
   const [showChatModal, setShowChatModal] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
   
   // Add these new hooks right here, after existing hooks and before other code
   const chatButtonRef = useRef<HTMLButtonElement>(null);
@@ -608,6 +610,15 @@ export default function HomestayDetailPage() {
   const handleChatClick = () => {
     if (isSignedIn) {
       setShowChatModal(true);
+    } else {
+      // Add the current URL as redirect_url parameter
+      router.push(`/sign-in?redirect_url=/homestays/${homestayId}`);
+    }
+  };
+
+  const handleBookingClick = () => {
+    if (isSignedIn) {
+      setShowBookingModal(true);
     } else {
       // Add the current URL as redirect_url parameter
       router.push(`/sign-in?redirect_url=/homestays/${homestayId}`);
@@ -1231,14 +1242,14 @@ export default function HomestayDetailPage() {
               </div>
               
               <div className="space-y-3 mb-6">
-                <Link 
-                  href={`/homestays/${homestayId}/contact`} 
+                <button
+                  onClick={handleBookingClick}
                   className="block w-full py-3 bg-primary text-white text-center font-medium rounded-lg hover:bg-primary-dark transition-colors"
                 >
-                  Book Stay
-                </Link>
-                
-                <Link 
+                  {isSignedIn ? 'Book Stay' : 'Sign In to Book'}
+                </button>
+
+                <Link
                   href={`/homestays/${homestayId}/about`}
                   className="block w-full py-3 bg-gray-100 text-gray-700 text-center font-medium rounded-lg hover:bg-gray-200 transition-colors"
                 >
@@ -1354,9 +1365,23 @@ export default function HomestayDetailPage() {
           onClose={() => setShowChatModal(false)}
         />
       )}
-      
+
+      {/* Booking Modal */}
+      {homestay && (
+        <BookingModal
+          isOpen={showBookingModal}
+          onClose={() => setShowBookingModal(false)}
+          homestayId={homestay.homestayId || homestay._id}
+          homestayName={homestay.homeStayName}
+          homestayImage={homestay.profileImage ? formatImageUrl(homestay.profileImage) : undefined}
+          maxGuests={(homestay as any).availability?.maxGuestsPerBooking || (homestay as any).maxGuests || 10}
+          maxRooms={(homestay as any).availability?.maxRoomsPerBooking || homestay.roomCount || 5}
+          isAvailable={(homestay as any).availability?.isAvailable ?? true}
+        />
+      )}
+
       {/* Single global style tag */}
       <style jsx global>{globalStyles}</style>
     </div>
   );
-} 
+}

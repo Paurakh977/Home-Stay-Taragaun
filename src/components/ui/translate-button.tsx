@@ -61,16 +61,28 @@ const TranslateButton = ({
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
     const isSecure = window.location.protocol === 'https:';
     
-    // Get all possible domain variations
+    // Get all possible domain variations with better production handling
     let domains = [hostname];
     if (!isLocalhost && hostname.includes('.')) {
-      // Add domain and all its parents
+      // For production domains like devhomestay.sthaniyataha.com
       const parts = hostname.split('.');
-      for (let i = 0; i < parts.length - 1; i++) {
-        domains.push(parts.slice(i).join('.'));
-      }
-      // Add domain without the first part
+      
+      // Add the full domain with dot prefix
       domains.push('.' + hostname);
+      
+      // Add parent domains (sthaniyataha.com, .sthaniyataha.com)
+      if (parts.length >= 2) {
+        const parentDomain = parts.slice(-2).join('.');
+        domains.push(parentDomain);
+        domains.push('.' + parentDomain);
+      }
+      
+      // Add all possible subdomain combinations
+      for (let i = 0; i < parts.length - 1; i++) {
+        const subdomain = parts.slice(i).join('.');
+        domains.push(subdomain);
+        domains.push('.' + subdomain);
+      }
     }
 
     // Common paths in the application
@@ -90,7 +102,7 @@ const TranslateButton = ({
 
     // Clear all cookies across all domains and paths
     cookies.forEach(cookieName => {
-      // Clear without domain specification
+      // Clear without domain specification first
       document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
       
       // Clear with domain specifications for all possible domains and paths
@@ -98,12 +110,10 @@ const TranslateButton = ({
         paths.forEach(path => {
           // Standard cookie clear
           document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path}; domain=${domain}`;
-          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path}; domain=.${domain}`;
           
           // Secure cookie clear
           if (isSecure) {
             document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path}; domain=${domain}; secure`;
-            document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path}; domain=.${domain}; secure`;
           }
         });
       });
@@ -159,30 +169,52 @@ const TranslateButton = ({
         // Special case for English - clear cookies first
         clearAllTranslateCookies();
         
-        // Also try to manually set cookie to English explicitly
-        document.cookie = `googtrans=/auto/en; path=/`;
-        if (!isLocalhost) {
-          document.cookie = `googtrans=/auto/en; path=/; domain=${hostname}${isSecure ? '; secure' : ''}`;
-          document.cookie = `googtrans=/auto/en; path=/; domain=.${hostname}${isSecure ? '; secure' : ''}`;
-        }
-      } else {
-        // Set cookies for non-English languages
-        const domains = [hostname];
-        if (!isLocalhost && hostname.includes('.')) {
+        // Force clear googtrans cookie with all possible domain variations
+        const hostname = window.location.hostname;
+        const isSecure = window.location.protocol === 'https:';
+        
+        // Clear googtrans cookie more aggressively for production
+        document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+        document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${hostname}`;
+        document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${hostname}`;
+        
+        // For production domain handling
+        if (hostname.includes('.')) {
           const parts = hostname.split('.');
-          for (let i = 0; i < parts.length - 1; i++) {
-            domains.push(parts.slice(i).join('.'));
+          if (parts.length >= 2) {
+            const parentDomain = parts.slice(-2).join('.');
+            document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${parentDomain}`;
+            document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${parentDomain}`;
           }
         }
         
-        // Set the translation cookie on all domains
-        domains.forEach(domain => {
-          if (!isLocalhost) {
-            document.cookie = `googtrans=/auto/${langCode}; path=/; domain=.${domain}${isSecure ? '; secure' : ''}`;
-            document.cookie = `googtrans=/auto/${langCode}; path=/; domain=${domain}${isSecure ? '; secure' : ''}`;
-          }
-        });
+        if (isSecure) {
+          document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${hostname}; secure`;
+          document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${hostname}; secure`;
+        }
+      } else {
+        // Set cookies for non-English languages with better domain handling
+        const hostname = window.location.hostname;
+        const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+        const isSecure = window.location.protocol === 'https:';
+        
+        // Set the translation cookie on multiple domain variations
         document.cookie = `googtrans=/auto/${langCode}; path=/`;
+        
+        if (!isLocalhost) {
+          document.cookie = `googtrans=/auto/${langCode}; path=/; domain=${hostname}${isSecure ? '; secure' : ''}`;
+          document.cookie = `googtrans=/auto/${langCode}; path=/; domain=.${hostname}${isSecure ? '; secure' : ''}`;
+          
+          // For production domains, also set on parent domain
+          if (hostname.includes('.')) {
+            const parts = hostname.split('.');
+            if (parts.length >= 2) {
+              const parentDomain = parts.slice(-2).join('.');
+              document.cookie = `googtrans=/auto/${langCode}; path=/; domain=${parentDomain}${isSecure ? '; secure' : ''}`;
+              document.cookie = `googtrans=/auto/${langCode}; path=/; domain=.${parentDomain}${isSecure ? '; secure' : ''}`;
+            }
+          }
+        }
       }
       
       // Force reload with a timestamp to prevent caching
@@ -250,4 +282,4 @@ declare global {
       };
     };
   }
-} 
+}

@@ -98,7 +98,7 @@ export default function RootLayout({
           .notranslate {
             unicode-bidi: isolate !important;
           }
-        `}} />
+        ` }} />
       </head>
       <body className={`${inter.className} min-h-screen flex flex-col`}>
         {/* Script to mark duplicate admin dashboards */}
@@ -146,18 +146,57 @@ export default function RootLayout({
             // Function to set Google Translate cookies
             function setGoogleTranslateCookies(lang) {
               const hostname = window.location.hostname;
+              const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+              const isSecure = window.location.protocol === 'https:';
+              
+              // Get domain variations for proper cookie handling
+              let domains = [hostname];
+              if (!isLocalhost && hostname.includes('.')) {
+                const parts = hostname.split('.');
+                
+                // Add the full hostname
+                domains.push(hostname);
+                
+                // Add with leading dot for subdomain cookies
+                domains.push('.' + hostname);
+                
+                // Add parent domains (e.g., 'sthaniyataha.com' from 'devhomestay.sthaniyataha.com')
+                if (parts.length >= 2) {
+                  const rootDomain = parts.slice(-2).join('.');
+                  domains.push(rootDomain);
+                  domains.push('.' + rootDomain);
+                }
+                
+                // Remove duplicates
+                domains = [...new Set(domains)];
+              }
               
               if (!lang || lang === 'en') {
-                // Clear cookies for English
-                document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.' + hostname;
-                document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + hostname;
+                // Clear cookies for English across all domain variations
+                domains.forEach(domain => {
+                  const domainWithDot = domain.startsWith('.') ? domain : '.' + domain;
+                  const domainWithoutDot = domain.startsWith('.') ? domain.substring(1) : domain;
+                  
+                  document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + domainWithDot;
+                  document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + domainWithoutDot;
+                  
+                  if (isSecure) {
+                    document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + domainWithDot + '; secure';
+                    document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + domainWithoutDot + '; secure';
+                  }
+                });
                 document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/';
                 return;
               }
               
-              // Set cookies at various levels to ensure they work
-              document.cookie = 'googtrans=/auto/' + lang + '; path=/; domain=.' + hostname;
-              document.cookie = 'googtrans=/auto/' + lang + '; path=/; domain=' + hostname;
+              // Set cookies for non-English languages across all domain variations
+              domains.forEach(domain => {
+                const domainWithDot = domain.startsWith('.') ? domain : '.' + domain;
+                const domainWithoutDot = domain.startsWith('.') ? domain.substring(1) : domain;
+                
+                document.cookie = 'googtrans=/auto/' + lang + '; path=/; domain=' + domainWithDot + (isSecure ? '; secure' : '');
+                document.cookie = 'googtrans=/auto/' + lang + '; path=/; domain=' + domainWithoutDot + (isSecure ? '; secure' : '');
+              });
               document.cookie = 'googtrans=/auto/' + lang + '; path=/';
               
               // Dispatch custom event to notify page change

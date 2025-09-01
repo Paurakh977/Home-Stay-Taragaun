@@ -254,8 +254,9 @@ export function TranslateProvider({ children }: { children: React.ReactNode }) {
       if (langFromCookie) targetLang = langFromCookie;
     }
     
-    // Only attempt to set language if it's not English or if URL explicitly requests English
-    if (targetLang !== 'en' || urlLang === 'en') {
+    // Handle language switching with improved English support
+    if (targetLang !== 'en') {
+      // Set non-English language
       setTimeout(() => {
         const selectField = document.querySelector('.goog-te-combo') as HTMLSelectElement;
         if (selectField && selectField.value !== targetLang) {
@@ -264,24 +265,59 @@ export function TranslateProvider({ children }: { children: React.ReactNode }) {
           selectField.dispatchEvent(new Event('change', { bubbles: true }));
         }
       }, 500);
-    } else if (targetLang === 'en') {
-      // If we need to ensure we're in English mode, reset any translation
-      document.body.classList.remove('translated-ltr', 'translated-rtl');
-      try {
-        // Try to find and click the "Show Original" link if available
-        const iframe = document.querySelector('.goog-te-banner-frame') as HTMLIFrameElement;
-        if (iframe) {
-          const frameDocument = iframe.contentDocument || iframe.contentWindow?.document;
-          if (frameDocument) {
-            const originalLink = frameDocument.querySelector('a.goog-te-menu-value') as HTMLAnchorElement;
-            if (originalLink) {
-              originalLink.click();
-            }
+    } else if (targetLang === 'en' || urlLang === 'en') {
+      // Enhanced English language handling for production
+      setTimeout(() => {
+        // Clear any existing translation cookies more aggressively
+        const hostname = window.location.hostname;
+        const isSecure = window.location.protocol === 'https:';
+        
+        // Clear googtrans cookie with multiple domain variations
+        document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+        document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${hostname}`;
+        document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${hostname}`;
+        
+        // For production domains, also clear parent domain cookies
+        if (hostname.includes('.')) {
+          const parts = hostname.split('.');
+          if (parts.length >= 2) {
+            const parentDomain = parts.slice(-2).join('.');
+            document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${parentDomain}`;
+            document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${parentDomain}`;
           }
         }
-      } catch (e) {
-        console.warn('Error resetting to English:', e);
-      }
+        
+        if (isSecure) {
+          document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${hostname}; secure`;
+          document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${hostname}; secure`;
+        }
+        
+        // Reset translation UI
+        document.body.classList.remove('translated-ltr', 'translated-rtl');
+        
+        // Set the select field to English
+        const selectField = document.querySelector('.goog-te-combo') as HTMLSelectElement;
+        if (selectField && selectField.value !== 'en') {
+          selectField.value = 'en';
+          selectField.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        
+        // Try to find and click the "Show Original" link if available
+        try {
+          const iframe = document.querySelector('.goog-te-banner-frame') as HTMLIFrameElement;
+          if (iframe) {
+            const frameDocument = iframe.contentDocument || iframe.contentWindow?.document;
+            if (frameDocument) {
+              const originalLink = frameDocument.querySelector('a.goog-te-menu-value') as HTMLAnchorElement;
+              if (originalLink) {
+                originalLink.click();
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Error resetting to English:', e);
+        }
+      }, 500);
     }
   };
   
@@ -393,4 +429,4 @@ declare global {
     addEventListener(type: 'nextjs:afterPageTransition', listener: (event: Event) => void): void;
     removeEventListener(type: 'nextjs:afterPageTransition', listener: (event: Event) => void): void;
   }
-} 
+}

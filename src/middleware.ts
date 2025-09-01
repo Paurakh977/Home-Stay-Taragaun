@@ -48,6 +48,9 @@ const SEED_API_PATH = '/api/seed-superadmin'; // Allow access for seeding
 const CLERK_AUTH_PATHS = ['/sign-in', '/sign-up', '/sso-callback', '/api/auth/clerk'];
 const PUBLIC_CLERK_PATHS = ['/', '/about', '/contact', '/homestays', '/news', '/sign-in', '/sign-up', '/sso-callback'];
 
+// Clerk protected API paths (require Clerk authentication)
+const CLERK_PROTECTED_API_PATHS = ['/api/bookings', '/api/chat', '/api/socket'];
+
 // Regex to match admin username routes that should be public
 // Match root paths like /admin1 but not /admin1/dashboard (which requires auth)
 const ADMIN_USERNAME_REGEX = /^\/[^\/]+$/;
@@ -161,6 +164,39 @@ async function middlewareHandler(auth: any, request: NextRequest) {
       return NextResponse.redirect(new URL('/sign-in', request.url));
     }
     return NextResponse.next();
+  }
+
+  // 4.5. Handle Clerk protected API paths (with JWT fallback for bookings)
+  if (CLERK_PROTECTED_API_PATHS.some(path => pathname.startsWith(path))) {
+    const { userId } = await auth();
+
+    // If Clerk auth succeeds, allow access
+    if (userId) {
+      return NextResponse.next();
+    }
+
+    // For booking and chat APIs, also check JWT authentication (homestay users)
+    if (pathname.startsWith('/api/bookings') || pathname.startsWith('/api/chat')) {
+      const authToken = request.cookies.get('auth_token')?.value;
+      if (authToken) {
+        try {
+          const { payload } = await jwtVerify(authToken, ENCODED_JWT_SECRET);
+          const homestayId = (payload as any).homestayId;
+          if (homestayId) {
+            // JWT authentication successful for homestay user
+            console.log(`✅ Middleware - JWT auth successful for homestay ${homestayId} on ${pathname}`);
+            return NextResponse.next();
+          }
+        } catch (error) {
+          console.log(`❌ Middleware - JWT verification failed for ${pathname}:`, error);
+          // JWT verification failed, continue to return 401
+        }
+      } else {
+        console.log(`❌ Middleware - No auth_token cookie found for ${pathname}`);
+      }
+    }
+
+    return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
   }
 
   // 5. Debug for seed-superadmin path

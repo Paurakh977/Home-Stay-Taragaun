@@ -7,13 +7,14 @@ import User from './User';
 import CustomField from './CustomField';
 import WebContent from './WebContent';
 import Navigation from './Navigation';
- import Chat from './Chat';
+import Chat from './Chat';
 import Message from './Message';
 import UserStatus from './UserStatus';
+import Booking from './Booking';
 
 export {
   HomestaySingle,
-  Official, 
+  Official,
   Contact,
   Location,
   User,
@@ -22,7 +23,8 @@ export {
   Navigation,
   Chat,
   Message,
-  UserStatus
+  UserStatus,
+  Booking
 };
 
 // Export types

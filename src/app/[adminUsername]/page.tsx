@@ -7,8 +7,6 @@ import ScrollPopup from "@/components/ui/ScrollPopup";
 import { User } from "@/lib/models";
 import dbConnect from "@/lib/mongodb";
 import Link from "next/link";
-import SuperadminWrapper from "@/components/shared/SuperadminWrapper";
-
 // Configure the page to use dynamic rendering
 export const dynamic = 'force-dynamic';
 
@@ -64,21 +62,18 @@ export default async function AdminHomePage({ params }: { params: { adminUsernam
       notFound();
     }
 
-    // Use SuperadminWrapper to conditionally show content
-    // If superadmin, it will show original content, otherwise "Explore Homestays" button
+    // No longer gated by superadmin check - open to all users
     return (
-      <SuperadminWrapper>
-        <div className="flex flex-col w-full">
-          <ImageSlider />
-          <FeaturedSection adminUsername={adminUsername} />
-          <TestimonialsSection />
-          <CtaSection adminUsername={adminUsername} />
-          <ScrollPopup />
-        </div>
-      </SuperadminWrapper>
+      <div className="flex flex-col w-full">
+        <ImageSlider />
+        <FeaturedSection adminUsername={adminUsername} />
+        <TestimonialsSection />
+        <CtaSection adminUsername={adminUsername} />
+        <ScrollPopup />
+      </div>
     );
   } catch (error) {
     console.error(`Error in admin home page for ${adminUsername}:`, error);
     notFound();
   }
-} 
+}
