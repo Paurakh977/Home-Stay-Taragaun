@@ -12,14 +12,23 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_for_developmen
 const ENCODED_JWT_SECRET = new TextEncoder().encode(JWT_SECRET);
 
 async function getUserFromRequest(request: NextRequest) {
+  console.log('🔐 API Auth - Starting authentication check');
+  console.log('🔐 API Auth - Request headers:', {
+    authorization: !!request.headers.get('authorization'),
+    cookie: !!request.headers.get('cookie'),
+    userAgent: request.headers.get('user-agent')?.substring(0, 50)
+  });
+
   // Check for Authorization header first (for client-side requests)
   const authHeader = request.headers.get('authorization');
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7);
+    console.log('🔐 API Auth - Found Bearer token in header');
 
     try {
       // Try to verify as Clerk token
+      console.log('🔐 API Auth - Attempting Clerk token verification...');
       const clerk = createClerkClient({
         secretKey: process.env.CLERK_SECRET_KEY!,
         publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!,
@@ -27,49 +36,73 @@ async function getUserFromRequest(request: NextRequest) {
 
       const { toAuth } = await clerk.authenticateRequest(request);
       const authData = toAuth();
+      console.log('🔐 API Auth - Clerk auth result:', {
+        hasAuthData: !!authData,
+        userId: authData?.userId,
+        sessionId: authData?.sessionId
+      });
+
       if (authData && authData.userId) {
+        console.log('✅ API Auth - Clerk authentication successful for user:', authData.userId);
         return { userId: authData.userId, userType: 'clerk' as const };
       }
     } catch (error) {
-      console.log('Clerk token verification failed, trying JWT...');
+      console.log('❌ API Auth - Clerk token verification failed:', error instanceof Error ? error.message : error);
 
       // Try to verify as JWT token
       try {
+        console.log('🔐 API Auth - Attempting JWT token verification...');
         const { payload } = await jwtVerify(token, ENCODED_JWT_SECRET);
         const homestayId = (payload as any).homestayId;
+        console.log('🔐 API Auth - JWT payload homestayId:', homestayId);
+        
         if (homestayId) {
+          console.log('✅ API Auth - JWT authentication successful for homestay:', homestayId);
           return { userId: homestayId, userType: 'homestay' as const };
         }
       } catch (jwtError) {
-        console.log('JWT token verification also failed');
+        console.log('❌ API Auth - JWT token verification also failed:', jwtError instanceof Error ? jwtError.message : jwtError);
       }
     }
+  } else {
+    console.log('🔐 API Auth - No Bearer token in Authorization header');
   }
 
   // Fallback to server-side auth (for server-side requests)
   try {
+    console.log('🔐 API Auth - Attempting server-side Clerk auth...');
     const { userId } = await auth();
+    console.log('🔐 API Auth - Server-side Clerk auth result:', { userId });
+    
     if (userId) {
+      console.log('✅ API Auth - Server-side Clerk authentication successful for user:', userId);
       return { userId, userType: 'clerk' as const };
     }
   } catch (error) {
-    // Clerk auth failed, continue to JWT check
+    console.log('❌ API Auth - Server-side Clerk auth failed:', error instanceof Error ? error.message : error);
   }
 
   // Check for JWT token in cookies (homestay/admin users)
   const authToken = request.cookies.get('auth_token')?.value;
+  console.log('🔐 API Auth - Checking JWT cookie:', !!authToken);
+  
   if (authToken) {
     try {
+      console.log('🔐 API Auth - Attempting JWT cookie verification...');
       const { payload } = await jwtVerify(authToken, ENCODED_JWT_SECRET);
       const homestayId = (payload as any).homestayId;
+      console.log('🔐 API Auth - JWT cookie payload homestayId:', homestayId);
+      
       if (homestayId) {
+        console.log('✅ API Auth - JWT cookie authentication successful for homestay:', homestayId);
         return { userId: homestayId, userType: 'homestay' as const };
       }
     } catch (error) {
-      // JWT verification failed
+      console.log('❌ API Auth - JWT cookie verification failed:', error instanceof Error ? error.message : error);
     }
   }
 
+  console.log('❌ API Auth - All authentication methods failed');
   return null;
 }
 

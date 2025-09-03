@@ -446,24 +446,35 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      console.log('🔍 ChatContext - Fetching conversations with auth:', {
+        tokenType: authData.tokenType,
+        userId: authData.userId,
+        hasToken: !!authData.token
+      });
+
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
       };
 
       if (authData.tokenType === 'clerk') {
         headers['Authorization'] = `Bearer ${authData.token}`;
+        console.log('🔍 ChatContext - Added Clerk Authorization header');
       } else {
-        // JWT token is already in cookies, no need to add to headers
+        console.log('🔍 ChatContext - Using JWT from cookies');
       }
 
+      console.log('🔍 ChatContext - Making fetch request to /api/chat/conversations');
       const response = await fetch('/api/chat/conversations', {
         headers,
         credentials: 'include' // Include cookies for JWT authentication
       });
+
+      console.log('🔍 ChatContext - Response status:', response.status);
       const data = await response.json();
+      console.log('🔍 ChatContext - Response data:', data);
 
       if (response.ok) {
-        console.log('Fetched conversations:', data.conversations?.length || 0, 'conversations');
+        console.log('✅ ChatContext - Successfully fetched conversations:', data.conversations?.length || 0, 'conversations');
         setConversations(data.conversations || []);
 
         // Initialize unread counts from API response
@@ -473,10 +484,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         });
         setUnreadCountByChatId(unreadCounts);
       } else {
-        console.error('Error fetching conversations:', data.error);
+        console.error('❌ ChatContext - Error fetching conversations:', {
+          status: response.status,
+          error: data.error,
+          details: data.details
+        });
       }
     } catch (error) {
-      console.error('Error fetching conversations:', error);
+      console.error('❌ ChatContext - Exception fetching conversations:', error);
     }
   };
 
@@ -561,6 +576,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Track current authData in a ref to avoid stale closures
+  const authDataRef = useRef(authData);
+  authDataRef.current = authData;
+
   // Auto-connect when auth data is available and component is mounted
   useEffect(() => {
     if (!isMounted) return;
@@ -585,10 +604,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       return () => clearTimeout(connectTimer);
     }
 
-    // Disconnect when auth data is lost
+    // Only disconnect if we're sure auth data is lost (not just temporarily null during loading)
+    // Wait a bit to avoid disconnecting during auth state transitions
     if (!authData && (isConnected || isConnecting)) {
-      console.log('🔌 ChatContext - Disconnecting socket due to lost auth data');
-      disconnectSocketHandler();
+      console.log('🔌 ChatContext - Auth data lost, scheduling disconnect check...');
+      const disconnectTimer = setTimeout(() => {
+        // Use ref to get current authData value (avoids stale closure)
+        const currentAuthData = authDataRef.current;
+        if (!currentAuthData) {
+          console.log('🔌 ChatContext - Confirming disconnect due to lost auth data');
+          disconnectSocketHandler();
+        } else {
+          console.log('🔌 ChatContext - Auth data recovered, keeping connection');
+        }
+      }, 1000); // Wait 1 second before disconnecting
+
+      return () => clearTimeout(disconnectTimer);
     }
   }, [authData, isConnected, isConnecting, connectSocket, disconnectSocketHandler, isMounted]);
 

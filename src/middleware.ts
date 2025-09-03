@@ -168,27 +168,32 @@ async function middlewareHandler(auth: any, request: NextRequest) {
 
   // 4.5. Handle Clerk protected API paths (with JWT fallback for bookings)
   if (CLERK_PROTECTED_API_PATHS.some(path => pathname.startsWith(path))) {
+    console.log(`🔐 Middleware - Checking auth for protected path: ${pathname}`);
     const { userId } = await auth();
+    console.log(`🔐 Middleware - Clerk auth result: ${userId ? 'authenticated' : 'not authenticated'}`);
 
     // If Clerk auth succeeds, allow access
     if (userId) {
+      console.log(`✅ Middleware - Clerk auth successful for user ${userId} on ${pathname}`);
       return NextResponse.next();
     }
 
     // For booking and chat APIs, also check JWT authentication (homestay users)
     if (pathname.startsWith('/api/bookings') || pathname.startsWith('/api/chat')) {
+      console.log(`🔐 Middleware - Checking JWT fallback for ${pathname}`);
       const authToken = request.cookies.get('auth_token')?.value;
+      console.log(`🔐 Middleware - JWT token present: ${!!authToken}`);
+      
       if (authToken) {
         try {
           const { payload } = await jwtVerify(authToken, ENCODED_JWT_SECRET);
           const homestayId = (payload as any).homestayId;
           if (homestayId) {
-            // JWT authentication successful for homestay user
             console.log(`✅ Middleware - JWT auth successful for homestay ${homestayId} on ${pathname}`);
             return NextResponse.next();
           }
         } catch (error) {
-          console.log(`❌ Middleware - JWT verification failed for ${pathname}:`, error);
+          console.log(`❌ Middleware - JWT verification failed for ${pathname}:`, error instanceof Error ? error.message : error);
           // JWT verification failed, continue to return 401
         }
       } else {
@@ -196,6 +201,7 @@ async function middlewareHandler(auth: any, request: NextRequest) {
       }
     }
 
+    console.log(`❌ Middleware - Authentication failed for ${pathname}`);
     return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
   }
 
