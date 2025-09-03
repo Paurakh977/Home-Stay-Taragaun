@@ -1,110 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import { Chat, HomestaySingle, Message, type IChat } from '@/lib/models';
-import { auth } from '@clerk/nextjs/server';
 import { createClerkClient } from '@clerk/backend';
-import { jwtVerify } from 'jose';
 import { v4 as uuidv4 } from 'uuid';
 import { REDIS_CHANNELS, initializeRedis, safeRedisPublish } from '@/lib/redis';
+import { getUserFromRequest, verifyUserChatAccess } from '@/lib/api-auth';
 
-// JWT verification for homestay users
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_for_development';
-const ENCODED_JWT_SECRET = new TextEncoder().encode(JWT_SECRET);
 
-async function getUserFromRequest(request: NextRequest) {
-  console.log('🔐 API Auth - Starting authentication check');
-  console.log('🔐 API Auth - Request headers:', {
-    authorization: !!request.headers.get('authorization'),
-    cookie: !!request.headers.get('cookie'),
-    userAgent: request.headers.get('user-agent')?.substring(0, 50)
-  });
-
-  // Check for Authorization header first (for client-side requests)
-  const authHeader = request.headers.get('authorization');
-
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7);
-    console.log('🔐 API Auth - Found Bearer token in header');
-
-    try {
-      // Try to verify as Clerk token
-      console.log('🔐 API Auth - Attempting Clerk token verification...');
-      const clerk = createClerkClient({
-        secretKey: process.env.CLERK_SECRET_KEY!,
-        publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!,
-      });
-
-      const { toAuth } = await clerk.authenticateRequest(request);
-      const authData = toAuth();
-      console.log('🔐 API Auth - Clerk auth result:', {
-        hasAuthData: !!authData,
-        userId: authData?.userId,
-        sessionId: authData?.sessionId
-      });
-
-      if (authData && authData.userId) {
-        console.log('✅ API Auth - Clerk authentication successful for user:', authData.userId);
-        return { userId: authData.userId, userType: 'clerk' as const };
-      }
-    } catch (error) {
-      console.log('❌ API Auth - Clerk token verification failed:', error instanceof Error ? error.message : error);
-
-      // Try to verify as JWT token
-      try {
-        console.log('🔐 API Auth - Attempting JWT token verification...');
-        const { payload } = await jwtVerify(token, ENCODED_JWT_SECRET);
-        const homestayId = (payload as any).homestayId;
-        console.log('🔐 API Auth - JWT payload homestayId:', homestayId);
-        
-        if (homestayId) {
-          console.log('✅ API Auth - JWT authentication successful for homestay:', homestayId);
-          return { userId: homestayId, userType: 'homestay' as const };
-        }
-      } catch (jwtError) {
-        console.log('❌ API Auth - JWT token verification also failed:', jwtError instanceof Error ? jwtError.message : jwtError);
-      }
-    }
-  } else {
-    console.log('🔐 API Auth - No Bearer token in Authorization header');
-  }
-
-  // Fallback to server-side auth (for server-side requests)
-  try {
-    console.log('🔐 API Auth - Attempting server-side Clerk auth...');
-    const { userId } = await auth();
-    console.log('🔐 API Auth - Server-side Clerk auth result:', { userId });
-    
-    if (userId) {
-      console.log('✅ API Auth - Server-side Clerk authentication successful for user:', userId);
-      return { userId, userType: 'clerk' as const };
-    }
-  } catch (error) {
-    console.log('❌ API Auth - Server-side Clerk auth failed:', error instanceof Error ? error.message : error);
-  }
-
-  // Check for JWT token in cookies (homestay/admin users)
-  const authToken = request.cookies.get('auth_token')?.value;
-  console.log('🔐 API Auth - Checking JWT cookie:', !!authToken);
-  
-  if (authToken) {
-    try {
-      console.log('🔐 API Auth - Attempting JWT cookie verification...');
-      const { payload } = await jwtVerify(authToken, ENCODED_JWT_SECRET);
-      const homestayId = (payload as any).homestayId;
-      console.log('🔐 API Auth - JWT cookie payload homestayId:', homestayId);
-      
-      if (homestayId) {
-        console.log('✅ API Auth - JWT cookie authentication successful for homestay:', homestayId);
-        return { userId: homestayId, userType: 'homestay' as const };
-      }
-    } catch (error) {
-      console.log('❌ API Auth - JWT cookie verification failed:', error instanceof Error ? error.message : error);
-    }
-  }
-
-  console.log('❌ API Auth - All authentication methods failed');
-  return null;
-}
 
 // Cache for user data to reduce API calls
 const userDataCache = new Map<string, { data: any; timestamp: number }>();
@@ -204,19 +106,7 @@ async function calculateUnreadCount(chatId: string, userId: string, userType: 'c
   }
 }
 
-// Verify user authorization for chat access
-async function verifyUserChatAccess(user: { userId: string; userType: 'clerk' | 'homestay' }, chatId?: string) {
-  if (!chatId) return true; // For creating new chats
 
-  const chat = await Chat.findOne({
-    chatId,
-    'participants.userId': user.userId,
-    'participants.userType': user.userType,
-    isActive: true
-  });
-
-  return !!chat;
-}
 
 // GET - Fetch user's conversations
 export async function GET(request: NextRequest) {
@@ -424,7 +314,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Verify user has access to this chat
-    const hasAccess = await verifyUserChatAccess(user, chatId);
+    const hasAccess = await verifyUserChatAccess(user, chatId, Chat);
     if (!hasAccess) {
       return NextResponse.json({ error: 'Forbidden: No access to this chat' }, { status: 403 });
     }

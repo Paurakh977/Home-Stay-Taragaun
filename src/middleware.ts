@@ -166,20 +166,29 @@ async function middlewareHandler(auth: any, request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 4.5. Handle Clerk protected API paths (with JWT fallback for bookings)
+  // 4.5. Handle Clerk protected API paths (with JWT fallback for bookings and chat)
   if (CLERK_PROTECTED_API_PATHS.some(path => pathname.startsWith(path))) {
     console.log(`🔐 Middleware - Checking auth for protected path: ${pathname}`);
-    const { userId } = await auth();
-    console.log(`🔐 Middleware - Clerk auth result: ${userId ? 'authenticated' : 'not authenticated'}`);
+    
+    let authenticated = false;
+    let authMethod = '';
 
-    // If Clerk auth succeeds, allow access
-    if (userId) {
-      console.log(`✅ Middleware - Clerk auth successful for user ${userId} on ${pathname}`);
-      return NextResponse.next();
+    // First try Clerk authentication
+    try {
+      const { userId } = await auth();
+      console.log(`🔐 Middleware - Clerk auth result: ${userId ? 'authenticated' : 'not authenticated'}`);
+
+      if (userId) {
+        console.log(`✅ Middleware - Clerk auth successful for user ${userId} on ${pathname}`);
+        authenticated = true;
+        authMethod = 'clerk';
+      }
+    } catch (clerkError) {
+      console.log(`🔐 Middleware - Clerk auth error for ${pathname}:`, clerkError instanceof Error ? clerkError.message : clerkError);
     }
 
-    // For booking and chat APIs, also check JWT authentication (homestay users)
-    if (pathname.startsWith('/api/bookings') || pathname.startsWith('/api/chat')) {
+    // For booking, chat, and socket APIs, also check JWT authentication (homestay users)
+    if (!authenticated && (pathname.startsWith('/api/bookings') || pathname.startsWith('/api/chat') || pathname.startsWith('/api/socket'))) {
       console.log(`🔐 Middleware - Checking JWT fallback for ${pathname}`);
       const authToken = request.cookies.get('auth_token')?.value;
       console.log(`🔐 Middleware - JWT token present: ${!!authToken}`);
@@ -188,17 +197,53 @@ async function middlewareHandler(auth: any, request: NextRequest) {
         try {
           const { payload } = await jwtVerify(authToken, ENCODED_JWT_SECRET);
           const homestayId = (payload as any).homestayId;
-          if (homestayId) {
+          const exp = payload.exp;
+          
+          // Check token expiration
+          if (exp && Date.now() >= exp * 1000) {
+            console.log(`❌ Middleware - JWT token expired for ${pathname}`);
+          } else if (homestayId) {
             console.log(`✅ Middleware - JWT auth successful for homestay ${homestayId} on ${pathname}`);
-            return NextResponse.next();
+            authenticated = true;
+            authMethod = 'jwt';
           }
         } catch (error) {
           console.log(`❌ Middleware - JWT verification failed for ${pathname}:`, error instanceof Error ? error.message : error);
-          // JWT verification failed, continue to return 401
         }
       } else {
         console.log(`❌ Middleware - No auth_token cookie found for ${pathname}`);
       }
+    }
+
+    // Check Bearer token in Authorization header as additional fallback
+    if (!authenticated) {
+      const authHeader = request.headers.get('authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        console.log(`🔐 Middleware - Checking Bearer token for ${pathname}`);
+        
+        try {
+          // Try JWT verification for Bearer tokens
+          const { payload } = await jwtVerify(token, ENCODED_JWT_SECRET);
+          const homestayId = (payload as any).homestayId;
+          const exp = payload.exp;
+          
+          if (exp && Date.now() >= exp * 1000) {
+            console.log(`❌ Middleware - Bearer JWT token expired for ${pathname}`);
+          } else if (homestayId) {
+            console.log(`✅ Middleware - Bearer JWT auth successful for homestay ${homestayId} on ${pathname}`);
+            authenticated = true;
+            authMethod = 'bearer-jwt';
+          }
+        } catch (error) {
+          console.log(`❌ Middleware - Bearer JWT verification failed for ${pathname}:`, error instanceof Error ? error.message : error);
+        }
+      }
+    }
+
+    if (authenticated) {
+      console.log(`✅ Middleware - Authentication successful via ${authMethod} for ${pathname}`);
+      return NextResponse.next();
     }
 
     console.log(`❌ Middleware - Authentication failed for ${pathname}`);

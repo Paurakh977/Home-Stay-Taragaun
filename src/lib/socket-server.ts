@@ -136,6 +136,40 @@ async function verifyUserChatAccess(user: SocketUser, chatId: string): Promise<b
   }
 }
 
+// Enhanced cookie parsing function
+function parseCookieHeader(cookieHeader: string): Map<string, string> {
+  const cookies = new Map<string, string>();
+  
+  if (!cookieHeader) return cookies;
+  
+  try {
+    // Split by semicolon and process each cookie
+    const cookiePairs = cookieHeader.split(';');
+    
+    for (const pair of cookiePairs) {
+      const trimmedPair = pair.trim();
+      if (!trimmedPair) continue;
+      
+      const [name, ...valueParts] = trimmedPair.split('=');
+      if (name && valueParts.length > 0) {
+        // Rejoin value parts in case the value contains '='
+        const value = valueParts.join('=');
+        try {
+          // Decode URI components if needed
+          cookies.set(name.trim(), decodeURIComponent(value));
+        } catch (decodeError) {
+          // If decoding fails, use raw value
+          cookies.set(name.trim(), value);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error parsing cookie header:', error);
+  }
+  
+  return cookies;
+}
+
 // Get user name by ID and type
 async function getUserName(userId: string, userType: 'clerk' | 'homestay'): Promise<string> {
   try {
@@ -315,111 +349,127 @@ export async function initializeSocketServer(server: HTTPServer) {
       console.error('⚠️ Redis subscription not set up; continuing without cross-instance events:', subErr);
     }
 
-    // Enhanced authentication middleware with better error handling
+    // Enhanced authentication middleware with better error handling and consistent flow
     io.use(async (socket, next) => {
       try {
         const { tokenType, token } = socket.handshake.auth as { tokenType?: 'clerk' | 'jwt'; token?: string };
         const userAgent = socket.handshake.headers['user-agent'] || 'unknown';
+        const cookieHeader = socket.handshake.headers.cookie || '';
+
+        console.log('🔐 Socket Auth - Starting authentication:', { tokenType, hasToken: !!token, hasCookies: !!cookieHeader });
 
         if (!tokenType) {
+          console.error('❌ Socket Auth - Token type missing');
           return next(new Error('Authentication token type missing'));
         }
 
-        // For JWT, we read from cookies, so token can be a placeholder
-        if (tokenType === 'clerk' && !token) {
-          return next(new Error('Clerk authentication token missing'));
-        }
-
         let user: SocketUser | null = null;
+        let authError: string | null = null;
 
+        // Handle Clerk authentication
         if (tokenType === 'clerk') {
-          // Verify Clerk session token using Backend SDK
-          const clerk: ClerkClient = createClerkClient({
-            secretKey: process.env.CLERK_SECRET_KEY as string,
-            publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY as string,
-          });
+          if (!token) {
+            authError = 'Clerk authentication token missing';
+          } else {
+            try {
+              console.log('🔐 Socket Auth - Attempting Clerk authentication...');
+              const clerk: ClerkClient = createClerkClient({
+                secretKey: process.env.CLERK_SECRET_KEY as string,
+                publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY as string,
+              });
 
-          try {
-            // Build a Request object with Authorization header
-            const headers = new Headers();
-            headers.set('Authorization', `Bearer ${token}`);
-            const reqForClerk = new Request('http://localhost/internal-socket-auth', { headers });
+              // Build a Request object with Authorization header
+              const headers = new Headers();
+              headers.set('Authorization', `Bearer ${token}`);
+              headers.set('User-Agent', userAgent);
+              const reqForClerk = new Request('http://localhost/internal-socket-auth', { headers });
 
-            const { isSignedIn, toAuth } = await clerk.authenticateRequest(reqForClerk);
+              const { isSignedIn, toAuth } = await clerk.authenticateRequest(reqForClerk);
 
-            if (!isSignedIn) {
-              return next(new Error('Invalid Clerk token'));
-            }
-
-            const authData = await toAuth();
-            if (!authData.userId) {
-              return next(new Error('Invalid Clerk token - no user ID'));
-            }
-
-            user = { userId: authData.userId, userType: 'clerk' };
-            
-          } catch (clerkError) {
-            console.error('Clerk authentication error:', clerkError);
-            return next(new Error('Clerk authentication failed'));
-          }
-
-        } else if (tokenType === 'jwt') {
-          // Verify custom JWT for homestay/admin users - read from cookies
-          try {
-            console.log('🔐 Socket JWT auth - Starting JWT authentication for homestay user');
-            // Extract JWT token from cookies
-            const cookieHeader = socket.handshake.headers.cookie;
-            console.log('🔐 Socket JWT auth - Cookie header:', cookieHeader);
-            let jwtToken = null;
-
-            if (cookieHeader) {
-              const cookies = cookieHeader.split(';').map(c => c.trim());
-              console.log('🔐 Socket JWT auth - Parsed cookies:', cookies);
-              const authCookie = cookies.find(c => c.startsWith('auth_token='));
-              console.log('🔐 Socket JWT auth - Auth cookie:', authCookie);
-              if (authCookie) {
-                jwtToken = authCookie.split('=')[1];
-                console.log('🔐 Socket JWT auth - Extracted token:', jwtToken ? 'Found' : 'Not found');
+              if (!isSignedIn) {
+                authError = 'Invalid Clerk token - not signed in';
+              } else {
+                const authData = await toAuth();
+                if (!authData.userId) {
+                  authError = 'Invalid Clerk token - no user ID';
+                } else {
+                  console.log('✅ Socket Auth - Clerk authentication successful:', authData.userId);
+                  user = { 
+                    userId: authData.userId, 
+                    userType: 'clerk',
+                    username: authData.userId // Use userId as fallback username
+                  };
+                }
               }
+            } catch (clerkError) {
+              console.error('❌ Socket Auth - Clerk authentication error:', clerkError);
+              authError = `Clerk authentication failed: ${clerkError instanceof Error ? clerkError.message : 'Unknown error'}`;
+            }
+          }
+        }
+        
+        // Handle JWT authentication
+        else if (tokenType === 'jwt') {
+          try {
+            console.log('🔐 Socket Auth - Attempting JWT authentication...');
+            
+            // Enhanced cookie parsing with better error handling
+            let jwtToken: string | null = null;
+            
+            if (cookieHeader) {
+              // Parse cookies more robustly
+              const cookies = parseCookieHeader(cookieHeader);
+              jwtToken = cookies.get('auth_token') || null;
+              console.log('🔐 Socket Auth - JWT token extracted from cookies:', !!jwtToken);
             }
 
             if (!jwtToken) {
-              console.log('❌ Socket JWT auth - No JWT token found in cookies');
-              return next(new Error('JWT token not found in cookies'));
+              authError = 'JWT token not found in cookies';
+            } else {
+              try {
+                console.log('🔐 Socket Auth - Verifying JWT token...');
+                const { payload } = await jwtVerify(jwtToken, ENCODED_JWT_SECRET);
+                
+                const homestayId = (payload as JWTPayload & { homestayId?: string }).homestayId;
+                const username = (payload as JWTPayload & { username?: string }).username;
+                const exp = payload.exp;
+
+                // Check token expiration
+                if (exp && Date.now() >= exp * 1000) {
+                  authError = 'JWT token has expired';
+                } else if (!homestayId) {
+                  authError = 'Invalid JWT token - no homestay ID';
+                } else {
+                  console.log('✅ Socket Auth - JWT authentication successful:', homestayId);
+                  user = {
+                    userId: homestayId,
+                    userType: 'homestay',
+                    username: username || homestayId,
+                    homestayId
+                  };
+                }
+              } catch (jwtError) {
+                console.error('❌ Socket Auth - JWT verification error:', jwtError);
+                authError = `JWT verification failed: ${jwtError instanceof Error ? jwtError.message : 'Unknown error'}`;
+              }
             }
-
-            console.log('🔐 Socket JWT auth - Verifying JWT token...');
-            const { payload } = await jwtVerify(jwtToken, ENCODED_JWT_SECRET);
-            console.log('🔐 Socket JWT auth - JWT payload:', payload);
-
-            const homestayId = (payload as JWTPayload & { homestayId?: string }).homestayId;
-            const username = (payload as JWTPayload & { username?: string }).username;
-
-            if (!homestayId) {
-              console.log('❌ Socket JWT auth - No homestayId in JWT payload');
-              return next(new Error('Invalid homestay token - no homestay ID'));
-            }
-
-            console.log('✅ Socket JWT auth - Successfully authenticated homestay user:', homestayId);
-            user = {
-              userId: homestayId,
-              userType: 'homestay',
-              username,
-              homestayId
-            };
-
-          } catch (jwtError) {
-            console.error('❌ Socket JWT auth - JWT verification error:', jwtError);
-            return next(new Error('JWT authentication failed'));
+          } catch (generalError) {
+            console.error('❌ Socket Auth - General JWT auth error:', generalError);
+            authError = `JWT authentication failed: ${generalError instanceof Error ? generalError.message : 'Unknown error'}`;
           }
+        } else {
+          authError = `Unsupported token type: ${tokenType}`;
         }
 
-        if (!user) {
-          return next(new Error('Authentication failed - no user data'));
+        // Check if authentication was successful
+        if (!user || authError) {
+          console.error('❌ Socket Auth - Authentication failed:', authError);
+          return next(new Error(authError || 'Authentication failed - no user data'));
         }
 
         // Attach user to socket
         (socket as any).user = user;
+        console.log(`✅ Socket Auth - User authenticated: ${user.userType}:${user.userId}`);
 
         // Persist user status to MongoDB and Redis with error handling
         try {

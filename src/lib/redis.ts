@@ -101,33 +101,81 @@ let redisClient: Redis | null = null;
 let redisSubscriber: Redis | null = null;
 let redisPublisher: Redis | null = null;
 
-// Circuit breaker for Redis operations
+// Enhanced circuit breaker for Redis operations
 let redisFailureCount = 0;
 let lastFailureTime = 0;
+let lastSuccessTime = 0;
 const MAX_FAILURES = 5;
 const CIRCUIT_BREAKER_TIMEOUT = 30000; // 30 seconds
+const HALF_OPEN_TEST_INTERVAL = 5000; // 5 seconds between tests in half-open state
 
-const isCircuitBreakerOpen = () => {
-  if (redisFailureCount >= MAX_FAILURES) {
-    const timeSinceLastFailure = Date.now() - lastFailureTime;
-    if (timeSinceLastFailure < CIRCUIT_BREAKER_TIMEOUT) {
-      return true;
-    } else {
-      // Reset circuit breaker after timeout
-      redisFailureCount = 0;
-      return false;
+enum CircuitBreakerState {
+  CLOSED = 'closed',     // Normal operation
+  OPEN = 'open',         // Failures exceeded, blocking requests
+  HALF_OPEN = 'half-open' // Testing if service recovered
+}
+
+let circuitBreakerState = CircuitBreakerState.CLOSED;
+let halfOpenTestTime = 0;
+
+const getCircuitBreakerState = () => {
+  const now = Date.now();
+  
+  if (circuitBreakerState === CircuitBreakerState.OPEN) {
+    const timeSinceLastFailure = now - lastFailureTime;
+    if (timeSinceLastFailure >= CIRCUIT_BREAKER_TIMEOUT) {
+      // Move to half-open state for testing
+      circuitBreakerState = CircuitBreakerState.HALF_OPEN;
+      halfOpenTestTime = now;
+      console.log('🔄 Redis circuit breaker moved to HALF_OPEN state');
     }
   }
-  return false;
+  
+  return circuitBreakerState;
+};
+
+const isCircuitBreakerOpen = () => {
+  const state = getCircuitBreakerState();
+  
+  if (state === CircuitBreakerState.OPEN) {
+    return true;
+  }
+  
+  if (state === CircuitBreakerState.HALF_OPEN) {
+    const now = Date.now();
+    // In half-open state, allow limited testing
+    if (now - halfOpenTestTime >= HALF_OPEN_TEST_INTERVAL) {
+      halfOpenTestTime = now;
+      return false; // Allow one test request
+    }
+    return true; // Block other requests
+  }
+  
+  return false; // CLOSED state, allow all requests
 };
 
 const recordRedisFailure = () => {
   redisFailureCount++;
   lastFailureTime = Date.now();
+  
+  if (redisFailureCount >= MAX_FAILURES) {
+    circuitBreakerState = CircuitBreakerState.OPEN;
+    console.error(`❌ Redis circuit breaker OPENED after ${redisFailureCount} failures`);
+  } else {
+    console.warn(`⚠️ Redis failure ${redisFailureCount}/${MAX_FAILURES}`);
+  }
 };
 
 const recordRedisSuccess = () => {
+  const wasOpen = circuitBreakerState !== CircuitBreakerState.CLOSED;
+  
   redisFailureCount = 0;
+  lastSuccessTime = Date.now();
+  circuitBreakerState = CircuitBreakerState.CLOSED;
+  
+  if (wasOpen) {
+    console.log('✅ Redis circuit breaker CLOSED - service recovered');
+  }
 };
 
 // Connection health check
@@ -139,7 +187,8 @@ export const checkRedisHealth = async (): Promise<boolean> => {
   
   // Throttle health checks
   if (now - lastHealthCheck < HEALTH_CHECK_INTERVAL) {
-    return true;
+    // Return cached result based on circuit breaker state
+    return circuitBreakerState === CircuitBreakerState.CLOSED;
   }
   
   lastHealthCheck = now;
@@ -147,21 +196,46 @@ export const checkRedisHealth = async (): Promise<boolean> => {
   try {
     if (!redisClient || !redisPublisher || !redisSubscriber) {
       console.log('⚠️ Redis clients not initialized');
+      recordRedisFailure();
       return false;
     }
 
-    // Ping all clients
-    await Promise.all([
+    // Check connection status first
+    const statuses = [
+      redisClient.status,
+      redisPublisher.status,
+      redisSubscriber.status
+    ];
+
+    if (statuses.some(status => status === 'end' || status === 'close')) {
+      console.log('⚠️ Some Redis clients are disconnected:', statuses);
+      recordRedisFailure();
+      return false;
+    }
+
+    // Ping all clients with timeout
+    const pingPromises = [
       redisClient.ping(),
       redisPublisher.ping(),
       redisSubscriber.ping()
+    ];
+
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Redis health check timeout')), 5000);
+    });
+
+    await Promise.race([
+      Promise.all(pingPromises),
+      timeoutPromise
     ]);
 
     console.log('✅ Redis health check passed');
+    recordRedisSuccess();
     return true;
 
   } catch (error) {
     console.error('❌ Redis health check failed:', error);
+    recordRedisFailure();
     return false;
   }
 };
@@ -170,40 +244,51 @@ export const checkRedisHealth = async (): Promise<boolean> => {
 let eventHandlersSetup = false;
 let healthCheckInterval: NodeJS.Timeout | null = null;
 
-// Initialize Redis connections with enhanced error handling
+// Enhanced Redis initialization with better error handling and recovery
 export const initializeRedis = async () => {
   try {
     const config = getRedisConfig();
 
-    // Main Redis client for general operations
+    // Initialize clients with enhanced error handling
+    const initializeClient = async (clientName: string): Promise<Redis> => {
+      console.log(`🔄 Initializing Redis ${clientName} client...`);
+      
+      const client = new Redis({
+        ...config,
+        lazyConnect: true, // Don't connect immediately
+        maxRetriesPerRequest: 3 // Allow retries for individual requests
+      });
+      
+      client.setMaxListeners(30); // Increase limit to prevent warnings
+
+      // Wait for connection with timeout
+      const connectPromise = client.connect();
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error(`${clientName} connection timeout`)), 10000);
+      });
+
+      await Promise.race([connectPromise, timeoutPromise]);
+      
+      // Verify connection with ping
+      await client.ping();
+      console.log(`✅ Redis ${clientName} client connected successfully`);
+      
+      return client;
+    };
+
+    // Initialize main client
     if (!redisClient) {
-      redisClient = new Redis(config);
-      redisClient.setMaxListeners(30); // Increase limit to prevent warnings
-
-      // Wait for connection
-      await redisClient.connect();
-      await redisClient.ping();
-      console.log('✅ Redis main client connected successfully');
+      redisClient = await initializeClient('main');
     }
 
-    // Publisher client for pub/sub
+    // Initialize publisher client
     if (!redisPublisher) {
-      redisPublisher = new Redis(config);
-      redisPublisher.setMaxListeners(30); // Increase limit to prevent warnings
-
-      await redisPublisher.connect();
-      await redisPublisher.ping();
-      console.log('✅ Redis publisher connected successfully');
+      redisPublisher = await initializeClient('publisher');
     }
 
-    // Subscriber client for pub/sub
+    // Initialize subscriber client
     if (!redisSubscriber) {
-      redisSubscriber = new Redis(config);
-      redisSubscriber.setMaxListeners(30); // Increase limit to prevent warnings
-
-      await redisSubscriber.connect();
-      await redisSubscriber.ping();
-      console.log('✅ Redis subscriber connected successfully');
+      redisSubscriber = await initializeClient('subscriber');
     }
 
     // Set up comprehensive error handlers only once
@@ -217,6 +302,7 @@ export const initializeRedis = async () => {
 
         client.on('error', (error) => {
           console.error(`❌ Redis ${name} client error:`, error);
+          recordRedisFailure();
         });
 
         client.on('connect', () => {
@@ -225,10 +311,12 @@ export const initializeRedis = async () => {
 
         client.on('ready', () => {
           console.log(`✅ Redis ${name} client ready`);
+          recordRedisSuccess();
         });
 
         client.on('close', () => {
           console.log(`🔌 Redis ${name} client connection closed`);
+          recordRedisFailure();
         });
 
         client.on('reconnecting', (ms: number) => {
@@ -237,6 +325,7 @@ export const initializeRedis = async () => {
 
         client.on('end', () => {
           console.log(`🔚 Redis ${name} client connection ended`);
+          recordRedisFailure();
         });
       });
 
@@ -245,13 +334,21 @@ export const initializeRedis = async () => {
 
     // Start periodic health checks only once
     if (!healthCheckInterval) {
-      healthCheckInterval = setInterval(checkRedisHealth, HEALTH_CHECK_INTERVAL);
+      healthCheckInterval = setInterval(() => {
+        checkRedisHealth().catch(error => {
+          console.error('Health check failed:', error);
+        });
+      }, HEALTH_CHECK_INTERVAL);
     }
 
+    // Record successful initialization
+    recordRedisSuccess();
+    
     return { redisClient, redisPublisher, redisSubscriber };
 
   } catch (error) {
     console.error('❌ Failed to initialize Redis connections:', error);
+    recordRedisFailure();
     throw new Error(`Redis initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };

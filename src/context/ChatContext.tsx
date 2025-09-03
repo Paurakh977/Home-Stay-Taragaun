@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useRef, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, ReactNode, useCallback, useReducer } from 'react';
 import {
   initSocket,
   getSocket,
@@ -23,7 +23,9 @@ import {
   leaveChat,
   sendMessage as socketSendMessage,
   sendTyping,
-  markMessagesAsRead
+  markMessagesAsRead,
+  getConnectionState,
+  updateAuth
 } from '@/lib/socket-client';
 import { useAuthToken } from '@/hooks/useAuthToken';
 import type { ChatData, MessageData, UserStatusData } from '@/types/chat';
@@ -62,11 +64,180 @@ interface ChatContextType {
   createConversation: (participantId: string, participantType: 'clerk' | 'homestay') => Promise<string | null>;
 }
 
+// State management with reducer to avoid race conditions
+interface ChatState {
+  isConnected: boolean;
+  isConnecting: boolean;
+  connectionError: string | null;
+  conversations: ChatData[];
+  currentChatId: string | null;
+  messages: { [chatId: string]: MessageData[] };
+  userStatuses: { [userId: string]: UserStatusData };
+  typingUsers: { [chatId: string]: { userId: string; userName: string }[] };
+  unreadCountByChatId: { [chatId: string]: number };
+}
+
+type ChatAction = 
+  | { type: 'SET_CONNECTION_STATE'; payload: { isConnected: boolean; isConnecting: boolean; error?: string | null } }
+  | { type: 'SET_CONVERSATIONS'; payload: ChatData[] }
+  | { type: 'SET_CURRENT_CHAT'; payload: string | null }
+  | { type: 'ADD_MESSAGE'; payload: { chatId: string; message: MessageData } }
+  | { type: 'SET_MESSAGES'; payload: { chatId: string; messages: MessageData[] } }
+  | { type: 'REMOVE_OPTIMISTIC_MESSAGE'; payload: { chatId: string; content: string; messageType: string } }
+  | { type: 'UPDATE_USER_STATUS'; payload: { userId: string; status: UserStatusData } }
+  | { type: 'SET_TYPING_USERS'; payload: { chatId: string; users: { userId: string; userName: string }[] } }
+  | { type: 'UPDATE_UNREAD_COUNT'; payload: { chatId: string; count: number } }
+  | { type: 'CLEAR_UNREAD_COUNT'; payload: string }
+  | { type: 'UPDATE_CONVERSATION_LAST_MESSAGE'; payload: { chatId: string; lastMessage: any; lastActivity: string } }
+  | { type: 'RESET_STATE' };
+
+function chatReducer(state: ChatState, action: ChatAction): ChatState {
+  switch (action.type) {
+    case 'SET_CONNECTION_STATE':
+      return {
+        ...state,
+        isConnected: action.payload.isConnected,
+        isConnecting: action.payload.isConnecting,
+        connectionError: action.payload.error ?? null
+      };
+    
+    case 'SET_CONVERSATIONS':
+      return { ...state, conversations: action.payload };
+    
+    case 'SET_CURRENT_CHAT':
+      return { ...state, currentChatId: action.payload };
+    
+    case 'ADD_MESSAGE': {
+      const { chatId, message } = action.payload;
+      const currentMessages = state.messages[chatId] || [];
+      
+      // Check for duplicates
+      const messageExists = currentMessages.some(msg => msg.messageId === message.messageId);
+      if (messageExists) {
+        return state;
+      }
+      
+      return {
+        ...state,
+        messages: {
+          ...state.messages,
+          [chatId]: [...currentMessages, message]
+        }
+      };
+    }
+    
+    case 'SET_MESSAGES':
+      return {
+        ...state,
+        messages: {
+          ...state.messages,
+          [action.payload.chatId]: action.payload.messages
+        }
+      };
+    
+    case 'REMOVE_OPTIMISTIC_MESSAGE': {
+      const { chatId, content, messageType } = action.payload;
+      const currentMessages = state.messages[chatId] || [];
+      
+      const filteredMessages = currentMessages.filter(msg => 
+        !(msg.messageId.startsWith('temp-') && 
+          msg.content === content && 
+          msg.messageType === messageType)
+      );
+      
+      return {
+        ...state,
+        messages: {
+          ...state.messages,
+          [chatId]: filteredMessages
+        }
+      };
+    }
+    
+    case 'UPDATE_USER_STATUS':
+      return {
+        ...state,
+        userStatuses: {
+          ...state.userStatuses,
+          [action.payload.userId]: action.payload.status
+        }
+      };
+    
+    case 'SET_TYPING_USERS':
+      return {
+        ...state,
+        typingUsers: {
+          ...state.typingUsers,
+          [action.payload.chatId]: action.payload.users
+        }
+      };
+    
+    case 'UPDATE_UNREAD_COUNT':
+      return {
+        ...state,
+        unreadCountByChatId: {
+          ...state.unreadCountByChatId,
+          [action.payload.chatId]: action.payload.count
+        }
+      };
+    
+    case 'CLEAR_UNREAD_COUNT':
+      return {
+        ...state,
+        unreadCountByChatId: {
+          ...state.unreadCountByChatId,
+          [action.payload]: 0
+        }
+      };
+    
+    case 'UPDATE_CONVERSATION_LAST_MESSAGE': {
+      const { chatId, lastMessage, lastActivity } = action.payload;
+      return {
+        ...state,
+        conversations: state.conversations.map(conv =>
+          conv.chatId === chatId
+            ? { ...conv, lastMessage, lastActivity }
+            : conv
+        )
+      };
+    }
+    
+    case 'RESET_STATE':
+      return {
+        isConnected: false,
+        isConnecting: false,
+        connectionError: null,
+        conversations: [],
+        currentChatId: null,
+        messages: {},
+        userStatuses: {},
+        typingUsers: {},
+        unreadCountByChatId: {}
+      };
+    
+    default:
+      return state;
+  }
+}
+
+const initialState: ChatState = {
+  isConnected: false,
+  isConnecting: false,
+  connectionError: null,
+  conversations: [],
+  currentChatId: null,
+  messages: {},
+  userStatuses: {},
+  typingUsers: {},
+  unreadCountByChatId: {}
+};
+
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const authData = useAuthToken();
   const [isMounted, setIsMounted] = useState(false);
+  const [state, dispatch] = useReducer(chatReducer, initialState);
 
   // Track mounting state to prevent SSR issues
   useEffect(() => {
@@ -79,43 +250,43 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       console.log('ChatProvider - authData changed:', authData);
     }
   }, [authData, isMounted]);
-  
-  // Connection state
-  const [isConnected, setIsConnected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
-  
-  // Chat data
-  const [conversations, setConversations] = useState<ChatData[]>([]);
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<{ [chatId: string]: MessageData[] }>({});
 
-  // User statuses
-  const [userStatuses, setUserStatuses] = useState<{ [userId: string]: UserStatusData }>({});
+  // Calculate total unread count from state
+  const totalUnreadCount = Object.values(state.unreadCountByChatId).reduce((sum, count) => sum + count, 0);
 
-  // Typing indicators
-  const [typingUsers, setTypingUsers] = useState<{ [chatId: string]: { userId: string; userName: string }[] }>({});
+  // Refs for debouncing and preventing memory leaks
+  const connectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastAuthDataRef = useRef<typeof authData>(null);
 
-  // Unread counts
-  const [unreadCountByChatId, setUnreadCountByChatId] = useState<{ [chatId: string]: number }>({});
-
-  // Calculate total unread count
-  const totalUnreadCount = Object.values(unreadCountByChatId).reduce((sum, count) => sum + count, 0);
-
-  // Socket connection
+  // Enhanced socket connection with error recovery
   const connectSocket = useCallback(async () => {
-    if (!authData || isConnecting || typeof window === 'undefined' || !isMounted) {
+    if (!authData || state.isConnecting || typeof window === 'undefined' || !isMounted) {
       if (!isMounted) {
         console.log('ChatProvider - Not mounted yet, skipping initialization');
       }
       return;
     }
 
+    // Clear any existing connection timeout
+    if (connectTimeoutRef.current) {
+      clearTimeout(connectTimeoutRef.current);
+    }
+
     console.log('🔌 ChatContext - Attempting to connect socket for:', authData);
-    setIsConnecting(true);
-    setConnectionError(null);
+    dispatch({ type: 'SET_CONNECTION_STATE', payload: { isConnected: false, isConnecting: true, error: null } });
 
     try {
+      // Check if auth data has changed and update socket auth if needed
+      if (lastAuthDataRef.current && getSocket()) {
+        const authChanged = lastAuthDataRef.current.tokenType !== authData.tokenType || 
+                           lastAuthDataRef.current.token !== authData.token;
+        if (authChanged) {
+          console.log('🔌 ChatContext - Auth data changed, updating socket');
+          await updateAuth({ tokenType: authData.tokenType, token: authData.token });
+        }
+      }
+
       await initSocket({
         tokenType: authData.tokenType,
         token: authData.token
@@ -124,42 +295,101 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const socket = getSocket();
       if (socket) {
         console.log('✅ ChatContext - Socket connected successfully for:', authData.tokenType, authData.userId);
-        setIsConnected(true);
+        dispatch({ type: 'SET_CONNECTION_STATE', payload: { isConnected: true, isConnecting: false } });
 
-        // Set up event listeners
-        onNewMessage(handleNewMessage);
-        onUserStatus(handleUserStatus);
-        onTypingStatus(handleTypingStatus);
-        onErrorMessage(handleErrorMessage);
-        onMessagesMarkedRead(handleMessagesMarkedRead);
-        onChatJoined(handleChatJoined);
-        onChatLeft(handleChatLeft);
+        // Set up event listeners with error handling
+        setupSocketEventListeners();
 
         socket.on('connect', () => {
           console.log('✅ ChatContext - Socket connect event fired for:', authData.tokenType, authData.userId);
-          setIsConnected(true);
+          dispatch({ type: 'SET_CONNECTION_STATE', payload: { isConnected: true, isConnecting: false } });
 
-          // Fetch conversations when socket connects
-          fetchConversations().catch(error => {
-            console.error('❌ ChatContext - Error fetching conversations on connect:', error);
-          });
+          // Debounced conversation fetch
+          if (fetchTimeoutRef.current) {
+            clearTimeout(fetchTimeoutRef.current);
+          }
+          fetchTimeoutRef.current = setTimeout(() => {
+            fetchConversations().catch(error => {
+              console.error('❌ ChatContext - Error fetching conversations on connect:', error);
+            });
+          }, 500);
         });
-        socket.on('disconnect', () => {
-          console.log('🔌 ChatContext - Socket disconnect event fired for:', authData.tokenType, authData.userId);
-          setIsConnected(false);
+
+        socket.on('disconnect', (reason) => {
+          console.log('🔌 ChatContext - Socket disconnect event fired for:', authData.tokenType, authData.userId, 'reason:', reason);
+          dispatch({ type: 'SET_CONNECTION_STATE', payload: { isConnected: false, isConnecting: false } });
         });
+
+        socket.on('connect_error', (error) => {
+          console.error('❌ ChatContext - Socket connection error:', error);
+          dispatch({ type: 'SET_CONNECTION_STATE', payload: { 
+            isConnected: false, 
+            isConnecting: false, 
+            error: error.message || 'Connection failed' 
+          }});
+        });
+
       } else {
         console.error('❌ ChatContext - Failed to get socket instance');
+        throw new Error('Failed to get socket instance');
       }
+
+      // Store auth data for change detection
+      lastAuthDataRef.current = authData;
+
     } catch (error) {
-      setConnectionError(error instanceof Error ? error.message : 'Connection failed');
+      const errorMessage = error instanceof Error ? error.message : 'Connection failed';
       console.error('❌ ChatContext - Socket connection error for:', authData.tokenType, authData.userId, error);
-    } finally {
-      setIsConnecting(false);
+      dispatch({ type: 'SET_CONNECTION_STATE', payload: { 
+        isConnected: false, 
+        isConnecting: false, 
+        error: errorMessage 
+      }});
+
+      // Schedule retry for auth errors or network issues
+      if (errorMessage.includes('authentication') || errorMessage.includes('network')) {
+        console.log('🔄 ChatContext - Scheduling connection retry in 5 seconds');
+        connectTimeoutRef.current = setTimeout(() => {
+          if (authData && isMounted) {
+            connectSocket();
+          }
+        }, 5000);
+      }
     }
-  }, [authData, isMounted]);
+  }, [authData, state.isConnecting, isMounted]);
+
+  // Setup socket event listeners with better error handling
+  const setupSocketEventListeners = useCallback(() => {
+    // Clear existing listeners first
+    offNewMessage();
+    offUserStatus();
+    offTypingStatus();
+    offErrorMessage();
+    offMessagesMarkedRead();
+    offChatJoined();
+    offChatLeft();
+
+    // Set up new listeners
+    onNewMessage(handleNewMessage);
+    onUserStatus(handleUserStatus);
+    onTypingStatus(handleTypingStatus);
+    onErrorMessage(handleErrorMessage);
+    onMessagesMarkedRead(handleMessagesMarkedRead);
+    onChatJoined(handleChatJoined);
+    onChatLeft(handleChatLeft);
+  }, []);
 
   const disconnectSocketHandler = useCallback(() => {
+    // Clear timeouts
+    if (connectTimeoutRef.current) {
+      clearTimeout(connectTimeoutRef.current);
+      connectTimeoutRef.current = null;
+    }
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+      fetchTimeoutRef.current = null;
+    }
+
     // Clean up event listeners
     offNewMessage();
     offUserStatus();
@@ -170,206 +400,226 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     offChatLeft();
 
     disconnectSocket();
-    setIsConnected(false);
+    dispatch({ type: 'SET_CONNECTION_STATE', payload: { isConnected: false, isConnecting: false } });
   }, []);
 
-  // Event handlers
-  const handleNewMessage = (data: any) => {
-    console.log('📨 ChatContext - Received new message:', data, 'for user:', authData?.userId);
-    const message: MessageData = {
-      _id: data.messageId,
-      messageId: data.messageId,
-      chatId: data.chatId,
-      senderId: data.senderId,
-      senderType: data.senderType,
-      senderName: data.senderName,
-      content: data.content,
-      messageType: data.messageType,
-      timestamp: data.timestamp,
-      readBy: [],
-      isEdited: false,
-      isDeleted: false,
-      createdAt: data.timestamp,
-      updatedAt: data.timestamp,
-      isSelf: data.senderId === authData?.userId
-    };
-
-    setMessages(prev => {
-      const currentMessages = prev[data.chatId] || [];
+  // Enhanced event handlers with better error handling
+  const handleNewMessage = useCallback((data: any) => {
+    try {
+      console.log('📨 ChatContext - Received new message:', data, 'for user:', authData?.userId);
       
-      // Check if message already exists to prevent duplicates
-      const messageExists = currentMessages.some(msg => msg.messageId === data.messageId);
-      if (messageExists) {
-        return prev;
+      if (!data || !data.messageId || !data.chatId) {
+        console.error('❌ ChatContext - Invalid message data received:', data);
+        return;
       }
-      
-      // Remove optimistic message if this is from the same sender and content matches
-      const filteredMessages = message.isSelf 
-        ? currentMessages.filter(msg => 
-            !(msg.messageId.startsWith('temp-') && 
-              msg.content === message.content && 
-              msg.messageType === message.messageType)
-          )
-        : currentMessages;
-      
-      return {
-        ...prev,
-        [data.chatId]: [...filteredMessages, message]
+
+      const message: MessageData = {
+        _id: data.messageId,
+        messageId: data.messageId,
+        chatId: data.chatId,
+        senderId: data.senderId,
+        senderType: data.senderType,
+        senderName: data.senderName,
+        content: data.content,
+        messageType: data.messageType,
+        timestamp: data.timestamp,
+        readBy: [],
+        isEdited: false,
+        isDeleted: false,
+        createdAt: data.timestamp,
+        updatedAt: data.timestamp,
+        isSelf: data.senderId === authData?.userId
       };
-    });
 
-    // Update conversation last message and unread count
-    setConversations(prev =>
-      prev.map(conv =>
-        conv.chatId === data.chatId
-          ? {
-              ...conv,
-              lastMessage: {
-                content: data.content,
-                senderId: data.senderId,
-                senderType: data.senderType,
-                timestamp: data.timestamp,
-                messageType: data.messageType
-              },
-              lastActivity: data.timestamp
-            }
-          : conv
-      )
-    );
+      // Remove optimistic message if this is from the same sender
+      if (message.isSelf) {
+        dispatch({ 
+          type: 'REMOVE_OPTIMISTIC_MESSAGE', 
+          payload: { 
+            chatId: data.chatId, 
+            content: message.content, 
+            messageType: message.messageType 
+          } 
+        });
+      }
 
-    // Update unread count if message is not from current user and not in current chat
-    if (!message.isSelf && data.chatId !== currentChatId) {
-      setUnreadCountByChatId(prev => ({
-        ...prev,
-        [data.chatId]: (prev[data.chatId] || 0) + 1
-      }));
+      // Add the new message
+      dispatch({ type: 'ADD_MESSAGE', payload: { chatId: data.chatId, message } });
+
+      // Update conversation last message
+      dispatch({ 
+        type: 'UPDATE_CONVERSATION_LAST_MESSAGE', 
+        payload: { 
+          chatId: data.chatId, 
+          lastMessage: {
+            content: data.content,
+            senderId: data.senderId,
+            senderType: data.senderType,
+            timestamp: data.timestamp,
+            messageType: data.messageType
+          },
+          lastActivity: data.timestamp
+        } 
+      });
+
+      // Update unread count if message is not from current user and not in current chat
+      if (!message.isSelf && data.chatId !== state.currentChatId) {
+        const currentCount = state.unreadCountByChatId[data.chatId] || 0;
+        dispatch({ 
+          type: 'UPDATE_UNREAD_COUNT', 
+          payload: { chatId: data.chatId, count: currentCount + 1 } 
+        });
+      }
+    } catch (error) {
+      console.error('❌ ChatContext - Error handling new message:', error);
     }
-  };
+  }, [authData?.userId, state.currentChatId, state.unreadCountByChatId]);
 
-  const handleUserStatus = (data: any) => {
-    setUserStatuses(prev => ({
-      ...prev,
-      [data.userId]: data
-    }));
-  };
-
-  const handleTypingStatus = (data: any) => {
-    console.log('⌨️ ChatContext - Received typing status:', data, 'for user:', authData?.userId);
-    // Don't show typing indicator for current user
-    if (data.userId === authData?.userId) {
-      console.log('⌨️ ChatContext - Ignoring typing status for self');
-      return;
+  const handleUserStatus = useCallback((data: any) => {
+    try {
+      if (!data || !data.userId) {
+        console.error('❌ ChatContext - Invalid user status data:', data);
+        return;
+      }
+      dispatch({ type: 'UPDATE_USER_STATUS', payload: { userId: data.userId, status: data } });
+    } catch (error) {
+      console.error('❌ ChatContext - Error handling user status:', error);
     }
+  }, []);
 
-    setTypingUsers(prev => {
-      const currentTyping = prev[data.chatId] || [];
+  const handleTypingStatus = useCallback((data: any) => {
+    try {
+      console.log('⌨️ ChatContext - Received typing status:', data, 'for user:', authData?.userId);
+      
+      if (!data || !data.chatId || !data.userId) {
+        console.error('❌ ChatContext - Invalid typing status data:', data);
+        return;
+      }
+
+      // Don't show typing indicator for current user
+      if (data.userId === authData?.userId) {
+        console.log('⌨️ ChatContext - Ignoring typing status for self');
+        return;
+      }
+
+      const currentTyping = state.typingUsers[data.chatId] || [];
 
       if (data.isTyping) {
         // Add user to typing list if not already there
         const existingUser = currentTyping.find(user => user.userId === data.userId);
         if (!existingUser) {
           console.log('⌨️ ChatContext - Adding user to typing list:', data.userId, data.userName);
-          return {
-            ...prev,
-            [data.chatId]: [...currentTyping, { userId: data.userId, userName: data.userName || 'Someone' }]
-          };
+          const newTypingUsers = [...currentTyping, { userId: data.userId, userName: data.userName || 'Someone' }];
+          dispatch({ type: 'SET_TYPING_USERS', payload: { chatId: data.chatId, users: newTypingUsers } });
         }
       } else {
         // Remove user from typing list
         console.log('⌨️ ChatContext - Removing user from typing list:', data.userId);
-        return {
-          ...prev,
-          [data.chatId]: currentTyping.filter(user => user.userId !== data.userId)
-        };
+        const filteredUsers = currentTyping.filter(user => user.userId !== data.userId);
+        dispatch({ type: 'SET_TYPING_USERS', payload: { chatId: data.chatId, users: filteredUsers } });
+      }
+    } catch (error) {
+      console.error('❌ ChatContext - Error handling typing status:', error);
+    }
+  }, [authData?.userId, state.typingUsers]);
+
+  const handleErrorMessage = useCallback((data: any) => {
+    try {
+      console.error('Socket error:', data.message);
+      dispatch({ type: 'SET_CONNECTION_STATE', payload: { 
+        isConnected: state.isConnected, 
+        isConnecting: state.isConnecting, 
+        error: data.message 
+      }});
+    } catch (error) {
+      console.error('❌ ChatContext - Error handling error message:', error);
+    }
+  }, [state.isConnected, state.isConnecting]);
+
+  const handleMessagesMarkedRead = useCallback((_data: any) => {
+    // Currently handled by server-side unread counting
+    // Could add local optimistic updates here if needed
+  }, []);
+
+  const handleChatJoined = useCallback((data: any) => {
+    console.log('Successfully joined chat:', data.chatId);
+  }, []);
+
+  const handleChatLeft = useCallback((data: any) => {
+    console.log('Successfully left chat:', data.chatId);
+  }, []);
+
+  // Enhanced actions with better error handling
+  const setCurrentChat = useCallback((chatId: string | null) => {
+    try {
+      if (state.currentChatId && state.currentChatId !== chatId) {
+        leaveChat(state.currentChatId);
+        // Clear typing indicators for the previous chat
+        dispatch({ type: 'SET_TYPING_USERS', payload: { chatId: state.currentChatId, users: [] } });
       }
 
-      return prev;
-    });
-  };
+      dispatch({ type: 'SET_CURRENT_CHAT', payload: chatId });
 
-  const handleErrorMessage = (data: any) => {
-    console.error('Socket error:', data.message);
-    setConnectionError(data.message);
-  };
+      if (chatId) {
+        // Reset unread count for this chat when opening it
+        dispatch({ type: 'CLEAR_UNREAD_COUNT', payload: chatId });
 
-  const handleMessagesMarkedRead = (_data: any) => {
-    // Optional: update local message read state or conversation unread counts if needed
-    // Currently, unread counting is derived on server; we keep client minimal
-  };
-
-  const handleChatJoined = (data: any) => {
-    console.log('Successfully joined chat:', data.chatId);
-  };
-
-  const handleChatLeft = (data: any) => {
-    console.log('Successfully left chat:', data.chatId);
-  };
-
-  // Actions
-  const setCurrentChat = (chatId: string | null) => {
-    if (currentChatId && currentChatId !== chatId) {
-      leaveChat(currentChatId);
-      // Clear typing indicators for the previous chat
-      setTypingUsers(prev => ({
-        ...prev,
-        [currentChatId]: []
-      }));
+        joinChat(chatId);
+        fetchMessages(chatId).catch(error => {
+          console.error('❌ ChatContext - Error fetching messages for chat:', chatId, error);
+        });
+      }
+    } catch (error) {
+      console.error('❌ ChatContext - Error setting current chat:', error);
     }
+  }, [state.currentChatId]);
 
-    setCurrentChatId(chatId);
+  const sendMessage = useCallback((chatId: string, content: string, messageType: 'text' | 'image' | 'file' = 'text') => {
+    try {
+      if (!state.isConnected || !authData) {
+        console.error('Cannot send message: not connected or not authenticated');
+        return;
+      }
 
-    if (chatId) {
-      // Reset unread count for this chat when opening it
-      setUnreadCountByChatId(prev => ({
-        ...prev,
-        [chatId]: 0
-      }));
+      if (!content.trim()) {
+        console.error('Cannot send empty message');
+        return;
+      }
 
-      joinChat(chatId);
-      fetchMessages(chatId);
+      // Create optimistic message
+      const optimisticMessage: MessageData = {
+        _id: `temp-${Date.now()}-${Math.random()}`,
+        messageId: `temp-${Date.now()}-${Math.random()}`,
+        chatId,
+        senderId: authData.userId,
+        senderType: authData.tokenType === 'clerk' ? 'clerk' : 'homestay',
+        content: content.trim(),
+        messageType,
+        timestamp: new Date().toISOString(),
+        readBy: [],
+        isEdited: false,
+        isDeleted: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isSelf: true
+      };
+
+      // Add optimistic message to local state
+      dispatch({ type: 'ADD_MESSAGE', payload: { chatId, message: optimisticMessage } });
+
+      // Send via socket
+      socketSendMessage(chatId, content.trim(), messageType);
+    } catch (error) {
+      console.error('❌ ChatContext - Error sending message:', error);
     }
-  };
-
-  const sendMessage = (chatId: string, content: string, messageType: 'text' | 'image' | 'file' = 'text') => {
-    if (!isConnected || !authData) {
-      console.error('Cannot send message: not connected or not authenticated');
-      return;
-    }
-
-    // Create optimistic message
-    const optimisticMessage: MessageData = {
-      _id: `temp-${Date.now()}`,
-      messageId: `temp-${Date.now()}`,
-      chatId,
-      senderId: authData.userId,
-      senderType: authData.tokenType === 'clerk' ? 'clerk' : 'homestay',
-      content,
-      messageType,
-      timestamp: new Date().toISOString(),
-      readBy: [],
-      isEdited: false,
-      isDeleted: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      isSelf: true
-    };
-
-    // Add optimistic message to local state
-    setMessages(prev => ({
-      ...prev,
-      [chatId]: [...(prev[chatId] || []), optimisticMessage]
-    }));
-
-    // Send via socket
-    socketSendMessage(chatId, content, messageType);
-  };
+  }, [state.isConnected, authData]);
 
   // Typing debounce refs
   const typingTimeoutRef = useRef<{ [chatId: string]: NodeJS.Timeout }>({});
   const isTypingRef = useRef<{ [chatId: string]: boolean }>({});
 
-  const startTyping = (chatId: string) => {
-    if (!isConnected) return;
+  const startTyping = useCallback((chatId: string) => {
+    if (!state.isConnected) return;
     
     // Clear existing timeout
     if (typingTimeoutRef.current[chatId]) {
@@ -386,10 +636,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     typingTimeoutRef.current[chatId] = setTimeout(() => {
       stopTyping(chatId);
     }, 3000); // Stop typing after 3 seconds of inactivity
-  };
+  }, [state.isConnected]);
 
-  const stopTyping = (chatId: string) => {
-    if (!isConnected) return;
+  const stopTyping = useCallback((chatId: string) => {
+    if (!state.isConnected) return;
     
     // Clear timeout
     if (typingTimeoutRef.current[chatId]) {
@@ -402,25 +652,26 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       sendTyping(chatId, false);
       isTypingRef.current[chatId] = false;
     }
-  };
+  }, [state.isConnected]);
 
-  const markAsRead = async (chatId: string, messageIds: string[]) => {
-    if (!authData) {
-      console.error('Cannot mark as read: not authenticated');
-      return;
-    }
-
-    // Reset unread count for this chat
-    setUnreadCountByChatId(prev => ({
-      ...prev,
-      [chatId]: 0
-    }));
-
-    // 1) Realtime read receipts via socket
-    markMessagesAsRead(chatId, messageIds);
-
-    // 2) Persist participant lastReadAt for ordering/unread logic
+  const markAsRead = useCallback(async (chatId: string, messageIds: string[]) => {
     try {
+      if (!authData) {
+        console.error('Cannot mark as read: not authenticated');
+        return;
+      }
+
+      if (!messageIds.length) {
+        return;
+      }
+
+      // Reset unread count for this chat
+      dispatch({ type: 'CLEAR_UNREAD_COUNT', payload: chatId });
+
+      // 1) Realtime read receipts via socket
+      markMessagesAsRead(chatId, messageIds);
+
+      // 2) Persist participant lastReadAt for ordering/unread logic
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
       };
@@ -432,14 +683,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       await fetch('/api/chat/conversations', {
         method: 'PATCH',
         headers,
+        credentials: 'include',
         body: JSON.stringify({ chatId, action: 'mark_read', timestamp: new Date().toISOString() })
       });
     } catch (err) {
-      console.error('Failed to PATCH conversation mark_read:', err);
+      console.error('❌ ChatContext - Failed to mark messages as read:', err);
     }
-  };
+  }, [authData]);
 
-  const fetchConversations = async () => {
+  const fetchConversations = useCallback(async () => {
     if (!authData) {
       console.error('Cannot fetch conversations: not authenticated');
       return;
@@ -454,6 +706,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache'
       };
 
       if (authData.tokenType === 'clerk') {
@@ -464,25 +717,35 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       }
 
       console.log('🔍 ChatContext - Making fetch request to /api/chat/conversations');
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
       const response = await fetch('/api/chat/conversations', {
         headers,
-        credentials: 'include' // Include cookies for JWT authentication
+        credentials: 'include',
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
       console.log('🔍 ChatContext - Response status:', response.status);
       const data = await response.json();
       console.log('🔍 ChatContext - Response data:', data);
 
       if (response.ok) {
         console.log('✅ ChatContext - Successfully fetched conversations:', data.conversations?.length || 0, 'conversations');
-        setConversations(data.conversations || []);
+        dispatch({ type: 'SET_CONVERSATIONS', payload: data.conversations || [] });
 
         // Initialize unread counts from API response
         const unreadCounts: { [chatId: string]: number } = {};
         (data.conversations || []).forEach((conv: any) => {
           unreadCounts[conv.chatId] = conv.unreadCount || 0;
         });
-        setUnreadCountByChatId(unreadCounts);
+        
+        // Update unread counts in batch
+        Object.entries(unreadCounts).forEach(([chatId, count]) => {
+          dispatch({ type: 'UPDATE_UNREAD_COUNT', payload: { chatId, count } });
+        });
       } else {
         console.error('❌ ChatContext - Error fetching conversations:', {
           status: response.status,
@@ -491,29 +754,45 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         });
       }
     } catch (error) {
-      console.error('❌ ChatContext - Exception fetching conversations:', error);
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('❌ ChatContext - Conversation fetch timeout');
+      } else {
+        console.error('❌ ChatContext - Exception fetching conversations:', error);
+      }
     }
-  };
+  }, [authData]);
 
-  const fetchMessages = async (chatId: string) => {
+  const fetchMessages = useCallback(async (chatId: string) => {
     if (!authData) {
       console.error('Cannot fetch messages: not authenticated');
+      return;
+    }
+
+    if (!chatId) {
+      console.error('Cannot fetch messages: invalid chatId');
       return;
     }
 
     try {
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache'
       };
 
       if (authData.tokenType === 'clerk') {
         headers['Authorization'] = `Bearer ${authData.token}`;
       }
 
-      const response = await fetch(`/api/chat/messages?chatId=${chatId}&limit=50`, {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      const response = await fetch(`/api/chat/messages?chatId=${encodeURIComponent(chatId)}&limit=50`, {
         headers,
-        credentials: 'include' // Include cookies for JWT authentication
+        credentials: 'include',
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
       const data = await response.json();
       
       if (response.ok) {
@@ -522,21 +801,27 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           isSelf: msg.senderId === authData.userId
         }));
         
-        setMessages(prev => ({
-          ...prev,
-          [chatId]: messagesWithSelfFlag
-        }));
+        dispatch({ type: 'SET_MESSAGES', payload: { chatId, messages: messagesWithSelfFlag } });
       } else {
-        console.error('Error fetching messages:', data.error);
+        console.error('❌ ChatContext - Error fetching messages:', data.error);
       }
     } catch (error) {
-      console.error('Error fetching messages:', error);
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('❌ ChatContext - Message fetch timeout for chat:', chatId);
+      } else {
+        console.error('❌ ChatContext - Error fetching messages:', error);
+      }
     }
-  };
+  }, [authData]);
 
-  const createConversation = async (participantId: string, participantType: 'clerk' | 'homestay'): Promise<string | null> => {
+  const createConversation = useCallback(async (participantId: string, participantType: 'clerk' | 'homestay'): Promise<string | null> => {
     if (!authData) {
       console.error('Cannot create conversation: not authenticated');
+      return null;
+    }
+
+    if (!participantId || !participantType) {
+      console.error('Cannot create conversation: invalid parameters');
       return null;
     }
 
@@ -549,38 +834,47 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         headers['Authorization'] = `Bearer ${authData.token}`;
       }
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const response = await fetch('/api/chat/conversations', {
         method: 'POST',
         headers,
-        credentials: 'include', // Include cookies for JWT authentication
+        credentials: 'include',
+        signal: controller.signal,
         body: JSON.stringify({
           participantId,
           participantType
         })
       });
-      
+
+      clearTimeout(timeoutId);
       const data = await response.json();
       
       if (response.ok) {
         if (data.isNew) {
-          setConversations(prev => [data.conversation, ...prev]);
+          dispatch({ type: 'SET_CONVERSATIONS', payload: [data.conversation, ...state.conversations] });
         }
         return data.conversation.chatId;
       } else {
-        console.error('Error creating conversation:', data.error);
+        console.error('❌ ChatContext - Error creating conversation:', data.error);
         return null;
       }
     } catch (error) {
-      console.error('Error creating conversation:', error);
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('❌ ChatContext - Create conversation timeout');
+      } else {
+        console.error('❌ ChatContext - Error creating conversation:', error);
+      }
       return null;
     }
-  };
+  }, [authData, state.conversations]);
 
   // Track current authData in a ref to avoid stale closures
   const authDataRef = useRef(authData);
   authDataRef.current = authData;
 
-  // Auto-connect when auth data is available and component is mounted
+  // Enhanced auto-connect with better error handling
   useEffect(() => {
     if (!isMounted) return;
 
@@ -588,13 +882,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       authData: !!authData,
       authDataType: authData?.tokenType,
       authDataUserId: authData?.userId,
-      isConnected,
-      isConnecting,
+      isConnected: state.isConnected,
+      isConnecting: state.isConnecting,
       isBrowser: typeof window !== 'undefined',
       isMounted
     });
 
-    if (authData && !isConnected && !isConnecting) {
+    if (authData && !state.isConnected && !state.isConnecting) {
       console.log('🚀 ChatContext - Triggering socket connection for:', authData.tokenType, authData.userId);
       // Add a small delay to ensure auth is fully established
       const connectTimer = setTimeout(() => {
@@ -606,7 +900,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     // Only disconnect if we're sure auth data is lost (not just temporarily null during loading)
     // Wait a bit to avoid disconnecting during auth state transitions
-    if (!authData && (isConnected || isConnecting)) {
+    if (!authData && (state.isConnected || state.isConnecting)) {
       console.log('🔌 ChatContext - Auth data lost, scheduling disconnect check...');
       const disconnectTimer = setTimeout(() => {
         // Use ref to get current authData value (avoids stale closure)
@@ -621,18 +915,31 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       return () => clearTimeout(disconnectTimer);
     }
-  }, [authData, isConnected, isConnecting, connectSocket, disconnectSocketHandler, isMounted]);
+  }, [authData, state.isConnected, state.isConnecting, connectSocket, disconnectSocketHandler, isMounted]);
 
-  // Fetch conversations on connect
+  // Fetch conversations on connect with debouncing
   useEffect(() => {
-    if (isConnected) {
-      fetchConversations();
+    if (state.isConnected) {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+      fetchTimeoutRef.current = setTimeout(() => {
+        fetchConversations();
+      }, 200);
     }
-  }, [isConnected]);
+  }, [state.isConnected, fetchConversations]);
 
-  // Cleanup on unmount
+  // Enhanced cleanup on unmount
   useEffect(() => {
     return () => {
+      // Clear all timeouts
+      if (connectTimeoutRef.current) {
+        clearTimeout(connectTimeoutRef.current);
+      }
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+
       // Clear all typing timeouts
       Object.values(typingTimeoutRef.current).forEach((timeout: NodeJS.Timeout) => {
         clearTimeout(timeout);
@@ -643,16 +950,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, [disconnectSocketHandler]);
 
   const contextValue: ChatContextType = {
-    isConnected,
-    isConnecting,
-    connectionError,
-    conversations,
-    currentChatId,
-    messages,
-    userStatuses,
-    typingUsers,
+    isConnected: state.isConnected,
+    isConnecting: state.isConnecting,
+    connectionError: state.connectionError,
+    conversations: state.conversations,
+    currentChatId: state.currentChatId,
+    messages: state.messages,
+    userStatuses: state.userStatuses,
+    typingUsers: state.typingUsers,
     totalUnreadCount,
-    unreadCountByChatId,
+    unreadCountByChatId: state.unreadCountByChatId,
     connectSocket,
     disconnectSocket: disconnectSocketHandler,
     setCurrentChat,
