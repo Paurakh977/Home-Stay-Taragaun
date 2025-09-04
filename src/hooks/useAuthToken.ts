@@ -187,9 +187,10 @@ export function useAuthToken() {
   }, []);
 
   useEffect(() => {
-    // Don't run if Clerk is not loaded yet
+    // Don't run if Clerk is not loaded yet, but be more patient
     if (!isLoaded) {
       console.log('useAuthToken - Waiting for Clerk to load...');
+      setIsLoading(true);
       return;
     }
 
@@ -197,13 +198,16 @@ export function useAuthToken() {
     const now = Date.now();
     const timeSinceLastCheck = now - lastCheckRef.current;
     
-    // Check immediately if we don't have auth data, if enough time has passed, or if this is initial check
+    // More aggressive conditions for auth checking
     const shouldCheck = !authData || 
                        timeSinceLastCheck > CACHE_DURATION || 
                        !lastCheckRef.current ||
                        // Force check if Clerk state changes
                        (isSignedIn && userId && authData?.tokenType !== 'clerk') ||
-                       (!isSignedIn && authData?.tokenType === 'clerk');
+                       (!isSignedIn && authData?.tokenType === 'clerk') ||
+                       // Also check if we have inconsistent state
+                       (isSignedIn && userId && !authData) ||
+                       (authData?.tokenType === 'clerk' && (!isSignedIn || !userId));
     
     if (shouldCheck) {
       console.log('useAuthToken - Triggering auth check:', {
@@ -211,13 +215,16 @@ export function useAuthToken() {
         timeSinceLastCheck,
         isInitialCheck: !lastCheckRef.current,
         clerkStateChanged: (isSignedIn && userId && authData?.tokenType !== 'clerk') || 
-                          (!isSignedIn && authData?.tokenType === 'clerk')
+                          (!isSignedIn && authData?.tokenType === 'clerk'),
+        clerkState: { isSignedIn, userId },
+        authDataState: { tokenType: authData?.tokenType, userId: authData?.userId }
       });
       getAuthData();
     } else {
       console.log('useAuthToken - Using cached auth data:', {
         timeSinceLastCheck,
-        cacheDuration: CACHE_DURATION
+        cacheDuration: CACHE_DURATION,
+        authData: !!authData
       });
       setIsLoading(false);
     }

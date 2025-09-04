@@ -9,7 +9,11 @@ import { getUserFromRequest, verifyUserChatAccess } from '@/lib/api-auth';
 
 
 
-// Enrich messages with sender names
+// Cache for user data to reduce API calls and provide fallbacks
+const messageUserDataCache = new Map<string, { data: any; timestamp: number }>();
+const MESSAGE_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Enrich messages with sender names and avatars
 async function enrichMessagesWithSenderNames(messages: any[]) {
   const clerk = createClerkClient({
     secretKey: process.env.CLERK_SECRET_KEY!,
@@ -18,26 +22,59 @@ async function enrichMessagesWithSenderNames(messages: any[]) {
 
   const enrichedMessages = await Promise.all(
     messages.map(async (message) => {
+      const cacheKey = `${message.senderType}:${message.senderId}`;
+      const now = Date.now();
+
+      // Check cache first
+      const cached = messageUserDataCache.get(cacheKey);
+      if (cached && (now - cached.timestamp) < MESSAGE_CACHE_DURATION) {
+        return { ...message, ...cached.data };
+      }
+
       try {
-        let senderName = 'Unknown User';
+        let userData: { senderName: string; senderAvatar: string | null } = {
+          senderName: 'Unknown User',
+          senderAvatar: null
+        };
 
         if (message.senderType === 'clerk') {
           const user = await clerk.users.getUser(message.senderId);
-          senderName = user.fullName || user.firstName || user.emailAddresses[0]?.emailAddress || 'Unknown User';
+          userData = {
+            senderName: user.fullName || user.firstName || user.emailAddresses[0]?.emailAddress || 'Unknown User',
+            senderAvatar: user.imageUrl || null
+          };
         } else if (message.senderType === 'homestay') {
           const homestay = await HomestaySingle.findOne({ homestayId: message.senderId }).lean();
-          senderName = homestay?.homeStayName || homestay?.name || 'Unknown Homestay';
+          if (homestay) {
+            userData = {
+              senderName: homestay.homeStayName || homestay.name || 'Unknown Homestay',
+              senderAvatar: homestay.profileImage || null
+            };
+          }
         }
+
+        // Cache the result
+        messageUserDataCache.set(cacheKey, { data: userData, timestamp: now });
 
         return {
           ...message,
-          senderName
+          ...userData
         };
       } catch (error) {
         console.error(`Error enriching message ${message.messageId}:`, error);
+        
+        // Try to use cached data even if expired as fallback
+        const expiredCache = messageUserDataCache.get(cacheKey);
+        if (expiredCache) {
+          console.log(`Using expired cache for ${cacheKey} due to error`);
+          return { ...message, ...expiredCache.data };
+        }
+
+        // Final fallback
         return {
           ...message,
-          senderName: 'Unknown User'
+          senderName: 'Unknown User',
+          senderAvatar: null
         };
       }
     })
@@ -214,8 +251,10 @@ export async function POST(request: NextRequest) {
 
     // Publish new message event via Redis with comprehensive error handling
     try {
-      // Get sender name for the event
+      // Get sender name and avatar for the event
       let senderName = 'Unknown User';
+      let senderAvatar = null;
+      
       if (user.userType === 'clerk') {
         const clerk = createClerkClient({
           secretKey: process.env.CLERK_SECRET_KEY!,
@@ -224,6 +263,7 @@ export async function POST(request: NextRequest) {
         try {
           const clerkUser = await clerk.users.getUser(user.userId);
           senderName = clerkUser.fullName || clerkUser.firstName || clerkUser.emailAddresses[0]?.emailAddress || 'Unknown User';
+          senderAvatar = clerkUser.imageUrl || null;
         } catch (clerkError) {
           console.error('Error fetching Clerk user for message event:', clerkError);
         }
@@ -231,17 +271,19 @@ export async function POST(request: NextRequest) {
         try {
           const homestay = await HomestaySingle.findOne({ homestayId: user.userId }).lean();
           senderName = homestay?.homeStayName || homestay?.name || 'Unknown Homestay';
+          senderAvatar = homestay?.profileImage || null;
         } catch (homestayError) {
           console.error('Error fetching homestay for message event:', homestayError);
         }
       }
 
-      const event: RedisMessage = {
+      const event = {
         chatId,
         messageId: msgDoc.messageId,
         senderId: msgDoc.senderId,
         senderType: msgDoc.senderType,
         senderName,
+        senderAvatar,
         content: msgDoc.content,
         messageType: msgDoc.messageType,
         timestamp: msgDoc.timestamp,
@@ -307,7 +349,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Verify user has access to the chat
-    const hasAccess = await verifyUserChatAccess(user, message.chatId);
+    const hasAccess = await verifyUserChatAccess(user, message.chatId, Chat);
     if (!hasAccess) {
       return NextResponse.json({ error: 'Forbidden: No access to this chat' }, { status: 403 });
     }

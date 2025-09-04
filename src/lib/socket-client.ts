@@ -8,9 +8,11 @@ import { DefaultEventsMap } from "socket.io";
     senderId: string;
     senderType: 'clerk' | 'homestay';
     senderName?: string;
+    senderAvatar?: string;
     content: string;
     messageType: 'text' | 'image' | 'file';
     timestamp: string;
+    recipientIds?: string[];
   }) => void;
   user_status: (data: {
     userId: string;

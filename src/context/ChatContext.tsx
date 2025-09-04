@@ -139,11 +139,25 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
       const { chatId, content, messageType } = action.payload;
       const currentMessages = state.messages[chatId] || [];
       
-      const filteredMessages = currentMessages.filter(msg => 
-        !(msg.messageId.startsWith('temp-') && 
-          msg.content === content && 
-          msg.messageType === messageType)
-      );
+      // More precise matching for optimistic message removal
+      const filteredMessages = currentMessages.filter(msg => {
+        const isOptimistic = msg.messageId.startsWith('temp-');
+        const contentMatch = msg.content.trim() === content.trim();
+        const typeMatch = msg.messageType === messageType;
+        
+        // Keep the message if it's not an optimistic message with matching content and type
+        const shouldRemove = isOptimistic && contentMatch && typeMatch;
+        
+        if (shouldRemove) {
+          console.log('🗑️ Removing optimistic message:', { 
+            messageId: msg.messageId, 
+            content: msg.content,
+            messageType: msg.messageType 
+          });
+        }
+        
+        return !shouldRemove;
+      });
       
       return {
         ...state,
@@ -244,12 +258,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setIsMounted(true);
   }, []);
 
-  // Add effect to track auth data changes
-  useEffect(() => {
-    if (isMounted) {
-      console.log('ChatProvider - authData changed:', authData);
-    }
-  }, [authData, isMounted]);
+  // Message queue for when auth data is not yet available
+  const messageQueueRef = useRef<any[]>([]);
+
 
   // Calculate total unread count from state
   const totalUnreadCount = Object.values(state.unreadCountByChatId).reduce((sum, count) => sum + count, 0);
@@ -406,11 +417,46 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // Enhanced event handlers with better error handling
   const handleNewMessage = useCallback((data: any) => {
     try {
-      console.log('📨 ChatContext - Received new message:', data, 'for user:', authData?.userId);
+      // Get current auth data from ref to avoid stale closures
+      const currentAuthData = authDataRef.current;
+      console.log('📨 ChatContext - Received new message:', data, 'for user:', currentAuthData?.userId);
+      console.log('📨 ChatContext - Current auth state:', { 
+        userId: currentAuthData?.userId, 
+        tokenType: currentAuthData?.tokenType,
+        hasAuthData: !!currentAuthData 
+      });
       
       if (!data || !data.messageId || !data.chatId) {
         console.error('❌ ChatContext - Invalid message data received:', data);
         return;
+      }
+
+      // If auth data is not available, queue the message for later processing
+      if (!currentAuthData) {
+        console.log('📨 ChatContext - Auth data not available, queuing message');
+        messageQueueRef.current.push(data);
+        return;
+      }
+
+      // More robust isSelf detection with detailed logging
+      let isSelf = false;
+      if (currentAuthData && currentAuthData.userId) {
+        // Direct userId match with same userType
+        const userTypeMatch = (data.senderType === 'clerk' && currentAuthData.tokenType === 'clerk') ||
+                             (data.senderType === 'homestay' && currentAuthData.tokenType === 'jwt');
+        
+        isSelf = data.senderId === currentAuthData.userId && userTypeMatch;
+        
+        console.log('📨 ChatContext - isSelf calculation:', {
+          dataSenderId: data.senderId,
+          currentUserId: currentAuthData.userId,
+          dataSenderType: data.senderType,
+          currentTokenType: currentAuthData.tokenType,
+          userTypeMatch,
+          isSelf
+        });
+      } else {
+        console.warn('📨 ChatContext - No auth data available for isSelf detection');
       }
 
       const message: MessageData = {
@@ -420,6 +466,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         senderId: data.senderId,
         senderType: data.senderType,
         senderName: data.senderName,
+        senderAvatar: data.senderAvatar || null,
         content: data.content,
         messageType: data.messageType,
         timestamp: data.timestamp,
@@ -428,23 +475,30 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         isDeleted: false,
         createdAt: data.timestamp,
         updatedAt: data.timestamp,
-        isSelf: data.senderId === authData?.userId
+        isSelf: isSelf
       };
 
-      // Remove optimistic message if this is from the same sender
-      if (message.isSelf) {
+      // For messages from current user, first remove any optimistic messages
+      if (isSelf) {
+        console.log('📨 ChatContext - Processing self message, removing optimistic:', data.content);
         dispatch({ 
           type: 'REMOVE_OPTIMISTIC_MESSAGE', 
           payload: { 
             chatId: data.chatId, 
-            content: message.content, 
-            messageType: message.messageType 
+            content: data.content.trim(), 
+            messageType: data.messageType 
           } 
         });
+        
+        // Small delay to ensure optimistic message is removed before adding real one
+        setTimeout(() => {
+          dispatch({ type: 'ADD_MESSAGE', payload: { chatId: data.chatId, message } });
+        }, 10);
+      } else {
+        // For messages from others, add immediately
+        console.log('📨 ChatContext - Processing message from other user, adding immediately');
+        dispatch({ type: 'ADD_MESSAGE', payload: { chatId: data.chatId, message } });
       }
-
-      // Add the new message
-      dispatch({ type: 'ADD_MESSAGE', payload: { chatId: data.chatId, message } });
 
       // Update conversation last message
       dispatch({ 
@@ -463,7 +517,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       });
 
       // Update unread count if message is not from current user and not in current chat
-      if (!message.isSelf && data.chatId !== state.currentChatId) {
+      if (!isSelf && data.chatId !== state.currentChatId) {
         const currentCount = state.unreadCountByChatId[data.chatId] || 0;
         dispatch({ 
           type: 'UPDATE_UNREAD_COUNT', 
@@ -473,7 +527,26 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('❌ ChatContext - Error handling new message:', error);
     }
-  }, [authData?.userId, state.currentChatId, state.unreadCountByChatId]);
+  }, [state.currentChatId, state.unreadCountByChatId]);
+
+  // Add effect to track auth data changes and process queued messages
+  useEffect(() => {
+    if (isMounted) {
+      console.log('ChatProvider - authData changed:', authData);
+      
+      // Process any queued messages when auth data becomes available
+      if (authData && messageQueueRef.current.length > 0) {
+        console.log('📨 ChatContext - Auth data now available, processing queued messages');
+        // Process directly here to avoid dependency issues
+        const queuedMessages = [...messageQueueRef.current];
+        messageQueueRef.current = [];
+        
+        queuedMessages.forEach(data => {
+          handleNewMessage(data);
+        });
+      }
+    }
+  }, [authData, isMounted, handleNewMessage]);
 
   const handleUserStatus = useCallback((data: any) => {
     try {
@@ -581,7 +654,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (!content.trim()) {
+      const trimmedContent = content.trim();
+      if (!trimmedContent) {
         console.error('Cannot send empty message');
         return;
       }
@@ -593,7 +667,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         chatId,
         senderId: authData.userId,
         senderType: authData.tokenType === 'clerk' ? 'clerk' : 'homestay',
-        content: content.trim(),
+        senderName: undefined, // Will be set when real message comes back
+        senderAvatar: undefined, // Will be set when real message comes back
+        content: trimmedContent,
         messageType,
         timestamp: new Date().toISOString(),
         readBy: [],
@@ -607,8 +683,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       // Add optimistic message to local state
       dispatch({ type: 'ADD_MESSAGE', payload: { chatId, message: optimisticMessage } });
 
-      // Send via socket
-      socketSendMessage(chatId, content.trim(), messageType);
+      // Send via socket with trimmed content to ensure consistency
+      socketSendMessage(chatId, trimmedContent, messageType);
     } catch (error) {
       console.error('❌ ChatContext - Error sending message:', error);
     }
@@ -917,9 +993,23 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, [authData, state.isConnected, state.isConnecting, connectSocket, disconnectSocketHandler, isMounted]);
 
-  // Fetch conversations on connect with debouncing
+  // Fetch conversations immediately when auth data is available (parallel to socket connection)
+  useEffect(() => {
+    if (authData && isMounted) {
+      console.log('🔍 ChatContext - Auth data available, fetching conversations immediately');
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+      fetchTimeoutRef.current = setTimeout(() => {
+        fetchConversations();
+      }, 50); // Very short delay just to ensure auth is stable
+    }
+  }, [authData, isMounted, fetchConversations]);
+
+  // Also fetch conversations on socket connect (as backup and for real-time updates)
   useEffect(() => {
     if (state.isConnected) {
+      console.log('🔍 ChatContext - Socket connected, refreshing conversations');
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
       }

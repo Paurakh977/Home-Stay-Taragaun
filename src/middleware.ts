@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { jwtVerify, type JWTPayload } from 'jose';
 import { clerkMiddleware } from "@clerk/nextjs/server";
+import { createClerkClient } from '@clerk/backend';
 
 // Extended JWT payload interface with our custom properties
 interface ExtendedJWTPayload extends JWTPayload {
@@ -223,20 +224,47 @@ async function middlewareHandler(auth: any, request: NextRequest) {
         console.log(`🔐 Middleware - Checking Bearer token for ${pathname}`);
         
         try {
-          // Try JWT verification for Bearer tokens
-          const { payload } = await jwtVerify(token, ENCODED_JWT_SECRET);
-          const homestayId = (payload as any).homestayId;
-          const exp = payload.exp;
+          // First try Clerk token verification (for Clerk Bearer tokens)
+          const clerk = createClerkClient({
+            secretKey: process.env.CLERK_SECRET_KEY!,
+            publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!,
+          });
+
+          // Create a minimal request with the Bearer token
+          const testRequest = new Request(`${request.nextUrl.origin}/test`, {
+            headers: {
+              'Authorization': authHeader,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          const { toAuth } = await clerk.authenticateRequest(testRequest);
+          const authData = toAuth();
           
-          if (exp && Date.now() >= exp * 1000) {
-            console.log(`❌ Middleware - Bearer JWT token expired for ${pathname}`);
-          } else if (homestayId) {
-            console.log(`✅ Middleware - Bearer JWT auth successful for homestay ${homestayId} on ${pathname}`);
+          if (authData && authData.userId) {
+            console.log(`✅ Middleware - Clerk Bearer auth successful for user ${authData.userId} on ${pathname}`);
             authenticated = true;
-            authMethod = 'bearer-jwt';
+            authMethod = 'clerk-bearer';
           }
-        } catch (error) {
-          console.log(`❌ Middleware - Bearer JWT verification failed for ${pathname}:`, error instanceof Error ? error.message : error);
+        } catch (clerkError) {
+          console.log(`🔐 Middleware - Not a Clerk token, trying JWT: ${clerkError instanceof Error ? clerkError.message : clerkError}`);
+          
+          // If Clerk verification fails, try JWT verification (for homestay Bearer tokens)
+          try {
+            const { payload } = await jwtVerify(token, ENCODED_JWT_SECRET);
+            const homestayId = (payload as any).homestayId;
+            const exp = payload.exp;
+            
+            if (exp && Date.now() >= exp * 1000) {
+              console.log(`❌ Middleware - Bearer JWT token expired for ${pathname}`);
+            } else if (homestayId) {
+              console.log(`✅ Middleware - Bearer JWT auth successful for homestay ${homestayId} on ${pathname}`);
+              authenticated = true;
+              authMethod = 'bearer-jwt';
+            }
+          } catch (jwtError) {
+            console.log(`❌ Middleware - Bearer JWT verification failed for ${pathname}:`, jwtError instanceof Error ? jwtError.message : jwtError);
+          }
         }
       }
     }
