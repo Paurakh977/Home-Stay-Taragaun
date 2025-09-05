@@ -12,12 +12,15 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
     
-    // Clear the standard auth cookie
+    // Clear the standard auth cookie with proper security attributes
     response.cookies.set({
       name: 'auth_token',
       value: '',
       expires: new Date(0), // Set expiration date to the past
       path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
     });
     
     // If this is an admin route, also clear the admin-specific auth cookie
@@ -34,6 +37,9 @@ export async function POST(request: NextRequest) {
           value: '',
           expires: new Date(0),
           path: '/',
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
         });
       });
     }

@@ -1,8 +1,8 @@
 import { useAuth } from '@clerk/nextjs';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 export function useAuthToken() {
-  const { getToken, userId } = useAuth();
+  const { getToken, userId, isLoaded, isSignedIn } = useAuth();
   const [authData, setAuthData] = useState<{
     token: string;
     tokenType: 'clerk' | 'jwt';
@@ -11,93 +11,251 @@ export function useAuthToken() {
 
   const [isLoading, setIsLoading] = useState(true);
   const lastCheckRef = useRef<number>(0);
-  const CACHE_DURATION = 30000; // 30 seconds cache
+  const authCheckInProgress = useRef(false);
+  const authCheckQueue = useRef<Promise<void> | null>(null);
+  const CACHE_DURATION = 120000; // 2 minutes cache - reduced frequency of checks
+  const tokenRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    const getAuthData = async () => {
-      setIsLoading(true);
-
-      // Throttle API calls to prevent excessive requests
-      const now = Date.now();
-      if (now - lastCheckRef.current < CACHE_DURATION && authData) {
-        setIsLoading(false);
-        return;
+  const getAuthData = useCallback(async (): Promise<void> => {
+    // Use queuing system to prevent race conditions while allowing proper waiting
+    if (authCheckInProgress.current) {
+      console.log('useAuthToken - Auth check in progress, waiting for completion...');
+      if (authCheckQueue.current) {
+        await authCheckQueue.current;
       }
-      lastCheckRef.current = now;
+      return;
+    }
 
-      console.log('useAuthToken - getAuthData called');
-      console.log('useAuthToken - Clerk userId:', userId);
+    // Wait for Clerk to load before checking authentication
+    if (!isLoaded) {
+      console.log('useAuthToken - Clerk not loaded yet, waiting...');
+      return;
+    }
 
-      // Check for Clerk authentication first
-      if (userId) {
-        console.log('useAuthToken - Found Clerk userId, getting token...');
-        try {
-          const token = await getToken();
-          if (token) {
-            setAuthData({
-              token,
-              tokenType: 'clerk',
-              userId
-            });
-            setIsLoading(false);
-            return;
-          }
-        } catch (error) {
-          console.error('Clerk token error:', error);
-        }
-      } else {
-        console.log('useAuthToken - No Clerk userId, checking JWT cookie');
-      }
+    authCheckInProgress.current = true;
+    setIsLoading(true);
 
-      // Check for JWT authentication via API (homestay users)
-      console.log('useAuthToken - Checking JWT via API...');
-
-      // Note: auth_token cookie is HttpOnly, so we can't check it client-side
-      // We need to make the API call to verify authentication
+    const authCheckPromise = (async () => {
       try {
-        const response = await fetch('/api/auth/me', {
-          credentials: 'include' // Include cookies
+        console.log('useAuthToken - getAuthData called');
+        console.log('useAuthToken - Clerk state:', { 
+          userId, 
+          isLoaded, 
+          isSignedIn,
+          hasUserId: !!userId 
         });
 
-        console.log('useAuthToken - API response status:', response.status);
+        let newAuthData: typeof authData = null;
 
-        if (response.ok) {
-          const authInfo = await response.json();
-          console.log('useAuthToken - API response data:', authInfo);
+        // Check for Clerk authentication first (prioritize active session)
+        if (isSignedIn && userId) {
+          console.log('useAuthToken - User is signed in with Clerk, getting token...');
+          try {
+            const token = await getToken();
+            console.log('useAuthToken - Clerk token received:', !!token);
+            
+            if (token) {
+              newAuthData = {
+                token,
+                tokenType: 'clerk' as const,
+                userId
+              };
+              console.log('useAuthToken - Setting Clerk auth data:', {
+                tokenType: newAuthData.tokenType,
+                userId: newAuthData.userId,
+                hasToken: !!newAuthData.token
+              });
+            } else {
+              console.warn('useAuthToken - Clerk token is null despite being signed in');
+            }
+          } catch (error) {
+            console.error('useAuthToken - Clerk token error:', error);
+          }
+        }
 
-          if (authInfo.authenticated && authInfo.userType === 'homestay') {
-            console.log('useAuthToken - Setting homestay auth data from API:', {
-              tokenType: 'jwt',
-              userId: authInfo.userId
+        // Only check JWT if Clerk auth is not available
+        if (!newAuthData && isLoaded) {
+          console.log('useAuthToken - Checking JWT via API...');
+
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+            const response = await fetch('/api/auth/me', {
+              credentials: 'include',
+              signal: controller.signal,
+              headers: {
+                'Cache-Control': 'no-cache'
+              }
             });
 
-            const newAuthData = {
-              token: 'jwt-from-cookie', // Indicates server should read from cookie
-              tokenType: 'jwt' as const,
-              userId: authInfo.userId as string
-            };
-            console.log('useAuthToken - About to set auth data:', newAuthData);
-            setAuthData(newAuthData);
-            console.log('useAuthToken - Auth data set successfully');
-            setIsLoading(false);
-            return;
-          } else {
-            console.log('useAuthToken - API response not authenticated or not homestay');
+            clearTimeout(timeoutId);
+            console.log('useAuthToken - JWT API response status:', response.status);
+
+            if (response.ok) {
+              const authInfo = await response.json();
+              console.log('useAuthToken - JWT API response data:', authInfo);
+
+              if (authInfo.authenticated && authInfo.userType === 'homestay') {
+                console.log('useAuthToken - Setting homestay auth data from API');
+
+                newAuthData = {
+                  token: 'jwt-from-cookie',
+                  tokenType: 'jwt' as const,
+                  userId: authInfo.userId as string
+                };
+              } else {
+                console.log('useAuthToken - JWT API response not authenticated or not homestay');
+              }
+            } else {
+              console.log('useAuthToken - JWT API response not ok:', response.status);
+            }
+          } catch (error) {
+            if (error instanceof Error && error.name === 'AbortError') {
+              console.error('useAuthToken - JWT Auth API timeout');
+            } else {
+              console.error('useAuthToken - JWT Auth API error:', error);
+            }
           }
+        }
+
+        // Update state with new auth data (or null if no auth found)
+        setAuthData(newAuthData);
+        setIsLoading(false);
+        lastCheckRef.current = Date.now();
+
+        // Set up token refresh for JWT tokens
+        if (newAuthData?.tokenType === 'jwt') {
+          setupTokenRefresh();
         } else {
-          console.log('useAuthToken - API response not ok:', response.status);
+          clearTokenRefresh();
+        }
+
+        if (!newAuthData) {
+          console.log('useAuthToken - No valid authentication found, clearing auth data');
+        }
+
+      } catch (error) {
+        console.error('useAuthToken - Critical error in getAuthData:', error);
+        setAuthData(null);
+        setIsLoading(false);
+        lastCheckRef.current = Date.now();
+      }
+    })();
+
+    authCheckQueue.current = authCheckPromise;
+    
+    try {
+      await authCheckPromise;
+    } finally {
+      authCheckInProgress.current = false;
+      authCheckQueue.current = null;
+    }
+  }, [userId, getToken, isLoaded, isSignedIn]);
+
+  // Token refresh setup for JWT tokens
+  const setupTokenRefresh = useCallback(() => {
+    clearTokenRefresh();
+    
+    // Refresh JWT token every 50 minutes (assuming 1 hour expiry)
+    tokenRefreshIntervalRef.current = setInterval(async () => {
+      try {
+        console.log('useAuthToken - Refreshing JWT token...');
+        const response = await fetch('/api/auth/me', {
+          credentials: 'include',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        
+        if (!response.ok) {
+          console.log('useAuthToken - JWT token refresh failed, clearing auth data');
+          setAuthData(null);
+          clearTokenRefresh();
         }
       } catch (error) {
-        console.error('useAuthToken - Auth API error:', error);
+        console.error('useAuthToken - JWT token refresh error:', error);
+        setAuthData(null);
+        clearTokenRefresh();
       }
+    }, 50 * 60 * 1000); // 50 minutes
+  }, []);
 
-      // No valid auth found; clear state
-      setAuthData(null);
+  const clearTokenRefresh = useCallback(() => {
+    if (tokenRefreshIntervalRef.current) {
+      clearInterval(tokenRefreshIntervalRef.current);
+      tokenRefreshIntervalRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    // Don't run if Clerk is not loaded yet, but be more patient
+    if (!isLoaded) {
+      console.log('useAuthToken - Waiting for Clerk to load...');
+      setIsLoading(true);
+      return;
+    }
+
+    // Throttle auth checks but allow immediate check after sign in/out events
+    const now = Date.now();
+    const timeSinceLastCheck = now - lastCheckRef.current;
+    
+    // More aggressive conditions for auth checking
+    const shouldCheck = !authData || 
+                       timeSinceLastCheck > CACHE_DURATION || 
+                       !lastCheckRef.current ||
+                       // Force check if Clerk state changes
+                       (isSignedIn && userId && authData?.tokenType !== 'clerk') ||
+                       (!isSignedIn && authData?.tokenType === 'clerk') ||
+                       // Also check if we have inconsistent state
+                       (isSignedIn && userId && !authData) ||
+                       (authData?.tokenType === 'clerk' && (!isSignedIn || !userId));
+    
+    if (shouldCheck) {
+      console.log('useAuthToken - Triggering auth check:', {
+        hasAuthData: !!authData,
+        timeSinceLastCheck,
+        isInitialCheck: !lastCheckRef.current,
+        clerkStateChanged: (isSignedIn && userId && authData?.tokenType !== 'clerk') || 
+                          (!isSignedIn && authData?.tokenType === 'clerk'),
+        clerkState: { isSignedIn, userId },
+        authDataState: { tokenType: authData?.tokenType, userId: authData?.userId }
+      });
+      getAuthData();
+    } else {
+      console.log('useAuthToken - Using cached auth data:', {
+        timeSinceLastCheck,
+        cacheDuration: CACHE_DURATION,
+        authData: !!authData
+      });
       setIsLoading(false);
-    };
+    }
+  }, [isLoaded, userId, isSignedIn, authData?.tokenType, getAuthData]);
 
-    getAuthData();
-  }, [userId, getToken]);
+  // Handle sign-out events and clear token refresh
+  useEffect(() => {
+    if (isLoaded && !isSignedIn && authData?.tokenType === 'clerk') {
+      console.log('useAuthToken - User signed out, clearing Clerk auth data');
+      setAuthData(null);
+      lastCheckRef.current = 0; // Reset cache
+      clearTokenRefresh(); // Clear any token refresh intervals
+    }
+  }, [isLoaded, isSignedIn, authData?.tokenType, clearTokenRefresh]);
+
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      clearTokenRefresh();
+    };
+  }, [clearTokenRefresh]);
+
+  console.log('useAuthToken - Current state:', {
+    authData: !!authData,
+    authDataType: authData?.tokenType,
+    authDataUserId: authData?.userId,
+    isLoading,
+    clerkIsLoaded: isLoaded,
+    clerkIsSignedIn: isSignedIn,
+    clerkUserId: userId
+  });
 
   return authData;
 }

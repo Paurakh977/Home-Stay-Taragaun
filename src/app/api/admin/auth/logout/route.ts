@@ -8,12 +8,15 @@ export async function POST(request: NextRequest) {
       message: 'Logout successful'
     });
     
-    // Clear the auth cookie by setting expiry to past date
+    // Clear the auth cookie by setting expiry to past date with proper security attributes
     response.cookies.set({
       name: 'auth_token',
       value: '',
       expires: new Date(0),
       path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
     });
     
     return response;

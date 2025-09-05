@@ -1,77 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import { Chat, HomestaySingle, Message, type IChat } from '@/lib/models';
-import { auth } from '@clerk/nextjs/server';
 import { createClerkClient } from '@clerk/backend';
-import { jwtVerify } from 'jose';
 import { v4 as uuidv4 } from 'uuid';
 import { REDIS_CHANNELS, initializeRedis, safeRedisPublish } from '@/lib/redis';
+import { getUserFromRequest, verifyUserChatAccess } from '@/lib/api-auth';
 
-// JWT verification for homestay users
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_for_development';
-const ENCODED_JWT_SECRET = new TextEncoder().encode(JWT_SECRET);
 
-async function getUserFromRequest(request: NextRequest) {
-  // Check for Authorization header first (for client-side requests)
-  const authHeader = request.headers.get('authorization');
-
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7);
-
-    try {
-      // Try to verify as Clerk token
-      const clerk = createClerkClient({
-        secretKey: process.env.CLERK_SECRET_KEY!,
-        publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!,
-      });
-
-      const { toAuth } = await clerk.authenticateRequest(request);
-      const authData = toAuth();
-      if (authData && authData.userId) {
-        return { userId: authData.userId, userType: 'clerk' as const };
-      }
-    } catch (error) {
-      console.log('Clerk token verification failed, trying JWT...');
-
-      // Try to verify as JWT token
-      try {
-        const { payload } = await jwtVerify(token, ENCODED_JWT_SECRET);
-        const homestayId = (payload as any).homestayId;
-        if (homestayId) {
-          return { userId: homestayId, userType: 'homestay' as const };
-        }
-      } catch (jwtError) {
-        console.log('JWT token verification also failed');
-      }
-    }
-  }
-
-  // Fallback to server-side auth (for server-side requests)
-  try {
-    const { userId } = await auth();
-    if (userId) {
-      return { userId, userType: 'clerk' as const };
-    }
-  } catch (error) {
-    // Clerk auth failed, continue to JWT check
-  }
-
-  // Check for JWT token in cookies (homestay/admin users)
-  const authToken = request.cookies.get('auth_token')?.value;
-  if (authToken) {
-    try {
-      const { payload } = await jwtVerify(authToken, ENCODED_JWT_SECRET);
-      const homestayId = (payload as any).homestayId;
-      if (homestayId) {
-        return { userId: homestayId, userType: 'homestay' as const };
-      }
-    } catch (error) {
-      // JWT verification failed
-    }
-  }
-
-  return null;
-}
 
 // Cache for user data to reduce API calls
 const userDataCache = new Map<string, { data: any; timestamp: number }>();
@@ -171,19 +106,7 @@ async function calculateUnreadCount(chatId: string, userId: string, userType: 'c
   }
 }
 
-// Verify user authorization for chat access
-async function verifyUserChatAccess(user: { userId: string; userType: 'clerk' | 'homestay' }, chatId?: string) {
-  if (!chatId) return true; // For creating new chats
 
-  const chat = await Chat.findOne({
-    chatId,
-    'participants.userId': user.userId,
-    'participants.userType': user.userType,
-    isActive: true
-  });
-
-  return !!chat;
-}
 
 // GET - Fetch user's conversations
 export async function GET(request: NextRequest) {
@@ -391,7 +314,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Verify user has access to this chat
-    const hasAccess = await verifyUserChatAccess(user, chatId);
+    const hasAccess = await verifyUserChatAccess(user, chatId, Chat);
     if (!hasAccess) {
       return NextResponse.json({ error: 'Forbidden: No access to this chat' }, { status: 403 });
     }

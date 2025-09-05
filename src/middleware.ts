@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { jwtVerify, type JWTPayload } from 'jose';
 import { clerkMiddleware } from "@clerk/nextjs/server";
+import { createClerkClient } from '@clerk/backend';
 
 // Extended JWT payload interface with our custom properties
 interface ExtendedJWTPayload extends JWTPayload {
@@ -166,36 +167,114 @@ async function middlewareHandler(auth: any, request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 4.5. Handle Clerk protected API paths (with JWT fallback for bookings)
+  // 4.5. Handle Clerk protected API paths (with JWT fallback for bookings and chat)
   if (CLERK_PROTECTED_API_PATHS.some(path => pathname.startsWith(path))) {
-    const { userId } = await auth();
+    console.log(`🔐 Middleware - Checking auth for protected path: ${pathname}`);
+    
+    let authenticated = false;
+    let authMethod = '';
 
-    // If Clerk auth succeeds, allow access
-    if (userId) {
-      return NextResponse.next();
+    // First try Clerk authentication
+    try {
+      const { userId } = await auth();
+      console.log(`🔐 Middleware - Clerk auth result: ${userId ? 'authenticated' : 'not authenticated'}`);
+
+      if (userId) {
+        console.log(`✅ Middleware - Clerk auth successful for user ${userId} on ${pathname}`);
+        authenticated = true;
+        authMethod = 'clerk';
+      }
+    } catch (clerkError) {
+      console.log(`🔐 Middleware - Clerk auth error for ${pathname}:`, clerkError instanceof Error ? clerkError.message : clerkError);
     }
 
-    // For booking and chat APIs, also check JWT authentication (homestay users)
-    if (pathname.startsWith('/api/bookings') || pathname.startsWith('/api/chat')) {
+    // For booking, chat, and socket APIs, also check JWT authentication (homestay users)
+    if (!authenticated && (pathname.startsWith('/api/bookings') || pathname.startsWith('/api/chat') || pathname.startsWith('/api/socket'))) {
+      console.log(`🔐 Middleware - Checking JWT fallback for ${pathname}`);
       const authToken = request.cookies.get('auth_token')?.value;
+      console.log(`🔐 Middleware - JWT token present: ${!!authToken}`);
+      
       if (authToken) {
         try {
           const { payload } = await jwtVerify(authToken, ENCODED_JWT_SECRET);
           const homestayId = (payload as any).homestayId;
-          if (homestayId) {
-            // JWT authentication successful for homestay user
+          const exp = payload.exp;
+          
+          // Check token expiration
+          if (exp && Date.now() >= exp * 1000) {
+            console.log(`❌ Middleware - JWT token expired for ${pathname}`);
+          } else if (homestayId) {
             console.log(`✅ Middleware - JWT auth successful for homestay ${homestayId} on ${pathname}`);
-            return NextResponse.next();
+            authenticated = true;
+            authMethod = 'jwt';
           }
         } catch (error) {
-          console.log(`❌ Middleware - JWT verification failed for ${pathname}:`, error);
-          // JWT verification failed, continue to return 401
+          console.log(`❌ Middleware - JWT verification failed for ${pathname}:`, error instanceof Error ? error.message : error);
         }
       } else {
         console.log(`❌ Middleware - No auth_token cookie found for ${pathname}`);
       }
     }
 
+    // Check Bearer token in Authorization header as additional fallback
+    if (!authenticated) {
+      const authHeader = request.headers.get('authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        console.log(`🔐 Middleware - Checking Bearer token for ${pathname}`);
+        
+        try {
+          // First try Clerk token verification (for Clerk Bearer tokens)
+          const clerk = createClerkClient({
+            secretKey: process.env.CLERK_SECRET_KEY!,
+            publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!,
+          });
+
+          // Create a minimal request with the Bearer token
+          const testRequest = new Request(`${request.nextUrl.origin}/test`, {
+            headers: {
+              'Authorization': authHeader,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          const { toAuth } = await clerk.authenticateRequest(testRequest);
+          const authData = toAuth();
+          
+          if (authData && authData.userId) {
+            console.log(`✅ Middleware - Clerk Bearer auth successful for user ${authData.userId} on ${pathname}`);
+            authenticated = true;
+            authMethod = 'clerk-bearer';
+          }
+        } catch (clerkError) {
+          console.log(`🔐 Middleware - Not a Clerk token, trying JWT: ${clerkError instanceof Error ? clerkError.message : clerkError}`);
+          
+          // If Clerk verification fails, try JWT verification (for homestay Bearer tokens)
+          try {
+            const { payload } = await jwtVerify(token, ENCODED_JWT_SECRET);
+            const homestayId = (payload as any).homestayId;
+            const exp = payload.exp;
+            
+            if (exp && Date.now() >= exp * 1000) {
+              console.log(`❌ Middleware - Bearer JWT token expired for ${pathname}`);
+            } else if (homestayId) {
+              console.log(`✅ Middleware - Bearer JWT auth successful for homestay ${homestayId} on ${pathname}`);
+              authenticated = true;
+              authMethod = 'bearer-jwt';
+            }
+          } catch (jwtError) {
+            console.log(`❌ Middleware - Bearer JWT verification failed for ${pathname}:`, jwtError instanceof Error ? jwtError.message : jwtError);
+          }
+        }
+      }
+    }
+
+    if (authenticated) {
+      console.log(`✅ Middleware - Authentication successful via ${authMethod} for ${pathname}`);
+      return NextResponse.next();
+    }
+
+    console.log(`❌ Middleware - Authentication failed for ${pathname}`);
     return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
   }
 

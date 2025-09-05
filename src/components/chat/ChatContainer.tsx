@@ -40,7 +40,7 @@ const convertMessagesToChatMessages = (messages: MessageData[]): Message[] => {
   return messages.map(msg => ({
     id: msg.messageId,
     sender: msg.isSelf ? 'You' : (msg.senderName || 'Unknown User'),
-    senderAvatar: msg.senderAvatar,
+    senderAvatar: msg.senderAvatar || undefined,
     content: msg.content,
     timestamp: msg.timestamp,
     isSelf: msg.isSelf || false,

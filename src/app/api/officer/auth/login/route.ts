@@ -260,12 +260,14 @@ export async function POST(request: NextRequest) {
       }
     });
     
-    // Set the officer auth token cookie
+    // Set the officer auth token cookie with proper security attributes
     response.cookies.set({
       name: 'officer_token',
       value: token,
       httpOnly: true,
       path: '/',
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 7 days
     });
     

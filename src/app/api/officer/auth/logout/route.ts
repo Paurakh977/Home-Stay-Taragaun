@@ -18,12 +18,14 @@ export async function POST(request: NextRequest) {
       { success: true, message: 'Logged out successfully' }
     );
     
-    // Clear the officer token cookie
+    // Clear the officer token cookie with proper security attributes
     response.cookies.set({
       name: 'officer_token',
       value: '',
       httpOnly: true,
       path: '/',
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
       maxAge: 0, // Expire immediately
     });
     
@@ -35,6 +37,8 @@ export async function POST(request: NextRequest) {
         value: '',
         httpOnly: true,
         path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
         maxAge: 0,
       });
     }
