@@ -119,30 +119,29 @@ export default function AIChatBubble({ adminUsername }: AIChatBubbleProps) {
 
   // Send message to ADK server
 
-
 const sendToADKServer = async (mimeType: string, data: string) => {
   try {
     setIsLoading(true);
     
-    const payload: any = {
-      mime_type: mimeType,
+    const payload = {
+      mime_type: mimeType,  
       data: data,
-      user_id: USER_ID,
-      adminUsername: adminUsername || undefined // Always include adminUsername if available
+      user_id: USER_ID,     
+      adminUsername: adminUsername || undefined  
     };
 
-    // Always use the internal API route - this avoids mixed content issues
     const response = await fetch('/api/adk/send', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      credentials: 'include', // include cookies for auth_token
+      credentials: 'include',
       body: JSON.stringify(payload)
     });
 
     if (!response.ok) {
-      throw new Error(`Server responded with status: ${response.status}`);
+      const errorData = await response.json();
+      throw new Error(`Server responded with status: ${response.status} - ${errorData.error || 'Unknown error'}`);
     }
 
     const result = await response.json();

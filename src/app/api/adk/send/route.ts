@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 
     // If adminUsername is provided, try to get the admin's token
     if (adminUsername) {
-      // Try different possible formats of admin tokens (matching change-password route logic)
+      // Try different possible formats of admin tokens
       const possibleTokenNames = [
         `${adminUsername}_auth_token`,
         `auth_token_${adminUsername}`,
@@ -57,27 +57,27 @@ export async function POST(request: NextRequest) {
           }
         } catch (error) {
           console.error('Error verifying admin token:', error);
-          // Continue without auth for now, as stated by user that auth is not always required
+          // Continue without auth for now
         }
       }
-    }
-
-    // Prepare payload for ADK server
-    const adkPayload: any = {
-      mime_type,
-      data
-    };
-
-    // Add admin context if available
-    if (token && extractedAdminUsername) {
-      adkPayload.auth_token = token;
-      adkPayload.admin_username = extractedAdminUsername;
     }
 
     // Use provided user_id or generate a random one
     const finalUserId = user_id || Math.floor(Math.random() * 1000) + 1;
 
-    // Forward request to ADK server
+    // Prepare payload for ADK server (with correct field names)
+    const adkPayload: any = {
+      mime_type,
+      data
+    };
+
+    // Add admin context if available (convert to snake_case)
+    if (token && extractedAdminUsername) {
+      adkPayload.auth_token = token;
+      adkPayload.admin_username = extractedAdminUsername;  // Changed from adminUsername to admin_username
+    }
+
+    // Forward request to ADK server with user_id in URL path
     const adkResponse = await fetch(`${ADK_API_BASE}/send/${finalUserId}`, {
       method: 'POST',
       headers: {
@@ -87,6 +87,8 @@ export async function POST(request: NextRequest) {
     });
 
     if (!adkResponse.ok) {
+      const errorText = await adkResponse.text();
+      console.error(`ADK server error (${adkResponse.status}):`, errorText);
       throw new Error(`ADK server responded with status: ${adkResponse.status}`);
     }
 
