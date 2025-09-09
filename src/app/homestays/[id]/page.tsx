@@ -492,20 +492,41 @@ export default function HomestayDetailPage() {
       images.push({ src: profileImgSrc, alt: data.homeStayName || 'Homestay Profile Image' });
     }
     
-    // If still no images, use high-quality fallback images
+    // If still no images, create SVG placeholders
     if (images.length === 0) {
-      console.log("PrepareGalleryImages - No images found, using default placeholder images");
+      console.log("PrepareGalleryImages - No images found, using SVG placeholders");
       images = [
-        { src: '/images/homestay-placeholder-1.jpg', alt: 'Homestay' },
-        { src: '/images/homestay-placeholder-2.jpg', alt: 'Homestay' },
-        { src: '/images/homestay-placeholder-3.jpg', alt: 'Homestay' },
-        { src: '/images/destinations/kathmandu.jpg', alt: 'Kathmandu Valley' },
-        { src: '/images/destinations/pokhara.jpg', alt: 'Pokhara' },
-        { src: '/images/destinations/chitwan.jpg', alt: 'Chitwan National Park' }
+        { src: 'data:image/svg+xml;base64,' + btoa(`
+          <svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#f3f4f6"/>
+            <g transform="translate(200,150)">
+              <rect x="-40" y="-30" width="80" height="60" fill="#e5e7eb" rx="4"/>
+              <rect x="-30" y="-20" width="60" height="40" fill="#d1d5db" rx="2"/>
+              <rect x="-20" y="-10" width="40" height="20" fill="#9ca3af" rx="1"/>
+              <circle cx="-10" cy="5" r="2" fill="#6b7280"/>
+              <circle cx="10" cy="5" r="2" fill="#6b7280"/>
+              <rect x="-5" y="10" width="10" height="8" fill="#6b7280" rx="1"/>
+            </g>
+            <text x="200" y="200" text-anchor="middle" fill="#6b7280" font-family="Arial, sans-serif" font-size="14">No Image Available</text>
+          </svg>
+        `), alt: 'Homestay Placeholder' },
+        { src: 'data:image/svg+xml;base64,' + btoa(`
+          <svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#f3f4f6"/>
+            <g transform="translate(200,150)">
+              <circle cx="0" cy="-20" r="30" fill="#e5e7eb"/>
+              <rect x="-25" y="10" width="50" height="30" fill="#d1d5db" rx="4"/>
+              <rect x="-15" y="20" width="30" height="15" fill="#9ca3af" rx="2"/>
+              <circle cx="-8" cy="27" r="2" fill="#6b7280"/>
+              <circle cx="8" cy="27" r="2" fill="#6b7280"/>
+            </g>
+            <text x="200" y="200" text-anchor="middle" fill="#6b7280" font-family="Arial, sans-serif" font-size="14">Gallery Image</text>
+          </svg>
+        `), alt: 'Gallery Placeholder' }
       ];
       
-      // Log that we're using default images
-      console.log("Using default gallery images for homestay:", data.homeStayName);
+      // Log that we're using SVG placeholders
+      console.log("Using SVG placeholders for homestay:", data.homeStayName);
     }
     
     console.log("PrepareGalleryImages - Final image count:", images.length);
@@ -698,6 +719,23 @@ export default function HomestayDetailPage() {
                         height={48}
                         className="object-cover"
                         unoptimized={true}
+                        onError={(e) => {
+                          console.warn(`Failed to load testimonial image: ${testimonial.photoPath}`);
+                          // Replace with SVG placeholder
+                          const target = e.currentTarget;
+                          target.src = 'data:image/svg+xml;base64,' + btoa(`
+                            <svg width="48" height="48" xmlns="http://www.w3.org/2000/svg">
+                              <rect width="100%" height="100%" fill="#f3f4f6"/>
+                              <g transform="translate(24,24)">
+                                <circle cx="0" cy="-6" r="8" fill="#e5e7eb"/>
+                                <rect x="-6" y="4" width="12" height="10" fill="#d1d5db" rx="1"/>
+                                <circle cx="-3" cy="8" r="1" fill="#9ca3af"/>
+                                <circle cx="3" cy="8" r="1" fill="#9ca3af"/>
+                                <rect x="-1.5" y="10" width="3" height="2" fill="#6b7280" rx="0.5"/>
+                              </g>
+                            </svg>
+                          `);
+                        }}
                       />
                     </div>
                     <div>
@@ -750,6 +788,25 @@ export default function HomestayDetailPage() {
                 priority={index === 0}
                 sizes="100vw"
                 unoptimized={true}
+                onError={(e) => {
+                  console.warn(`Failed to load gallery image: ${image.src}`);
+                  // Replace with SVG placeholder
+                  const target = e.currentTarget;
+                  target.src = 'data:image/svg+xml;base64,' + btoa(`
+                    <svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+                      <rect width="100%" height="100%" fill="#f3f4f6"/>
+                      <g transform="translate(200,150)">
+                        <rect x="-40" y="-30" width="80" height="60" fill="#e5e7eb" rx="4"/>
+                        <rect x="-30" y="-20" width="60" height="40" fill="#d1d5db" rx="2"/>
+                        <rect x="-20" y="-10" width="40" height="20" fill="#9ca3af" rx="1"/>
+                        <circle cx="-10" cy="5" r="2" fill="#6b7280"/>
+                        <circle cx="10" cy="5" r="2" fill="#6b7280"/>
+                        <rect x="-5" y="10" width="10" height="8" fill="#6b7280" rx="1"/>
+                      </g>
+                      <text x="200" y="200" text-anchor="middle" fill="#6b7280" font-family="Arial, sans-serif" font-size="14">Image Unavailable</text>
+                    </svg>
+                  `);
+                }}
               />
             </div>
           ))}
@@ -798,17 +855,38 @@ export default function HomestayDetailPage() {
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pt-20 pb-8 px-4 md:px-6 z-10">
             <div className="container mx-auto">
               <div className="flex items-center">
-                {homestay.profileImage && (
-                  <div className="relative h-16 w-16 md:h-20 md:w-20 rounded-full overflow-hidden border-2 border-white mr-4 bg-white">
+                <div className="relative h-16 w-16 md:h-20 md:w-20 rounded-full overflow-hidden border-2 border-white mr-4 bg-white">
+                  {homestay.profileImage ? (
                     <Image
                       src={getImageUrl(homestay.profileImage)}
                       alt={homestay.homeStayName}
                       fill
                       className="object-cover"
                       unoptimized={true}
+                      onError={(e) => {
+                        console.warn(`Failed to load profile image: ${homestay.profileImage}`);
+                        // Replace with SVG placeholder
+                        const target = e.currentTarget;
+                        target.src = 'data:image/svg+xml;base64,' + btoa(`
+                          <svg width="80" height="80" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="100%" height="100%" fill="#f3f4f6"/>
+                            <g transform="translate(40,40)">
+                              <circle cx="0" cy="-10" r="15" fill="#e5e7eb"/>
+                              <rect x="-12" y="8" width="24" height="20" fill="#d1d5db" rx="2"/>
+                              <circle cx="-6" cy="15" r="2" fill="#9ca3af"/>
+                              <circle cx="6" cy="15" r="2" fill="#9ca3af"/>
+                              <rect x="-3" y="20" width="6" height="4" fill="#6b7280" rx="1"/>
+                            </g>
+                          </svg>
+                        `);
+                      }}
                     />
-                  </div>
-                )}
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                      <Home size={24} className="text-gray-400" />
+                    </div>
+                  )}
+                </div>
                 <div>
                   <h1 className="text-2xl md:text-3xl font-bold text-white">{homestay.homeStayName}</h1>
                   {homestay.pageContent?.heroSection?.slogan && (
@@ -943,6 +1021,25 @@ export default function HomestayDetailPage() {
                       className="object-cover hover:scale-105 transition-transform duration-300 cursor-pointer"
                       onClick={() => { setCurrentImageIndex(index); setShowGallery(true); }}
                       unoptimized={true}
+                      onError={(e) => {
+                        console.warn(`Failed to load gallery image: ${image.src}`);
+                        // Replace with SVG placeholder
+                        const target = e.currentTarget;
+                        target.src = 'data:image/svg+xml;base64,' + btoa(`
+                          <svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="100%" height="100%" fill="#f3f4f6"/>
+                            <g transform="translate(200,150)">
+                              <rect x="-40" y="-30" width="80" height="60" fill="#e5e7eb" rx="4"/>
+                              <rect x="-30" y="-20" width="60" height="40" fill="#d1d5db" rx="2"/>
+                              <rect x="-20" y="-10" width="40" height="20" fill="#9ca3af" rx="1"/>
+                              <circle cx="-10" cy="5" r="2" fill="#6b7280"/>
+                              <circle cx="10" cy="5" r="2" fill="#6b7280"/>
+                              <rect x="-5" y="10" width="10" height="8" fill="#6b7280" rx="1"/>
+                            </g>
+                            <text x="200" y="200" text-anchor="middle" fill="#6b7280" font-family="Arial, sans-serif" font-size="14">Image Unavailable</text>
+                          </svg>
+                        `);
+                      }}
                     />
                     {index === 5 && galleryImages.length > 6 && (
                       <div 
@@ -1324,6 +1421,25 @@ export default function HomestayDetailPage() {
               height={800}
               className="object-contain max-h-[90vh]"
               unoptimized={true}
+              onError={(e) => {
+                console.warn(`Failed to load fullscreen gallery image: ${galleryImages[currentImageIndex].src}`);
+                // Replace with SVG placeholder
+                const target = e.currentTarget;
+                target.src = 'data:image/svg+xml;base64,' + btoa(`
+                  <svg width="1200" height="800" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="100%" height="100%" fill="#f3f4f6"/>
+                    <g transform="translate(600,400)">
+                      <rect x="-100" y="-75" width="200" height="150" fill="#e5e7eb" rx="8"/>
+                      <rect x="-75" y="-50" width="150" height="100" fill="#d1d5db" rx="4"/>
+                      <rect x="-50" y="-25" width="100" height="50" fill="#9ca3af" rx="2"/>
+                      <circle cx="-25" cy="12" r="5" fill="#6b7280"/>
+                      <circle cx="25" cy="12" r="5" fill="#6b7280"/>
+                      <rect x="-12" y="25" width="24" height="20" fill="#6b7280" rx="2"/>
+                    </g>
+                    <text x="600" y="500" text-anchor="middle" fill="#6b7280" font-family="Arial, sans-serif" font-size="24">Image Unavailable</text>
+                  </svg>
+                `);
+              }}
             />
           </div>
           

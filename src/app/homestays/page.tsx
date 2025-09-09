@@ -69,12 +69,17 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
   
   // State variables
   const [homestays, setHomestays] = useState<HomestayListing[]>([]);
-  const [filteredHomestays, setFilteredHomestays] = useState<HomestayListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [isSuperadmin, setIsSuperadmin] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [itemsPerPage] = useState(12);
   
   // Address data state
   const [addressData, setAddressData] = useState<{
@@ -213,35 +218,43 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
     }
   }, [selectedDistrict, addressData.districtMunicipalitiesMap, selectedMunicipality]);
   
-  // Fetch homestays
-  useEffect(() => {
-    async function fetchHomestays() {
-      try {
-        setLoading(true);
-        console.log("Fetching homestays from API...");
-        
-        // Build the API URL with adminContext if provided
-        let apiUrl = "/api/homestays?limit=100";
-        if (adminContext) {
-          apiUrl += `&adminUsername=${adminContext}`;
-        }
-        
-        const response = await fetch(apiUrl);
-        
-        if (!response.ok) {
-          console.error("API response not OK:", response.status, response.statusText);
-          throw new Error("Failed to fetch homestays");
-        }
-        
-        const data = await response.json();
-        console.log("API response data:", data);
-        console.log("Number of homestays returned:", data.data?.length || 0);
-        
-        // Set homestays from API data (empty array if no data)
-        setHomestays(data.data || []);
-        setFilteredHomestays(data.data || []);
-        
-        // Extract all unique facilities for filter options
+  // Fetch homestays with pagination and filters
+  const fetchHomestays = useCallback(async (page: number = 1, filters: any = {}) => {
+    try {
+      setLoading(true);
+      console.log("Fetching homestays from API...", { page, filters });
+      
+      // Build query parameters
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: itemsPerPage.toString(),
+        ...(filters.searchQuery && { q: filters.searchQuery }),
+        ...(filters.selectedProvince && { province: filters.selectedProvince }),
+        ...(filters.selectedDistrict && { district: filters.selectedDistrict }),
+        ...(filters.selectedMunicipality && { municipality: filters.selectedMunicipality }),
+        ...(filters.selectedType && { homeStayType: filters.selectedType }),
+        ...(adminContext && { adminUsername: adminContext })
+      });
+      
+      const response = await fetch(`/api/homestays?${params}`);
+      
+      if (!response.ok) {
+        console.error("API response not OK:", response.status, response.statusText);
+        throw new Error("Failed to fetch homestays");
+      }
+      
+      const data = await response.json();
+      console.log("API response data:", data);
+      console.log("Number of homestays returned:", data.data?.length || 0);
+      
+      // Set homestays from API data
+      setHomestays(data.data || []);
+      setTotalPages(data.pagination?.totalPages || 1);
+      setTotalCount(data.pagination?.totalCount || 0);
+      setCurrentPage(page);
+      
+      // Extract all unique facilities for filter options (only on first load)
+      if (page === 1) {
         const allLocalAttractions = new Set<string>();
         const allTourismServices = new Set<string>();
         const allInfrastructure = new Set<string>();
@@ -254,8 +267,6 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
               homestay.features.infrastructure?.forEach(item => allInfrastructure.add(item));
             }
           });
-        } else {
-          console.warn("No homestays found or empty data returned");
         }
         
         setAllFacilities({
@@ -263,76 +274,57 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
           tourismServices: Array.from(allTourismServices),
           infrastructure: Array.from(allInfrastructure)
         });
-        
-        setLoading(false);
-      } catch (err) {
-        console.error("Error fetching homestays:", err);
-        setError("Could not load homestays. Please try again later.");
-        setLoading(false);
-        
-        // Set empty arrays on error
-        setHomestays([]);
-        setFilteredHomestays([]);
-        setAllFacilities({
-          localAttractions: [],
-          tourismServices: [],
-          infrastructure: []
-        });
       }
+      
+      setLoading(false);
+    } catch (err) {
+      console.error("Error fetching homestays:", err);
+      setError("Could not load homestays. Please try again later.");
+      setLoading(false);
+      
+      // Set empty arrays on error
+      setHomestays([]);
+      setTotalPages(1);
+      setTotalCount(0);
+      setAllFacilities({
+        localAttractions: [],
+        tourismServices: [],
+        infrastructure: []
+      });
     }
-    
-    fetchHomestays();
-  }, [adminContext]);
-  
-  // Apply filters and search
+  }, [adminContext, itemsPerPage]);
+
+  // Initial fetch
   useEffect(() => {
-    let results = [...homestays];
+    fetchHomestays(1, {
+      searchQuery,
+      selectedProvince,
+      selectedDistrict,
+      selectedMunicipality,
+      selectedType,
+      selectedFacilities
+    });
+  }, [adminContext, fetchHomestays]);
+  
+  // Trigger API call when filters change
+  useEffect(() => {
+    // Reset to first page when filters change
+    setCurrentPage(1);
     
-    // Apply text search
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      results = results.filter(homestay =>
-        homestay.homeStayName.toLowerCase().includes(query) ||
-        homestay.villageName.toLowerCase().includes(query) ||
-        (homestay.address.formattedAddress && homestay.address.formattedAddress.toLowerCase().includes(query)) ||
-        (homestay.description && homestay.description.toLowerCase().includes(query))
-      );
-    }
+    // Debounce the search query to avoid too many API calls
+    const timeoutId = setTimeout(() => {
+      fetchHomestays(1, {
+        searchQuery,
+        selectedProvince,
+        selectedDistrict,
+        selectedMunicipality,
+        selectedType,
+        selectedFacilities
+      });
+    }, searchQuery ? 500 : 0); // 500ms delay for search, immediate for other filters
     
-    // Apply province filter
-    if (selectedProvince) {
-      results = results.filter(homestay => homestay.address.province === selectedProvince);
-    }
-    
-    // Apply district filter
-    if (selectedDistrict) {
-      results = results.filter(homestay => homestay.address.district === selectedDistrict);
-    }
-    
-    // Apply municipality filter
-    if (selectedMunicipality) {
-      results = results.filter(homestay => homestay.address.municipality === selectedMunicipality);
-    }
-    
-    // Apply homestay type filter
-    if (selectedType) {
-      results = results.filter(homestay => homestay.homeStayType === selectedType);
-    }
-    
-    // Apply facility filters
-    for (const category of facilityCategories) {
-      const key = category.key as keyof typeof selectedFacilities;
-      if (selectedFacilities[key].length > 0) {
-        results = results.filter(homestay =>
-          selectedFacilities[key].every(facility => 
-            homestay.features?.[key]?.some(f => f.toLowerCase().includes(facility.toLowerCase()))
-          )
-        );
-      }
-    }
-    
-    setFilteredHomestays(results);
-  }, [homestays, searchQuery, selectedProvince, selectedDistrict, selectedMunicipality, selectedType, selectedFacilities]);
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, selectedProvince, selectedDistrict, selectedMunicipality, selectedType, selectedFacilities, fetchHomestays]);
   
   // Handle facility selection
   const toggleFacility = (category: keyof typeof selectedFacilities, facility: string) => {
@@ -358,6 +350,20 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
       localAttractions: [],
       tourismServices: [],
       infrastructure: []
+    });
+    setCurrentPage(1);
+  };
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    fetchHomestays(page, {
+      searchQuery,
+      selectedProvince,
+      selectedDistrict,
+      selectedMunicipality,
+      selectedType,
+      selectedFacilities
     });
   };
   
@@ -398,11 +404,13 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
   
   // Initialize state from searchParams (Example)
   useEffect(() => {
-    const initialSearch = searchParams.get('q') || "";
-    setSearchQuery(initialSearch);
-    const initialProvince = searchParams.get('province') || "";
-    setSelectedProvince(initialProvince);
-    // ... initialize other filters from searchParams ...
+    if (searchParams) {
+      const initialSearch = searchParams.get('q') || "";
+      setSearchQuery(initialSearch);
+      const initialProvince = searchParams.get('province') || "";
+      setSelectedProvince(initialProvince);
+      // ... initialize other filters from searchParams ...
+    }
   }, [searchParams]);
   
   // Format the image path correctly
@@ -671,11 +679,16 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
         </div>
       </div>
       
-      {/* Results count */}
+      {/* Results count and pagination info */}
       <div className="container mx-auto px-4 pt-6 pb-4">
         <div className="flex justify-between items-center">
           <p className="text-gray-600">
-            {filteredHomestays.length} {filteredHomestays.length === 1 ? 'homestay' : 'homestays'} found
+            {totalCount} {totalCount === 1 ? 'homestay' : 'homestays'} found
+            {totalPages > 1 && (
+              <span className="text-gray-500 ml-2">
+                (Page {currentPage} of {totalPages})
+              </span>
+            )}
           </p>
           
           {/* Could add sorting options here in the future */}
@@ -684,7 +697,12 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
       
       {/* Homestays List */}
       <div className="container mx-auto px-4 pb-16">
-        {filteredHomestays.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-16">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading homestays...</p>
+          </div>
+        ) : homestays.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-lg shadow-sm">
             <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
               <Home size={24} className="text-gray-400" />
@@ -701,8 +719,9 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredHomestays.map((homestay) => (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {homestays.map((homestay) => (
               <div 
                 key={homestay._id} 
                 onClick={() => router.push(`/homestays/${homestay.homestayId}`)}
@@ -839,7 +858,61 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+            
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="mt-12 flex justify-center">
+                <div className="flex items-center space-x-2">
+                  {/* Previous button */}
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  
+                  {/* Page numbers */}
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => handlePageChange(pageNum)}
+                        className={`px-3 py-2 text-sm font-medium rounded-md ${
+                          currentPage === pageNum
+                            ? 'bg-primary text-white'
+                            : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  
+                  {/* Next button */}
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
       
