@@ -235,6 +235,30 @@ export function HomestayContent({ adminContext }: { adminContext?: string }) {
         ...(filters.selectedType && { homeStayType: filters.selectedType }),
         ...(adminContext && { adminUsername: adminContext })
       });
+
+      // Add facility filters
+      if (filters.selectedFacilities) {
+        const { localAttractions, tourismServices, infrastructure } = filters.selectedFacilities;
+        console.log("Selected facilities:", { localAttractions, tourismServices, infrastructure });
+        
+        if (localAttractions && localAttractions.length > 0) {
+          localAttractions.forEach((attraction: string) => {
+            params.append('localAttractions', attraction);
+          });
+        }
+        
+        if (tourismServices && tourismServices.length > 0) {
+          tourismServices.forEach((service: string) => {
+            params.append('tourismServices', service);
+          });
+        }
+        
+        if (infrastructure && infrastructure.length > 0) {
+          infrastructure.forEach((item: string) => {
+            params.append('infrastructure', item);
+          });
+        }
+      }
       
       const response = await fetch(`/api/homestays?${params}`);
       

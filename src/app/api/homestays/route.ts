@@ -166,6 +166,11 @@ export async function GET(req: NextRequest) {
     const adminUsername = searchParams.get("adminUsername");
     const status = searchParams.get("status");
     
+    // Facility filters
+    const localAttractions = searchParams.getAll("localAttractions");
+    const tourismServices = searchParams.getAll("tourismServices");
+    const infrastructure = searchParams.getAll("infrastructure");
+    
     // Build filter
     const filter: any = {};
     
@@ -231,6 +236,39 @@ export async function GET(req: NextRequest) {
         { 'address.formattedAddress.ne': searchRegex }
       ];
     }
+    
+    // Facility filters - use $in to match any of the selected facilities in each category
+    const facilityFilters: any[] = [];
+    
+    if (localAttractions.length > 0) {
+      facilityFilters.push({
+        'features.localAttractions': { $in: localAttractions }
+      });
+    }
+    
+    if (tourismServices.length > 0) {
+      facilityFilters.push({
+        'features.tourismServices': { $in: tourismServices }
+      });
+    }
+    
+    if (infrastructure.length > 0) {
+      facilityFilters.push({
+        'features.infrastructure': { $in: infrastructure }
+      });
+    }
+    
+    // If we have facility filters, add them to the main filter
+    if (facilityFilters.length > 0) {
+      console.log("Applying facility filters:", facilityFilters);
+      if (filter.$and) {
+        filter.$and.push(...facilityFilters);
+      } else {
+        filter.$and = facilityFilters;
+      }
+    }
+    
+    console.log("Final filter object:", JSON.stringify(filter, null, 2));
     
     // Calculate pagination
     const skip = (page - 1) * limit;

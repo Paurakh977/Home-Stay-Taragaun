@@ -139,6 +139,23 @@ export default function HomestayLayout({
                         height={32}
                         className="object-cover w-full h-full object-center"
                         unoptimized={true}
+                        onError={(e) => {
+                          console.warn(`Failed to load profile image in navbar: ${homestay.profileImage}`);
+                          // Replace with SVG placeholder
+                          const target = e.currentTarget;
+                          target.src = 'data:image/svg+xml;base64,' + btoa(`
+                            <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
+                              <rect width="100%" height="100%" fill="#f3f4f6"/>
+                              <g transform="translate(16,16)">
+                                <circle cx="0" cy="-4" r="6" fill="#e5e7eb"/>
+                                <rect x="-4" y="2" width="8" height="6" fill="#d1d5db" rx="1"/>
+                                <circle cx="-2" cy="4" r="1" fill="#9ca3af"/>
+                                <circle cx="2" cy="4" r="1" fill="#9ca3af"/>
+                                <rect x="-1" y="6" width="2" height="1" fill="#6b7280" rx="0.5"/>
+                              </g>
+                            </svg>
+                          `);
+                        }}
                       />
                     </div>
                   ) : (
