@@ -272,25 +272,56 @@ export function TranslateProvider({ children }: { children: React.ReactNode }) {
         const hostname = window.location.hostname;
         const isSecure = window.location.protocol === 'https:';
         
-        // Clear googtrans cookie with multiple domain variations
-        document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-        document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${hostname}`;
-        document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${hostname}`;
-        
-        // For production domains, also clear parent domain cookies
-        if (hostname.includes('.')) {
-          const parts = hostname.split('.');
-          if (parts.length >= 2) {
-            const parentDomain = parts.slice(-2).join('.');
-            document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${parentDomain}`;
-            document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${parentDomain}`;
+        // Function to clear cookies with all possible domain variations
+        const clearCookie = (name: string) => {
+          const cookieOptions = [
+            `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`,
+            `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${hostname}`,
+            `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${hostname}`,
+          ];
+          
+          // For production domains like dev.homesstay.org, also clear parent domain
+          if (hostname.includes('.')) {
+            const parts = hostname.split('.');
+            if (parts.length >= 2) {
+              const parentDomain = parts.slice(-2).join('.');
+              cookieOptions.push(
+                `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${parentDomain}`,
+                `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${parentDomain}`
+              );
+            }
           }
-        }
+          
+          // Add secure versions if HTTPS
+          if (isSecure) {
+            cookieOptions.push(
+              `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${hostname}; secure`,
+              `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${hostname}; secure`
+            );
+            
+            if (hostname.includes('.')) {
+              const parts = hostname.split('.');
+              if (parts.length >= 2) {
+                const parentDomain = parts.slice(-2).join('.');
+                cookieOptions.push(
+                  `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${parentDomain}; secure`,
+                  `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${parentDomain}; secure`
+                );
+              }
+            }
+          }
+          
+          // Apply all cookie clearing options
+          cookieOptions.forEach(option => {
+            document.cookie = option;
+          });
+        };
         
-        if (isSecure) {
-          document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${hostname}; secure`;
-          document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${hostname}; secure`;
-        }
+        // Clear all Google Translate related cookies
+        clearCookie('googtrans');
+        clearCookie('googtrans/');
+        clearCookie('goog-gt-tt');
+        clearCookie('goog-gt-tl');
         
         // Reset translation UI
         document.body.classList.remove('translated-ltr', 'translated-rtl');

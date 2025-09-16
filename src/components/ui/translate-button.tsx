@@ -64,13 +64,13 @@ const TranslateButton = ({
     // Get all possible domain variations with better production handling
     let domains = [hostname];
     if (!isLocalhost && hostname.includes('.')) {
-      // For production domains like devhomestay.sthaniyataha.com
+      // For production domains like dev.homesstay.org
       const parts = hostname.split('.');
       
       // Add the full domain with dot prefix
       domains.push('.' + hostname);
       
-      // Add parent domains (sthaniyataha.com, .sthaniyataha.com)
+      // Add parent domains (homesstay.org, .homesstay.org)
       if (parts.length >= 2) {
         const parentDomain = parts.slice(-2).join('.');
         domains.push(parentDomain);

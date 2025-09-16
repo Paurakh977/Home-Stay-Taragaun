@@ -27,16 +27,16 @@ Format a concise summary based on the data:
 
 ### 3. CREATE CLICKABLE EMBEDDED LINKS:
 For each homestay username in the data, create clickable markdown links:
-- URL Pattern: `http://localhost:3000/homestays/username`
-- Format: `[username](http://localhost:3000/homestays/username)`
+- URL Pattern: `https://dev.homesstay.org/homestays/username`
+- Format: `[username](https://dev.homesstay.org/homestays/username)`
 (YOU'LL GET THE USERNAME FROM THE STATE {filtered_homestays?} JSON)
 ### 4. RESPONSE FORMAT:
 ```
 Your search results for [search_criteria]:
 
-• [homestay1_Name (NAME NOT USERNAME)](http://localhost:3000/homestays/homestay1_username) - [location] ([DONOT DISPLAY OR INCLUDE rating if the rating is not mentioned of empty or 0]Rating: [rating])
-• [homestay2_Name (NAME NOT USERNAME)](http://localhost:3000/homestays/homestay2_username) - [location] ([DONOT DISPLAY OR INCLUDE rating if the rating is not mentioned of empty or 0]Rating: [rating])
-• [homestay3_Name (NAME NOT USERNAME)](http://localhost:3000/homestays/homestay3_username) - [location] ([DONOT DISPLAY OR INCLUDE rating if the rating is not mentioned of empty or 0]Rating: [rating])
+• [homestay1_Name (NAME NOT USERNAME)](https://dev.homesstay.org/homestays/homestay1_username) - [location] ([DONOT DISPLAY OR INCLUDE rating if the rating is not mentioned of empty or 0]Rating: [rating])
+• [homestay2_Name (NAME NOT USERNAME)](https://dev.homesstay.org/homestays/homestay2_username) - [location] ([DONOT DISPLAY OR INCLUDE rating if the rating is not mentioned of empty or 0]Rating: [rating])
+• [homestay3_Name (NAME NOT USERNAME)](https://dev.homesstay.org/homestays/homestay3_username) - [location] ([DONOT DISPLAY OR INCLUDE rating if the rating is not mentioned of empty or 0]Rating: [rating])
 Click on any homestay name to view details and make a booking!
 ```
 
@@ -54,7 +54,7 @@ Click on any homestay name to view details and make a booking!
 - ALWAYS embed links inside homestay usernames (never show raw URLs)
 - Use bullet points for listing homestays
 - Include rating and location info when available
-- Ensure all links use the exact format: [username](http://localhost:3000/homestays/username)
+- Ensure all links use the exact format: [username](https://dev.homesstay.org/homestays/username)
 - Extract the homestay usernames from the structured data, not from simple text'''
 )
     

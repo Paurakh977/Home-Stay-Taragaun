@@ -118,78 +118,68 @@ export default function AIChatBubble({ adminUsername }: AIChatBubbleProps) {
   };
 
   // Send message to ADK server
-  const sendToADKServer = async (mimeType: string, data: string) => {
-    try {
-      setIsLoading(true);
+
+const sendToADKServer = async (mimeType: string, data: string) => {
+  try {
+    setIsLoading(true);
+    
+    const payload = {
+      mime_type: mimeType,  
+      data: data,
+      user_id: USER_ID,     
+      adminUsername: adminUsername || undefined  
+    };
+
+    const response = await fetch('/api/adk/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Server responded with status: ${response.status} - ${errorData.error || 'Unknown error'}`);
+    }
+
+    const result = await response.json();
+    
+    if (result.success && result.response_text) {
+      // Convert markdown to HTML for proper formatting
+      const htmlContent = convertMarkdownToHtml(result.response_text);
       
-      const payload: any = {
-        mime_type: mimeType,
-        data: data
+      const aiResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        text: htmlContent,
+        isUser: false,
+        timestamp: new Date(),
       };
-
-      let response: Response;
-
-      if (adminUsername) {
-        // When used in admin dashboard, forward via internal API that attaches cookies
-        response = await fetch('/api/adk/send', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include', // include cookies for auth_token
-          body: JSON.stringify({ ...payload, user_id: USER_ID, adminUsername })
-        });
-      } else {
-        // Public usage - direct to ADK server without admin context
-        response = await fetch(`${ADK_API_BASE}/send/${USER_ID}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload)
-        });
-      }
-
-      if (!response.ok) {
-        throw new Error(`Server responded with status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (result.success && result.response_text) {
-        // Convert markdown to HTML for proper formatting
-        const htmlContent = convertMarkdownToHtml(result.response_text);
-        
-        const aiResponse: Message = {
-          id: (Date.now() + 1).toString(),
-          text: htmlContent,
-          isUser: false,
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, aiResponse]);
-      } else {
-        // Handle error case
-        const errorResponse: Message = {
-          id: (Date.now() + 1).toString(),
-          text: `Sorry, I encountered an error: ${result.error || 'Unknown error occurred'}`,
-          isUser: false,
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, errorResponse]);
-      }
-    } catch (error) {
-      console.error('Error communicating with ADK server:', error);
+      setMessages(prev => [...prev, aiResponse]);
+    } else {
+      // Handle error case
       const errorResponse: Message = {
         id: (Date.now() + 1).toString(),
-        text: 'Sorry, I\'m having trouble connecting to the server. Please try again later.',
+        text: `Sorry, I encountered an error: ${result.error || 'Unknown error occurred'}`,
         isUser: false,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, errorResponse]);
-    } finally {
-      setIsLoading(false);
     }
-  };
+  } catch (error) {
+    console.error('Error communicating with ADK server:', error);
+    const errorResponse: Message = {
+      id: (Date.now() + 1).toString(),
+      text: 'Sorry, I\'m having trouble connecting to the server. Please try again later.',
+      isUser: false,
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, errorResponse]);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const startRecording = async () => {
     try {

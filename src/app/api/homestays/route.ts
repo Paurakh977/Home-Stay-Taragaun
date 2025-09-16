@@ -156,13 +156,20 @@ export async function GET(req: NextRequest) {
     // Get query parameters
     const searchParams = req.nextUrl.searchParams;
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "10");
+    const limit = parseInt(searchParams.get("limit") || "12"); // Increased default limit
     const province = searchParams.get("province");
     const district = searchParams.get("district");
+    const municipality = searchParams.get("municipality");
+    const homeStayType = searchParams.get("homeStayType");
     const query = searchParams.get("q");
     const lang = searchParams.get("lang") || "ne"; // Default to Nepali
     const adminUsername = searchParams.get("adminUsername");
     const status = searchParams.get("status");
+    
+    // Facility filters
+    const localAttractions = searchParams.getAll("localAttractions");
+    const tourismServices = searchParams.getAll("tourismServices");
+    const infrastructure = searchParams.getAll("infrastructure");
     
     // Build filter
     const filter: any = {};
@@ -179,6 +186,7 @@ export async function GET(req: NextRequest) {
       filter.status = "approved"; // Default to showing only approved homestays
     }
     
+    // Address filters
     if (province) {
       // Handle both old and new schema
       if (province.includes('.')) {
@@ -201,9 +209,66 @@ export async function GET(req: NextRequest) {
       }
     }
     
-    if (query) {
-      filter.$text = { $search: query };
+    if (municipality) {
+      // Handle both old and new schema
+      if (municipality.includes('.')) {
+        // Direct path query
+        filter[municipality] = municipality;
+      } else {
+        // Assume new schema with bilingual fields
+        filter[`address.municipality.${lang}`] = municipality;
+      }
     }
+    
+    // Homestay type filter
+    if (homeStayType) {
+      filter.homeStayType = homeStayType;
+    }
+    
+    // Text search - use regex for better search across multiple fields
+    if (query) {
+      const searchRegex = new RegExp(query, 'i');
+      filter.$or = [
+        { homeStayName: searchRegex },
+        { villageName: searchRegex },
+        { description: searchRegex },
+        { 'address.formattedAddress.en': searchRegex },
+        { 'address.formattedAddress.ne': searchRegex }
+      ];
+    }
+    
+    // Facility filters - use $in to match any of the selected facilities in each category
+    const facilityFilters: any[] = [];
+    
+    if (localAttractions.length > 0) {
+      facilityFilters.push({
+        'features.localAttractions': { $in: localAttractions }
+      });
+    }
+    
+    if (tourismServices.length > 0) {
+      facilityFilters.push({
+        'features.tourismServices': { $in: tourismServices }
+      });
+    }
+    
+    if (infrastructure.length > 0) {
+      facilityFilters.push({
+        'features.infrastructure': { $in: infrastructure }
+      });
+    }
+    
+    // If we have facility filters, add them to the main filter
+    if (facilityFilters.length > 0) {
+      console.log("Applying facility filters:", facilityFilters);
+      if (filter.$and) {
+        filter.$and.push(...facilityFilters);
+      } else {
+        filter.$and = facilityFilters;
+      }
+    }
+    
+    console.log("Final filter object:", JSON.stringify(filter, null, 2));
     
     // Calculate pagination
     const skip = (page - 1) * limit;
@@ -213,7 +278,7 @@ export async function GET(req: NextRequest) {
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 })
-      .select("homestayId homeStayName villageName address homeStayType averageRating profileImage adminUsername")
+      .select("homestayId homeStayName villageName address homeStayType averageRating profileImage adminUsername features dhsrNo homeCount roomCount bedCount")
       .lean();
     
     // Format the response to handle bilingual address fields
