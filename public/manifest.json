@@ -1,6 +1,6 @@
 {
     "name": "NepalStayLink",
-    "short_name": "GOTUS",
+    "short_name": "NepalStayLink",
     "description": "A platfom for finding your perfect stay",
     "start_url": "/",
     "display": "standalone",
