@@ -1,4 +1,16 @@
 /** @type {import('next').NextConfig} */
+
+// @ts-ignore: no type definitions for next-pwa
+import withPWAInit from "next-pwa";
+
+
+const withPWA = withPWAInit({
+  dest: "public",
+  register: true,
+  skipWaiting: true,
+});
+
+
 const nextConfig = {
   /* config options here */
   // Ensure images work
@@ -103,4 +115,5 @@ const nextConfig = {
   }
 };
 
-module.exports = nextConfig;
+// module.exports = nextConfig;
+export default withPWA(nextConfig);

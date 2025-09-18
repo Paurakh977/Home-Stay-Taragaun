@@ -11,14 +11,20 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: {
-    template: '%s | Hamro Home Stay',
-    default: 'Hamro Home Stay | Authentic Nepali Homestay Experience',
+    template: 'NepalStayLink',
+    default: 'NepalStayLink | Authentic Nepali Homestay Experience',
   },
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/Logo.png",
+    apple: "/icons/icon-192x192.png",
+  },
+  themeColor: "#000000",
   description: "Experience authentic Nepali culture and hospitality with our carefully selected home stays across Nepal. Book your stay today!",
   keywords: ['homestay', 'Nepal', 'travel', 'authentic', 'accommodation', 'tourism', 'Nepali culture', 'hospitality'],
-  authors: [{ name: 'Hamro Home Stay Team' }],
-  creator: 'Hamro Home Stay',
-  publisher: 'Hamro Home Stay',
+  authors: [{ name: 'NepalStayLink Team' }],
+  creator: 'NepalStayLink',
+  publisher: 'NepalStayLink',
   formatDetection: {
     email: false,
     address: false,
@@ -29,16 +35,16 @@ export const metadata: Metadata = {
     canonical: '/',
   },
   openGraph: {
-    title: 'Hamro Home Stay | Authentic Nepali Homestay Experience',
+    title: 'NepalStayLink | Authentic Nepali Homestay Experience',
     description: 'Experience authentic Nepali culture and hospitality with our carefully selected home stays across Nepal.',
     url: 'https://hamrohomestay.com',
-    siteName: 'Hamro Home Stay',
+    siteName: 'NepalStayLink',
     images: [
       {
         url: '/images/og-image.jpg',
         width: 1200,
         height: 630,
-        alt: 'Hamro Home Stay - Authentic Nepali Homestays',
+        alt: 'NepalStayLink - Authentic Nepali Homestays',
       },
     ],
     locale: 'en_US',
@@ -46,7 +52,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Hamro Home Stay | Authentic Nepali Homestay Experience',
+    title: 'NepalStayLink | Authentic Nepali Homestay Experience',
     description: 'Experience authentic Nepali culture and hospitality with our carefully selected home stays across Nepal.',
     images: ['/images/twitter-image.jpg'],
   },
